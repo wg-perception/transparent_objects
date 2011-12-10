@@ -169,8 +169,10 @@ void findGlassMask(const Mat &bgrImage, const Mat &depthMat, int &numberOfCompon
   imshow("mask with registration", srcMask);
 #endif
   Mat registrationMask = imread("depthMask.png", CV_LOAD_IMAGE_GRAYSCALE);
-  CV_Assert(!registrationMask.empty());
-  srcMask.setTo(0, registrationMask);
+  if (!registrationMask.empty())
+  {
+    srcMask.setTo(0, registrationMask);
+  }
 #ifdef VISUALIZE
   imshow("mask without registration", srcMask);
 #endif

@@ -25,12 +25,8 @@ void PoseEstimator::addObject(const EdgeModel &_edgeModel)
 {
   edgeModel = _edgeModel;
 
-  //TODO: move to parameters
-  const int silhouetteCount = 10;
-  float downFactor = 1.0f;
-  int closingIterationsCount = 10;
   Ptr<const PinholeCamera> centralCameraPtr = new PinholeCamera(kinectCamera);
-  edgeModel.generateSilhouettes(centralCameraPtr, silhouetteCount, silhouettes, downFactor, closingIterationsCount);
+  edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
 }
 
 void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
@@ -43,8 +39,8 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
 void PoseEstimator::refinePosesByTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities, ros::Publisher *pt_pub) const
 {
   Vec4f tablePlane;
-  bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
-  //bool isEstimated = computeTableOrientation(fullSceneCloud, tablePlane);
+  //bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
+  bool isEstimated = computeTableOrientation(fullSceneCloud, tablePlane);
   CV_Assert(isEstimated);
 
   if (pt_pub != 0)
