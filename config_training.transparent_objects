@@ -1,0 +1,16 @@
+# info about the db
+db:
+  type: 'CouchDB'
+  root: 'http://localhost:5984'
+  collection: 'object_recognition'
+
+pipeline1:
+  method: 'transparent_objects'
+  package: 'transparent_objects'
+  submethod: ''
+  parameters:
+    K: [1,0,0,0,1,0,0,0,1]
+    D: []
+
+# The list of object_ids to analyze
+object_ids: "all"

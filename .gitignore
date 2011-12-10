@@ -1,0 +1,15 @@
+.svn
+*~
+*.png
+*.jpg
+build_*/
+data
+.settings
+.project
+.cproject
+._*
+build/
+*.pyc
+.pydevproject
+linemod
+mmod
