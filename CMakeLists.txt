@@ -1,5 +1,7 @@
 project(transparent_objects)
 
+SET(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 find_package(ecto REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(object_recognition REQUIRED)

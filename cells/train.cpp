@@ -39,23 +39,40 @@ namespace transparent_objects
     {
       std::cout  << __PRETTY_FUNCTION__ << *json_submethod_  <<std::endl;
       or_json::mValue submethod = object_recognition::to_json(*json_submethod_);
-      if (submethod.get_str() == "default")
+//      if (submethod.get_str() == "default")
       {
         {
           std::vector<float> K_value;
-          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_K_).get_array())
-            K_value.push_back(value.get_real());
-          *K_ = cv::Mat_<float>(K_value);
-          *K_ = (*K_).reshape(1, 3);
+          for (size_t i = 0; i < object_recognition::to_json(*json_K_).get_array().size(); ++i)
+          {
+            K_value.push_back(object_recognition::to_json(*json_K_).get_array()[i].get_real());
+          }
+
+//          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_K_).get_array())
+//                K_value.push_back(value.get_real());
+
+          K_ = cv::Mat(K_value);
+          K_ = (K_).reshape(1, 3);
         }
         {
           std::vector<float> D_value;
-          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_D_).get_array())
-            D_value.push_back(value.get_real());
-          *D_ = cv::Mat_<float>(D_value);
+//          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_D_).get_array())
+//            D_value.push_back(value.get_real());
+          for (size_t i = 0; i < object_recognition::to_json(*json_D_).get_array().size(); ++i)
+          {
+            D_value.push_back(object_recognition::to_json(*json_D_).get_array()[i].get_real());
+          }
+
+          if (D_value.empty())
+          {
+            const int distortionCoefficientsCount = 5;
+            D_value.resize(distortionCoefficientsCount, 0.0f);
+          }
+
+          D_ = cv::Mat(D_value);
         }
 
-        PinholeCamera camera(*K_, *D_);
+        PinholeCamera camera(K_, D_);
         *poseEstimator_ = new PoseEstimator(camera);
       }
     }
@@ -80,12 +97,13 @@ namespace transparent_objects
       readPointCloud(file_name, points, colors, normals);
 
       EdgeModel edgeModel(points, false);
+      assert(!poseEstimator_->empty());
       (*poseEstimator_)->addObject(edgeModel);
       std::cout << "done." << std::endl;
       return ecto::OK;
     }
 
-    spore<cv::Mat> K_, D_;
+    cv::Mat K_, D_;
     spore<std::string> json_K_, json_D_;
     spore<object_recognition::db::Document> document_;
     spore<cv::Ptr<PoseEstimator> > poseEstimator_;
