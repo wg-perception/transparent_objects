@@ -97,7 +97,7 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool centralize)
   {
     centralizedModel = inModel;
   }
-  centralizedModel.rotationAxis *= -1;
+//  centralizedModel.rotationAxis *= -1;
   setTableAnchor(centralizedModel);
   setStableEdgels(centralizedModel);
 
@@ -206,6 +206,7 @@ void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera,
 
 void EdgeModel::computePointsMask(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, float downFactor, int closingIterationsCount, cv::Mat &image, cv::Point &tl)
 {
+  CV_Assert(imageSize.height > 0 && imageSize.width > 0);
   bool isValid = false;
   int downRows = static_cast<int>(imageSize.height * downFactor);
   int downCols = static_cast<int>(imageSize.width * downFactor);
@@ -477,6 +478,7 @@ void EdgeModel::write(cv::FileStorage &fs) const
   fs << "normals" << Mat(normals);
   fs << "orientations" << Mat(orientations);
   fs << "rotationAxis" << Mat(rotationAxis);
+  fs << "tableAnchor" << Mat(tableAnchor);
   fs << "Rt_obj2cam" << Rt_obj2cam;
 
 //  fs << "}";
@@ -539,6 +541,11 @@ void EdgeModel::read(const cv::FileNode &fn)
   fn["rotationAxis"] >> rotationAxisMat;
   CV_Assert(!rotationAxisMat.empty());
   rotationAxis = Point3d(rotationAxisMat);
+  
+  Mat tableAnchorMat;
+  fn["tableAnchor"] >> tableAnchorMat;
+  CV_Assert(!tableAnchorMat.empty());
+  tableAnchor = Point3d(tableAnchorMat);
 
   fn["Rt_obj2cam"] >> Rt_obj2cam;
   CV_Assert(!Rt_obj2cam.empty());

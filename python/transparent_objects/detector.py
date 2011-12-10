@@ -4,6 +4,8 @@ Module defining the transparent objects detector to find objects in a scene
 """
 
 from object_recognition.pipelines.detection import DetectionPipeline
+import transparent_objects_cells
+
 
 ########################################################################################################################
 
@@ -15,7 +17,6 @@ class TransparentObjectsDetectionPipeline(DetectionPipeline):
         return 'transparent_objects'
 
     def detector(self, submethod, parameters, db_params, model_documents, args):
-        import transparent_objects
         #visualize = args.get('visualize', False)
         #threshold = parameters.get('threshold', 90)
-        return transparent_objects.Detector(model_documents=model_documents)
+        return transparent_objects_cells.Detector(model_documents=model_documents)

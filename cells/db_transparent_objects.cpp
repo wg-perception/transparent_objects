@@ -60,11 +60,10 @@ namespace object_recognition
 
       // Write it to disk
       std::ofstream writer(file_name.c_str());
-      writer << ss.rdbuf();
+      writer << ss.rdbuf() << std::flush;
 
       // Read it
-      cv::FileStorage fs(file_name, cv::FileStorage::READ);
-      value.read(fs.root());
+      value.read(file_name);
       boost::filesystem::remove(file_name.c_str());
     }
 

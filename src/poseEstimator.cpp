@@ -9,7 +9,12 @@
 #include "edges_pose_refiner/localPoseRefiner.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/cloud_viewer.h>
+
 #include <opencv2/opencv.hpp>
+#include <boost/thread/thread.hpp>
+
 
 using namespace cv;
 using std::cout;
@@ -671,4 +676,31 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
 
   fs << "confidentDomination" << confidentDomination;
   fs << "}";
+}
+
+void PoseEstimator::visualize(const cv::Mat &image, const PoseRT &pose, const std::string &title)
+{
+  displayEdgels(image, edgeModel.points, pose, kinectCamera, title);
+}
+
+void PoseEstimator::visualize(const pcl::PointCloud<pcl::PointXYZ> &scene, const PoseRT &pose, const std::string &title)
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer (title));
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> sceneColor(scene.makeShared(), 0, 255, 0);
+  viewer->addPointCloud<pcl::PointXYZ>(scene.makeShared(), sceneColor, "scene");
+
+
+  vector<Point3f> object;
+  project3dPoints(edgeModel.points, pose.getRvec(), pose.getTvec(), object);
+  pcl::PointCloud<pcl::PointXYZ> pclObject;
+  cv2pcl(object, pclObject);
+
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> objectColor(pclObject.makeShared(), 255, 0, 0);
+  viewer->addPointCloud<pcl::PointXYZ>(pclObject.makeShared(), objectColor, "object");
+
+  while (!viewer->wasStopped ())
+  {
+    viewer->spinOnce (100);
+    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+  }
 }

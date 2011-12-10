@@ -51,7 +51,7 @@ namespace transparent_objects
 //          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_K_).get_array())
 //                K_value.push_back(value.get_real());
 
-          K_ = cv::Mat(K_value);
+          K_ = cv::Mat(K_value).clone();
           K_ = (K_).reshape(1, 3);
         }
         {
@@ -69,10 +69,12 @@ namespace transparent_objects
             D_value.resize(distortionCoefficientsCount, 0.0f);
           }
 
-          D_ = cv::Mat(D_value);
+          D_ = cv::Mat(D_value).clone();
         }
 
-        PinholeCamera camera(K_, D_);
+        //TODO: fix
+        std::cout << "WARNING: hard-coded image size: fix me" << std::endl;
+        PinholeCamera camera(K_, D_, PoseRT(), cv::Size(640, 480));
         *poseEstimator_ = new PoseEstimator(camera);
       }
     }

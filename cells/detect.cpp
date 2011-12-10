@@ -11,6 +11,7 @@
 #include <opencv2/highgui/highgui.hpp>
 
 //#define TRANSPARENT_DEBUG
+#define VISUALIZE_DETECTION
 
 using ecto::tendrils;
 using ecto::spore;
@@ -27,7 +28,7 @@ namespace transparent_objects
       BOOST_FOREACH(const object_recognition::db::Document & document, db_documents)
           {
             // Load the detector for that class
-            document.get_attachment<PoseEstimator>("poseEstimator", *poseEstimator_);
+            document.get_attachment<PoseEstimator>("detector", *poseEstimator_);
 
             std::string object_id = document.get_value<ObjectId>("object_id");
             printf("Loaded %s\n", object_id.c_str());
@@ -59,7 +60,7 @@ namespace transparent_objects
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
       std::cout << "detector: configure" << std::endl;
-//      detector_ = linemod::getDefaultLINEMOD();
+      poseEstimator_ = new PoseEstimator(PinholeCamera());
     }
 
     int
@@ -69,12 +70,19 @@ namespace transparent_objects
 
       int numberOfComponents;
       cv::Mat glassMask;
-      findGlassMask(*color_, *depth_, numberOfComponents, glassMask);
+      //TOOD: fix
+      std::cout << "WARNING: hard-coded parameters" << std::endl;
+      findGlassMask(*color_, *depth_, numberOfComponents, glassMask, 8, 15, 8);
+#ifdef VISUALIZE_DETECTION
+      imshow("glassMask", glassMask);
+      cv::waitKey(100);
+#endif
+      
 #ifdef TRANSPARENT_DEBUG
       cv::imwrite("color.png", *color_);
       cv::imwrite("depth.png", *depth_);
       cv::imwrite("glass.png", glassMask);
-      FileStorage fs("input.xml", FileStorage::WRITE);
+      cv::FileStorage fs("input.xml", cv::FileStorage::WRITE);
       fs << "K" << *K_;
       fs << "image" << *color_;
       fs << "depth" << *depth_;
@@ -94,6 +102,7 @@ namespace transparent_objects
       cv2pcl(cvCloud, pclCloud);
 
 #ifdef TRANSPARENT_DEBUG
+/*
       cv::Mat D = cv::Mat::zeros(5, 1, CV_32FC1);
       PinholeCamera camera(*K_, D);
       poseEstimator_ = new PoseEstimator(camera);
@@ -104,6 +113,7 @@ namespace transparent_objects
 
       EdgeModel edgeModel(points, false);
       poseEstimator_->addObject(edgeModel);
+*/      
 #endif
       assert(!poseEstimator_.empty());
       std::cout << "starting to estimate pose..." << std::endl;
@@ -114,6 +124,13 @@ namespace transparent_objects
       rvecs_->push_back(poses[0].getRvec());
       tvecs_->push_back(poses[0].getTvec());
       object_ids_->push_back("object_id");
+
+#ifdef VISUALIZE_DETECTION
+      poseEstimator_->visualize(*color_, poses[0]);
+      cv::waitKey(1000);
+      poseEstimator_->visualize(pclCloud, poses[0]);
+#endif
+
       return ecto::OK;
     }
 
