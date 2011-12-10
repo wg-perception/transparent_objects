@@ -37,7 +37,7 @@ namespace transparent_objects
     void
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
-      std::cout  <<*json_submethod_  <<std::endl;
+      std::cout  << __PRETTY_FUNCTION__ << *json_submethod_  <<std::endl;
       or_json::mValue submethod = object_recognition::to_json(*json_submethod_);
       if (submethod.get_str() == "default")
       {
@@ -63,6 +63,7 @@ namespace transparent_objects
     int
     process(const tendrils& inputs, const tendrils& outputs)
     {
+      std::cout << "training..." << std::endl;
       // Get the binary file
       char buffer [L_tmpnam];
       char *p = std::tmpnam (buffer);
@@ -80,6 +81,7 @@ namespace transparent_objects
 
       EdgeModel edgeModel(points, false);
       (*poseEstimator_)->addObject(edgeModel);
+      std::cout << "done." << std::endl;
       return ecto::OK;
     }
 

@@ -16,6 +16,11 @@
 
 struct PoseEstimatorParams
 {
+  //training parameters
+  int silhouetteCount;
+  float downFactor;
+  int closingIterationsCount;
+
   //plane estimation parameters
   float downLeafSize;
   int kSearch;
@@ -32,6 +37,10 @@ struct PoseEstimatorParams
 
   PoseEstimatorParams()
   {
+    silhouetteCount = 10;
+    downFactor = 1.0f;
+    closingIterationsCount = 10;
+
     minGlassContourLength = 10;
 
     downLeafSize = 0.001f;
@@ -54,7 +63,8 @@ class PoseEstimator
 public:
   PoseEstimator(const PinholeCamera &kinectCamera, const PoseEstimatorParams &params = PoseEstimatorParams());
   void addObject(const EdgeModel &edgeModel);
-  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const;
+  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities) const;
+
   void read(const std::string &filename);
   void read(const cv::FileNode& fn);
   void write(const std::string &filename) const;
@@ -68,10 +78,11 @@ private:
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, ros::Publisher *pt_pub = 0, const cv::Mat finalJacobian = cv::Mat()) const;
   void refinePosesByTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities, ros::Publisher *pt_pub = 0) const;
 
-  PoseEstimatorParams params;
-  PinholeCamera kinectCamera;
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;
+
+  PoseEstimatorParams params;
+  PinholeCamera kinectCamera;
 };
 
 #endif /* POSEESTIMATOR_HPP_ */

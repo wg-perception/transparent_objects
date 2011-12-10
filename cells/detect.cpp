@@ -8,6 +8,9 @@
 #include <edges_pose_refiner/utils.hpp>
 #include "db_transparent_objects.hpp"
 
+#include <opencv2/highgui/highgui.hpp>
+
+//#define TRANSPARENT_DEBUG
 
 using ecto::tendrils;
 using ecto::spore;
@@ -67,6 +70,19 @@ namespace transparent_objects
       int numberOfComponents;
       cv::Mat glassMask;
       findGlassMask(*color_, *depth_, numberOfComponents, glassMask);
+#ifdef TRANSPARENT_DEBUG
+      cv::imwrite("color.png", *color_);
+      cv::imwrite("depth.png", *depth_);
+      cv::imwrite("glass.png", glassMask);
+      FileStorage fs("input.xml", FileStorage::WRITE);
+      fs << "K" << *K_;
+      fs << "image" << *color_;
+      fs << "depth" << *depth_;
+      fs << "points3d" << *cloud_;
+      fs.release();
+#endif
+
+
 //      assert(numberOfComponents == 1);
 
       std::vector<PoseRT> poses;
@@ -76,7 +92,23 @@ namespace transparent_objects
       std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
       pcl::PointCloud<pcl::PointXYZ> pclCloud;
       cv2pcl(cvCloud, pclCloud);
+
+#ifdef TRANSPARENT_DEBUG
+      cv::Mat D = cv::Mat::zeros(5, 1, CV_32FC1);
+      PinholeCamera camera(*K_, D);
+      poseEstimator_ = new PoseEstimator(camera);
+
+      std::vector<cv::Point3f> points, normals;
+      std::vector<cv::Point3i> colors;
+      readPointCloud("cloud.ply", points, colors, normals);
+
+      EdgeModel edgeModel(points, false);
+      poseEstimator_->addObject(edgeModel);
+#endif
+      assert(!poseEstimator_.empty());
+      std::cout << "starting to estimate pose..." << std::endl;
       poseEstimator_->estimatePose(*color_, glassMask, pclCloud, poses, posesQualities);
+      std::cout << "done." << std::endl;
       assert(!poses.empty());
       //TODO: add detection
       rvecs_->push_back(poses[0].getRvec());
