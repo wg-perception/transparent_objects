@@ -58,7 +58,7 @@ struct EdgeModel
   /** \brief Empty constructor */
   EdgeModel();
 
-  EdgeModel(const std::vector<cv::Point3f> &points, bool centralize);
+  EdgeModel(const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize);
 
   /** \brief Create deep copy of the edgeModel object */
   EdgeModel(const EdgeModel &edgeModel);

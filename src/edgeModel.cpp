@@ -75,7 +75,7 @@ EdgeModel::EdgeModel()
 {
 }
 
-EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool centralize)
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel inModel;
   inModel.rotationAxis = Point3d(0.0, 0.0, 1.0);
@@ -97,7 +97,10 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool centralize)
   {
     centralizedModel = inModel;
   }
-//  centralizedModel.rotationAxis *= -1;
+  if (isModelUpsideDown)
+  {
+    centralizedModel.rotationAxis *= -1;
+  }
   setTableAnchor(centralizedModel);
   setStableEdgels(centralizedModel);
 

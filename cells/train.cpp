@@ -98,7 +98,7 @@ namespace transparent_objects
       std::vector<cv::Point3i> colors;
       readPointCloud(file_name, points, colors, normals);
 
-      EdgeModel edgeModel(points, false);
+      EdgeModel edgeModel(points, true, false);
       assert(!poseEstimator_->empty());
       (*poseEstimator_)->addObject(edgeModel);
       std::cout << "done." << std::endl;
