@@ -61,6 +61,7 @@ namespace transparent_objects
     {
       std::cout << "detector: configure" << std::endl;
       poseEstimator_ = new PoseEstimator(PinholeCamera());
+      std::cout << "detector: leaving configure" << std::endl;
     }
 
     int
@@ -72,7 +73,7 @@ namespace transparent_objects
       cv::Mat glassMask;
       //TOOD: fix
       std::cout << "WARNING: hard-coded parameters" << std::endl;
-      findGlassMask(*color_, *depth_, numberOfComponents, glassMask, 8, 15, 8);
+      findGlassMask(*color_, *depth_, numberOfComponents, glassMask);
 #ifdef VISUALIZE_DETECTION
       imshow("glassMask", glassMask);
       cv::waitKey(100);
@@ -127,7 +128,7 @@ namespace transparent_objects
 
 #ifdef VISUALIZE_DETECTION
       poseEstimator_->visualize(*color_, poses[0]);
-      cv::waitKey(1000);
+      cv::waitKey(3000);
       poseEstimator_->visualize(pclCloud, poses[0]);
 #endif
 
