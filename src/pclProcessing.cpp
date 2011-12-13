@@ -27,6 +27,9 @@
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
 
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+
 #include <pcl/common/transform.h>
 
 #include <opencv2/opencv.hpp>
@@ -132,7 +135,7 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
   coefficients->values[2] = 1;
 }
 
-bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull)
+bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance)
 {
   cout << "all points: " << fullSceneCloud.points.size() << endl;
 
@@ -162,11 +165,35 @@ bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::Po
 
   if (tableHull != 0)
   {
-
     pcl::PointCloud<pcl::PointXYZ> projectedInliers;
     projectInliersOnTable(sceneCloud, inliers, coefficients, projectedInliers);
 
-    reconstructConvexHull(projectedInliers, *tableHull);
+//    reconstructConvexHull(projectedInliers, *tableHull);
+
+
+    pcl::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::KdTreeFLANN<pcl::PointXYZ>);
+    tree->setInputCloud(projectedInliers.makeShared());
+
+    std::vector<pcl::PointIndices> clusterIndices;
+    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    ec.setClusterTolerance(clusterTolerance);
+    ec.setSearchMethod(tree);
+    ec.setInputCloud(projectedInliers.makeShared());
+    ec.extract(clusterIndices);
+
+    int maxClusterIndex = 0;
+    for (size_t i = 1; i < clusterIndices.size(); ++i)
+    {
+      if (clusterIndices[maxClusterIndex].indices.size() < clusterIndices[i].indices.size())
+      {
+        maxClusterIndex = i;
+      }
+    }
+
+    pcl::PointCloud<pcl::PointXYZ> table;
+    extractPointCloud(projectedInliers, boost::make_shared<pcl::PointIndices>(clusterIndices[maxClusterIndex]), table);
+
+    reconstructConvexHull(table, *tableHull);
   }
 
 
