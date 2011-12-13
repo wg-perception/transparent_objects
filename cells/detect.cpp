@@ -96,6 +96,10 @@ namespace transparent_objects
         std::cerr << "Cannot find a table plane" << std::endl;
         return ecto::OK;
       }
+      else
+      {
+        std::cout << "table plane is estimated" << std::endl;
+      }
 
       int numberOfComponents;
       cv::Mat glassMask;

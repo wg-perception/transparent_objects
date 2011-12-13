@@ -10,7 +10,7 @@ using std::endl;
 
 //#define VISUALIZE
 
-//#define VISUALIZE_TABLE
+#define VISUALIZE_TABLE
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");
@@ -206,8 +206,8 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
 #endif
   Mat registrationMask = imread("depthMask.png", CV_LOAD_IMAGE_GRAYSCALE);
   CV_Assert(!registrationMask.empty());
+  CV_Assert(registrationMask.size() == depthMat.size());
   srcMask.setTo(0, registrationMask);
-
   if (camera != 0 && tablePlane != 0 && tableHull != 0)
   {
     refineGlassMaskByTableOrientation(*camera, *tablePlane, *tableHull, srcMask);
