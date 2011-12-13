@@ -1,10 +1,17 @@
 project(transparent_objects)
-
-SET(CMAKE_BUILD_TYPE RelWithDebInfo)
+#this needs a stanza to prevent overwrite.
+if(NOT CMAKE_BUILD_TYPE)#Only do this the on the first run, if the build type hasn't been set prior
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
+    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+  FORCE)
+endif()
 
 find_package(ecto REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(object_recognition REQUIRED)
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
                     ${object_recognition_INCLUDE_DIRS}
