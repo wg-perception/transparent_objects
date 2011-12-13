@@ -90,9 +90,7 @@ namespace transparent_objects
 
       int numberOfComponents;
       cv::Mat glassMask;
-      GlassSegmentationParams params;
-      params.openingIterations = 3;
-      GlassSegmentator glassSegmentator(params);
+      GlassSegmentator glassSegmentator;
       PinholeCamera camera(*K_);
       glassSegmentator.segment(*color_, *depth_, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
 

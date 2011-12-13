@@ -228,7 +228,11 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
   Mat glassImage(mask.size(), CV_8UC1, Scalar(0));
   drawContours(glassImage, contours, -1, Scalar(255), -1);
 
-  morphologyEx(srcMask, srcMask, MORPH_CLOSE, Mat(), Point(-1, -1), params.finalClosingIterations);
+  int elementSize = params.finalClosingIterations * 2 + 1;
+  Mat structuringElement = getStructuringElement(MORPH_ELLIPSE, Size(elementSize, elementSize), Point(params.finalClosingIterations, params.finalClosingIterations));
+  morphologyEx(srcMask, srcMask, MORPH_CLOSE, structuringElement, Point(params.finalClosingIterations, params.finalClosingIterations));
+
+//  morphologyEx(srcMask, srcMask, MORPH_CLOSE, Mat(), Point(-1, -1), params.finalClosingIterations);
 #ifdef VISUALIZE
   imshow("final closing", srcMask);
 #endif

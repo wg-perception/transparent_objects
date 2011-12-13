@@ -25,9 +25,9 @@ struct GlassSegmentationParams
 
   GlassSegmentationParams()
   {
-    closingIterations = 8;
-    openingIterations = 15;
-    finalClosingIterations = 8;
+    closingIterations = 12;
+    openingIterations = 6;
+    finalClosingIterations = 15;
 
     useGrabCut = true;
     grabCutIterations = 2;
