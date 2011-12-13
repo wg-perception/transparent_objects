@@ -47,7 +47,11 @@ void PoseEstimator::refinePosesByTableOrientation(const pcl::PointCloud<pcl::Poi
   Vec4f tablePlane;
   //bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
   bool isEstimated = computeTableOrientation(fullSceneCloud, tablePlane);
-  CV_Assert(isEstimated);
+  if (!isEstimated)
+  {
+    std::cerr << "Cannot find a table plane" << std::endl;
+    return;
+  }
 
   if (pt_pub != 0)
   {
@@ -242,7 +246,11 @@ bool PoseEstimator::computeTableOrientation(const pcl::PointCloud<pcl::PointXYZ>
 
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-  segmentTable(params.distanceThreshold, sceneCloud, sceneNormals, inliers, coefficients);
+  bool isTableSegmented = segmentTable(params.distanceThreshold, sceneCloud, sceneNormals, inliers, coefficients);
+  if (!isTableSegmented)
+  {
+    return false;
+  }
   cout << "inliers: " << inliers->indices.size () << endl;
 
   const int coeffsCount = 4;

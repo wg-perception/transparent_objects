@@ -60,7 +60,7 @@ void estimateNormals(int kSearch, const pcl::PointCloud<pcl::PointXYZ> &cloud, p
   normalsEstimator.compute(normals);
 }
 
-void segmentTable(float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &cloud, const pcl::PointCloud<pcl::Normal> &normals, pcl::PointIndices::Ptr &inliers, pcl::ModelCoefficients::Ptr &coefficients)
+bool segmentTable(float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &cloud, const pcl::PointCloud<pcl::Normal> &normals, pcl::PointIndices::Ptr &inliers, pcl::ModelCoefficients::Ptr &coefficients)
 {
   pcl::SACSegmentationFromNormals<pcl::PointXYZ, pcl::Normal> tableSegmentator;
 
@@ -73,7 +73,7 @@ void segmentTable(float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> 
   tableSegmentator.setInputNormals(normals.makeShared());
   tableSegmentator.segment(*inliers, *coefficients);
 
-  CV_Assert(!inliers->indices.empty());
+  return !inliers->indices.empty(); 
 }
 
 void projectInliersOnTable(const pcl::PointCloud<pcl::PointXYZ> &cloud, const pcl::PointIndices::ConstPtr &inliers, const pcl::ModelCoefficients::ConstPtr &coefficients, pcl::PointCloud<pcl::PointXYZ> &projectedInliers)
