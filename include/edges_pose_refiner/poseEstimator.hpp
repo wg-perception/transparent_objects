@@ -45,7 +45,7 @@ struct PoseEstimatorParams
 
     downLeafSize = 0.001f;
     kSearch = 10;
-    distanceThreshold = 0.01f;
+    distanceThreshold = 0.02f;
 
     cannyThreshold1 = 25;
     cannyThreshold2 = 50;
