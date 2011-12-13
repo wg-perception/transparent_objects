@@ -32,6 +32,7 @@ struct PoseEstimatorParams
   int dilationsForEdgesRemovalCount;
 
   size_t minGlassContourLength;
+  double minGlassContourArea;
 
   float confidentDomination;
 
@@ -42,6 +43,8 @@ struct PoseEstimatorParams
     closingIterationsCount = 10;
 
     minGlassContourLength = 10;
+    //TODO: use in persistence
+    minGlassContourArea = 64.0;
 
     downLeafSize = 0.001f;
     kSearch = 10;

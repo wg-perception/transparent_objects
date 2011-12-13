@@ -403,6 +403,11 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
       continue;
     }
 
+    if (contourArea(allGlassContours[contourIndex]) < params.minGlassContourArea)
+    {
+      continue;
+    }
+
     vector<Mat> affineTransformations(silhouettes.size());
     vector<float> poseQualities(silhouettes.size());
 
