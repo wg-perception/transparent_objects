@@ -31,7 +31,7 @@ struct GlassSegmentationParams
 
     useGrabCut = true;
     grabCutIterations = 2;
-    grabCutErosionsIterations = 10;
+    grabCutErosionsIterations = 6;
     grabCutMargin = 10;    
 
     fillConvex = false;
