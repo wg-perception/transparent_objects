@@ -15,6 +15,7 @@
 #include <opencv2/opencv.hpp>
 #include <boost/thread/thread.hpp>
 
+//#define VISUALIZE_TABLE_ESTIMATION
 
 using namespace cv;
 using std::cout;
@@ -231,8 +232,9 @@ bool PoseEstimator::computeTableOrientation(const pcl::PointCloud<pcl::PointXYZ>
   cout << "all points: " << fullSceneCloud.points.size() << endl;
 
   pcl::PointCloud<pcl::PointXYZ> sceneCloud;
-  downsample(params.downLeafSize, fullSceneCloud, sceneCloud);
-  cout << "down points: " << sceneCloud.points.size() << endl;
+//  downsample(params.downLeafSize, fullSceneCloud, sceneCloud);
+//  cout << "down points: " << sceneCloud.points.size() << endl;
+  sceneCloud = fullSceneCloud;
 
   pcl::PointCloud<pcl::Normal> sceneNormals;
   estimateNormals(params.kSearch, sceneCloud, sceneNormals);
@@ -249,19 +251,19 @@ bool PoseEstimator::computeTableOrientation(const pcl::PointCloud<pcl::PointXYZ>
     tablePlane[i] = coefficients->values[i];
   }
 
-#ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
+#ifdef VISUALIZE_TABLE_ESTIMATION
   pcl::PointCloud<pcl::PointXYZ> table;
   extractPointCloud(sceneCloud, inliers, table);
 
-  pcl_visualization::CloudViewer viewer ("test cloud");
-  viewer.showCloud(sceneCloud, "points");
+  pcl::visualization::CloudViewer viewer ("test cloud");
+  viewer.showCloud(sceneCloud.makeShared(), "points");
 
   while (!viewer.wasStopped ())
   {
   }
 
-  pcl_visualization::CloudViewer viewer2 ("table");
-  viewer2.showCloud(table, "table");
+  pcl::visualization::CloudViewer viewer2 ("table");
+  viewer2.showCloud(table.makeShared(), "table");
   while (!viewer2.wasStopped ())
   {
   }
