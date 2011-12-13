@@ -10,6 +10,8 @@ using std::endl;
 
 //#define VISUALIZE
 
+//#define VISUALIZE_TABLE
+
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");
 
@@ -166,12 +168,16 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
   vector<Point2f> projectedHull;
   camera.projectPoints(tableHull, PoseRT(), projectedHull);
 
-//  cvtColor(glassMask, refinedGlassMask, CV_GRAY2BGR);
-//  for (size_t i = 0; i < projectedHull.size(); ++i)
-//  {
-//    circle(refinedGlassMask, projectedHull[i], 2, Scalar(0, 0, 255), -1);
-//    line(refinedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0));
-//  }
+#ifdef VISUALIZE_TABLE
+  Mat visualizedGlassMask;
+  cvtColor(glassMask, visualizedGlassMask, CV_GRAY2BGR);
+  for (size_t i = 0; i < projectedHull.size(); ++i)
+  {
+    circle(visualizedGlassMask, projectedHull[i], 2, Scalar(0, 0, 255), -1);
+    line(visualizedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0));
+  }
+  imshow("table", visualizedGlassMask);
+#endif
 
   vector<vector<Point> > contours;
   Mat copyGlassMask = glassMask.clone();
