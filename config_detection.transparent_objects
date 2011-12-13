@@ -4,13 +4,17 @@ db:
   root: 'http://localhost:5984'
   collection: 'object_recognition'
 
+source:
+  type: ros_kinect
+  rgb_frame_id: '/camera_rgb_optical_frame'
+sink:
+  type: publisher
+
 pipeline1:
   method: 'transparent_objects'
   package: 'transparent_objects'
   submethod: ''
-  parameters:
-    K: [525., 0., 319.5, 0., 525., 239.5, 0., 0., 1.]
-    D: []
+  parameters: ''
 
 # The list of object_ids to analyze
 object_ids: "all"
