@@ -8,7 +8,7 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-#define VISUALIZE
+//#define VISUALIZE
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");
