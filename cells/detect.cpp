@@ -6,6 +6,7 @@
 #include <edges_pose_refiner/poseEstimator.hpp>
 #include <edges_pose_refiner/glassDetector.hpp>
 #include <edges_pose_refiner/utils.hpp>
+#include <edges_pose_refiner/pclProcessing.hpp>
 #include "db_transparent_objects.hpp"
 
 #include <opencv2/highgui/highgui.hpp>
@@ -69,9 +70,32 @@ namespace transparent_objects
     {
       std::cout << "detector: process" << std::endl;
 
+      assert(cloud_->channels() == 3);
+      std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
+      pcl::PointCloud<pcl::PointXYZ> pclCloud;
+      cv2pcl(cvCloud, pclCloud);
+
+      cv::Vec4f tablePlane;
+      pcl::PointCloud<pcl::PointXYZ> tableHull;
+      int kSearch = 10;
+      float distanceThreshold = 0.02f;
+      std::cout << "WARNING: hard-coded parameters" << std::endl;
+      //TODO: fix
+      bool isEstimated = computeTableOrientation(kSearch, distanceThreshold, pclCloud, tablePlane, &tableHull);
+      if (!isEstimated)
+      {
+        std::cerr << "Cannot find a table plane" << std::endl;
+        return ecto::OK;
+      }
+
       int numberOfComponents;
       cv::Mat glassMask;
-      findGlassMask(*color_, *depth_, numberOfComponents, glassMask);
+      GlassSegmentationParams params;
+      params.openingIterations = 3;
+      GlassSegmentator glassSegmentator(params);
+      PinholeCamera camera(*K_);
+      glassSegmentator.segment(*color_, *depth_, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
+
 #ifdef VISUALIZE_DETECTION
       imshow("glassMask", glassMask);
       cv::waitKey(100);
@@ -95,10 +119,6 @@ namespace transparent_objects
       std::vector<PoseRT> poses;
       std::vector<float> posesQualities;
 
-      assert(cloud_->channels() == 3);
-      std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
-      pcl::PointCloud<pcl::PointXYZ> pclCloud;
-      cv2pcl(cvCloud, pclCloud);
 
 #ifdef TRANSPARENT_DEBUG
 /*
@@ -116,9 +136,14 @@ namespace transparent_objects
 #endif
       assert(!poseEstimator_.empty());
       std::cout << "starting to estimate pose..." << std::endl;
-      poseEstimator_->estimatePose(*color_, glassMask, pclCloud, poses, posesQualities);
+      poseEstimator_->estimatePose(*color_, glassMask, pclCloud, poses, posesQualities, &tablePlane);
       std::cout << "done." << std::endl;
-      assert(!poses.empty());
+      if (poses.empty())
+      {
+        std::cerr << "Cannot estimate a pose" << std::endl;
+        return ecto::OK;
+      }
+
       //TODO: add detection
       rvecs_->push_back(poses[0].getRvec());
       tvecs_->push_back(poses[0].getTvec());

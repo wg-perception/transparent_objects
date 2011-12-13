@@ -63,7 +63,7 @@ class PoseEstimator
 public:
   PoseEstimator(const PinholeCamera &kinectCamera, const PoseEstimatorParams &params = PoseEstimatorParams());
   void addObject(const EdgeModel &edgeModel);
-  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities) const;
+  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities, const cv::Vec4f *tablePlane = 0) const;
 
   void read(const std::string &filename);
   void read(const cv::FileNode& fn);
@@ -76,10 +76,9 @@ private:
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
   void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities) const;
-  bool computeTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane) const;
   bool tmpComputeTableOrientation(const cv::Mat &centralBgrImage, cv::Vec4f &tablePlane, ros::Publisher *pt_pub) const;
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, ros::Publisher *pt_pub = 0, const cv::Mat finalJacobian = cv::Mat()) const;
-  void refinePosesByTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities, ros::Publisher *pt_pub = 0) const;
+  void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities, ros::Publisher *pt_pub = 0) const;
 
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;

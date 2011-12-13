@@ -13,7 +13,15 @@ using namespace cv;
 PinholeCamera::PinholeCamera(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const PoseRT &_extrinsics, const cv::Size &_imageSize)
 {
   cameraMatrix = _cameraMatrix;
-  distCoeffs = _distCoeffs;
+  if (_distCoeffs.empty())
+  {
+    const int distCoeffsCount = 5;
+    distCoeffs = Mat::zeros(distCoeffsCount, 1, CV_32FC1);
+  }
+  else
+  {
+    distCoeffs = _distCoeffs;
+  }
   extrinsics = _extrinsics;
   imageSize = _imageSize;
 }

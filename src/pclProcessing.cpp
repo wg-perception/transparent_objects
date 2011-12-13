@@ -33,6 +33,9 @@
 
 using namespace cv;
 
+using std::cout;
+using std::endl;
+
 void downsample(float downLeafSize, pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
   pcl::VoxelGrid<pcl::PointXYZ> downsampler;
@@ -127,4 +130,63 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
   coefficients->values[0] = 0;
   coefficients->values[1] = 0;
   coefficients->values[2] = 1;
+}
+
+bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull)
+{
+  cout << "all points: " << fullSceneCloud.points.size() << endl;
+
+  pcl::PointCloud<pcl::PointXYZ> sceneCloud;
+//  downsample(params.downLeafSize, fullSceneCloud, sceneCloud);
+//  cout << "down points: " << sceneCloud.points.size() << endl;
+  sceneCloud = fullSceneCloud;
+
+  pcl::PointCloud<pcl::Normal> sceneNormals;
+  estimateNormals(kSearch, sceneCloud, sceneNormals);
+  cout << "normals: " << sceneNormals.points.size() << endl;
+
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+  bool isTableSegmented = segmentTable(distanceThreshold, sceneCloud, sceneNormals, inliers, coefficients);
+  if (!isTableSegmented)
+  {
+    return false;
+  }
+  cout << "inliers: " << inliers->indices.size () << endl;
+
+  const int coeffsCount = 4;
+  for (int i = 0; i < coeffsCount; ++i)
+  {
+    tablePlane[i] = coefficients->values[i];
+  }
+
+  if (tableHull != 0)
+  {
+
+    pcl::PointCloud<pcl::PointXYZ> projectedInliers;
+    projectInliersOnTable(sceneCloud, inliers, coefficients, projectedInliers);
+
+    reconstructConvexHull(projectedInliers, *tableHull);
+  }
+
+
+#ifdef VISUALIZE_TABLE_ESTIMATION
+  pcl::PointCloud<pcl::PointXYZ> table;
+  extractPointCloud(sceneCloud, inliers, table);
+
+  pcl::visualization::CloudViewer viewer ("test cloud");
+  viewer.showCloud(sceneCloud.makeShared(), "points");
+
+  while (!viewer.wasStopped ())
+  {
+  }
+
+  pcl::visualization::CloudViewer viewer2 ("table");
+  viewer2.showCloud(table.makeShared(), "table");
+  while (!viewer2.wasStopped ())
+  {
+  }
+#endif
+
+  return true;
 }

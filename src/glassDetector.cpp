@@ -154,7 +154,40 @@ void readDepthImage(const string &filename, Mat &depthMat)
   fs.release();
 }
 
-void findGlassMask(const Mat &bgrImage, const Mat &depthMat, int &numberOfComponents, Mat &glassMask, const GlassSegmentationParams &params)
+GlassSegmentator::GlassSegmentator(const GlassSegmentationParams &_params)
+{
+  params = _params;
+}
+
+void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Vec4f &tablePlane, const pcl::PointCloud<pcl::PointXYZ> &pclTableHull, cv::Mat &glassMask)
+{
+  vector<Point3f> tableHull;
+  pcl2cv(pclTableHull, tableHull);
+  vector<Point2f> projectedHull;
+  camera.projectPoints(tableHull, PoseRT(), projectedHull);
+
+//  cvtColor(glassMask, refinedGlassMask, CV_GRAY2BGR);
+//  for (size_t i = 0; i < projectedHull.size(); ++i)
+//  {
+//    circle(refinedGlassMask, projectedHull[i], 2, Scalar(0, 0, 255), -1);
+//    line(refinedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0));
+//  }
+
+  vector<vector<Point> > contours;
+  Mat copyGlassMask = glassMask.clone();
+  findContours(copyGlassMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  for (size_t i = 0; i < contours.size(); ++i)
+  {
+    Moments moms = moments(contours[i]);
+    Point2f centroid(moms.m10 / moms.m00, moms.m01 / moms.m00);
+    if (pointPolygonTest(projectedHull, centroid, false) < 0)
+    {
+      drawContours(glassMask, contours, i, Scalar(0, 0, 0), -1);
+    }
+  }
+}
+
+void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
 //  Mat srcMask = depthMat == 0;
   Mat srcMask = (depthMat != depthMat);
@@ -168,11 +201,16 @@ void findGlassMask(const Mat &bgrImage, const Mat &depthMat, int &numberOfCompon
   Mat registrationMask = imread("depthMask.png", CV_LOAD_IMAGE_GRAYSCALE);
   CV_Assert(!registrationMask.empty());
   srcMask.setTo(0, registrationMask);
-  
+
+  if (camera != 0 && tablePlane != 0 && tableHull != 0)
+  {
+    refineGlassMaskByTableOrientation(*camera, *tablePlane, *tableHull, srcMask);
+  }
+
 #ifdef VISUALIZE
   imshow("mask without registration", srcMask);
 #endif
-  
+
   Mat mask = srcMask.clone();
   morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), params.closingIterations);
 #ifdef VISUALIZE
@@ -243,3 +281,4 @@ void findGlassMask(const Mat &bgrImage, const Mat &depthMat, int &numberOfCompon
   waitKey();
 #endif
 }
+

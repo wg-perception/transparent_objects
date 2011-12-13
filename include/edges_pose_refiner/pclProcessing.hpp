@@ -13,6 +13,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/ModelCoefficients.h>
 
+#include <opencv2/core/core.hpp>
+
 void downsample(float downLeafSize, pcl::PointCloud<pcl::PointXYZ> &cloud);
 void downsample(float downLeafSize, const pcl::PointCloud<pcl::PointXYZ> &inCloud, pcl::PointCloud<pcl::PointXYZ> &outCloud);
 
@@ -29,5 +31,7 @@ void extractPointCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, const pcl::P
 void segmentObjects(float minZ, float maxZ, const pcl::PointCloud<pcl::PointXYZ> &cloud, const pcl::PointCloud<pcl::PointXYZ> &tableHull, pcl::PointIndices::Ptr objectsIndices);
 
 void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointCloud<pcl::PointXYZ> &sceneCloud, pcl::PointCloud<pcl::PointXYZ> &projectedInliers, pcl::PointCloud<pcl::PointXYZ> &tableHull);
+
+bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull = 0);
 
 #endif /* PCLPROCESSING_HPP_ */

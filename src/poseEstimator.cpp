@@ -35,23 +35,30 @@ void PoseEstimator::addObject(const EdgeModel &_edgeModel)
   edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
 }
 
-void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
+void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
 {
-  getInitialPoses(glassMask, poses_cam, posesQualities);
-  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
-  refinePosesByTableOrientation(fullSceneCloud, kinectBgrImage, glassMask, poses_cam, posesQualities);
-}
-
-void PoseEstimator::refinePosesByTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities, ros::Publisher *pt_pub) const
-{
-  Vec4f tablePlane;
-  //bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
-  bool isEstimated = computeTableOrientation(fullSceneCloud, tablePlane);
-  if (!isEstimated)
+  if (silhouettes.empty())
   {
-    std::cerr << "Cannot find a table plane" << std::endl;
+    std::cerr << "PoseEstimator is not initialized" << std::endl;
     return;
   }
+
+  getInitialPoses(glassMask, poses_cam, posesQualities);
+  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
+  if (tablePlane != 0)
+  {
+    refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
+  }
+}
+
+void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities, ros::Publisher *pt_pub) const
+{
+  if (poses_cam.empty())
+  {
+    return;
+  }
+
+  //bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
 
   if (pt_pub != 0)
   {
@@ -229,55 +236,6 @@ void PoseEstimator::findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f 
   PoseRT transform2table_cam(Rt_cam);
 
   pose_cam = transform2table_cam * pose_cam;
-}
-
-bool PoseEstimator::computeTableOrientation(const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, Vec4f &tablePlane) const
-{
-  cout << "all points: " << fullSceneCloud.points.size() << endl;
-
-  pcl::PointCloud<pcl::PointXYZ> sceneCloud;
-//  downsample(params.downLeafSize, fullSceneCloud, sceneCloud);
-//  cout << "down points: " << sceneCloud.points.size() << endl;
-  sceneCloud = fullSceneCloud;
-
-  pcl::PointCloud<pcl::Normal> sceneNormals;
-  estimateNormals(params.kSearch, sceneCloud, sceneNormals);
-  cout << "normals: " << sceneNormals.points.size() << endl;
-
-  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-  pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-  bool isTableSegmented = segmentTable(params.distanceThreshold, sceneCloud, sceneNormals, inliers, coefficients);
-  if (!isTableSegmented)
-  {
-    return false;
-  }
-  cout << "inliers: " << inliers->indices.size () << endl;
-
-  const int coeffsCount = 4;
-  for (int i = 0; i < coeffsCount; ++i)
-  {
-    tablePlane[i] = coefficients->values[i];
-  }
-
-#ifdef VISUALIZE_TABLE_ESTIMATION
-  pcl::PointCloud<pcl::PointXYZ> table;
-  extractPointCloud(sceneCloud, inliers, table);
-
-  pcl::visualization::CloudViewer viewer ("test cloud");
-  viewer.showCloud(sceneCloud.makeShared(), "points");
-
-  while (!viewer.wasStopped ())
-  {
-  }
-
-  pcl::visualization::CloudViewer viewer2 ("table");
-  viewer2.showCloud(table.makeShared(), "table");
-  while (!viewer2.wasStopped ())
-  {
-  }
-#endif
-
-  return true;
 }
 
 bool PoseEstimator::tmpComputeTableOrientation(const cv::Mat &centralBgrImage, Vec4f &tablePlane, ros::Publisher *pt_pub) const
@@ -575,6 +533,11 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 
 void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities) const
 {
+  if (initPoses_cam.empty())
+  {
+    return;
+  }
+
   Mat centralEdges, silhouetteEdges;
   computeCentralEdges(centralBgrImage, glassMask, centralEdges, silhouetteEdges);
 
