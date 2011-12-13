@@ -71,8 +71,6 @@ namespace transparent_objects
 
       int numberOfComponents;
       cv::Mat glassMask;
-      //TOOD: fix
-      std::cout << "WARNING: hard-coded parameters" << std::endl;
       findGlassMask(*color_, *depth_, numberOfComponents, glassMask);
 #ifdef VISUALIZE_DETECTION
       imshow("glassMask", glassMask);
@@ -128,7 +126,7 @@ namespace transparent_objects
 
 #ifdef VISUALIZE_DETECTION
       poseEstimator_->visualize(*color_, poses[0]);
-      cv::waitKey(3000);
+      cv::waitKey(100);
       poseEstimator_->visualize(pclCloud, poses[0]);
 #endif
 
