@@ -70,6 +70,15 @@ namespace transparent_objects
     {
       std::cout << "detector: process" << std::endl;
 
+#ifdef TRANSPARENT_DEBUG
+      cv::FileStorage fs("input.xml", cv::FileStorage::READ);
+      fs["K"] >> *K_;
+      fs["image"] >> *color_;
+      fs["depth"] >> *depth_;
+      fs["points3d"] >> *cloud_;
+      fs.release();
+#endif
+
       assert(cloud_->channels() == 3);
       std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
       pcl::PointCloud<pcl::PointXYZ> pclCloud;
@@ -95,7 +104,9 @@ namespace transparent_objects
       glassSegmentator.segment(*color_, *depth_, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
 
 #ifdef VISUALIZE_DETECTION
+      cv::Mat segmentation = drawSegmentation(*color_, glassMask);
       imshow("glassMask", glassMask);
+      imshow("segmentation", segmentation);
       cv::waitKey(100);
 #endif
       
