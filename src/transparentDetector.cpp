@@ -28,7 +28,7 @@ void TransparentDetector::addObject(const std::string &name, const PoseEstimator
   objectNames.push_back(name);
 }
 
-void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
+void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
 {
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
@@ -50,7 +50,7 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
   int numberOfComponents;
   cv::Mat glassMask;
   GlassSegmentator glassSegmentator;
-  glassSegmentator.segment(bgrImage, depth, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
+  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
 
   std::cout << "glass is segmented" << std::endl;
 

@@ -37,6 +37,7 @@ void PoseEstimator::addObject(const EdgeModel &_edgeModel)
 
 void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
 {
+  CV_Assert(kinectBgrImage.size() == glassMask.size());
   CV_Assert(kinectBgrImage.size() == kinectCamera.imageSize);
 
   if (silhouettes.empty())

@@ -193,7 +193,7 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
   }
 }
 
-void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
+void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
 //  Mat srcMask = depthMat == 0;
   Mat srcMask = (depthMat != depthMat);
@@ -204,7 +204,7 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
 #ifdef VISUALIZE
   imshow("mask with registration", srcMask);
 #endif
-  Mat registrationMask = imread("depthMask.png", CV_LOAD_IMAGE_GRAYSCALE);
+
   CV_Assert(!registrationMask.empty());
   CV_Assert(registrationMask.size() == depthMat.size());
   srcMask.setTo(0, registrationMask);

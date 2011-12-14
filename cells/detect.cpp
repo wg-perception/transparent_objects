@@ -44,6 +44,7 @@ namespace transparent_objects
     declare_params(tendrils& params)
     {
       std::cout << "detector: declare_params" << std::endl;
+      params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
 
 //      params.declare(&LinemodDetector::threshold_, "threshold", "Matching threshold, as a percentage", 90.0f);
     }
@@ -73,18 +74,16 @@ namespace transparent_objects
     process(const tendrils& inputs, const tendrils& outputs)
     {
       std::cout << "detector: process" << std::endl;
-
 #ifdef TRANSPARENT_DEBUG
-      cv::FileStorage fs("input.xml", cv::FileStorage::READ);
-      fs["K"] >> *K_;
-      fs["image"] >> *color_;
-      fs["depth"] >> *depth_;
-      fs["points3d"] >> *cloud_;
-      fs.release();
+//      cv::FileStorage fs("input.xml", cv::FileStorage::READ);
+//      fs["K"] >> *K_;
+//      fs["image"] >> *color_;
+//      fs["depth"] >> *depth_;
+//      fs["points3d"] >> *cloud_;
+//      fs.release();
       
       cv::imwrite("color.png", *color_);
       cv::imwrite("depth.png", *depth_);
-      cv::imwrite("glass.png", glassMask);
       cv::FileStorage fs("input.xml", cv::FileStorage::WRITE);
       fs << "K" << *K_;
       fs << "image" << *color_;
@@ -104,7 +103,9 @@ namespace transparent_objects
       detector_->initialize(camera);
       std::vector<float> posesQualities;
       std::vector<std::string> detectedObjects;
-      detector_->detect(*color_, *depth_, pclCloud, poses, posesQualities, detectedObjects);
+
+      cv::Mat registrationMask = cv::imread(*registrationMaskFilename_, CV_LOAD_IMAGE_GRAYSCALE);
+      detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
 
 #ifdef VISUALIZE_DETECTION
       cv::Mat visualization = color_->clone();
@@ -139,6 +140,8 @@ namespace transparent_objects
 
     // Parameters
 //    spore<float> threshold_;
+    spore<std::string> registrationMaskFilename_;
+
     // Inputs
     spore<cv::Mat> K_, color_, depth_, cloud_;
 

@@ -22,8 +22,10 @@ namespace transparent_objects
     {
       params.declare(&Trainer::json_submethod_, "json_submethod", "The submethod to use, as a JSON string.").required(
           true);
-      params.declare(&Trainer::json_K_, "json_K", "Intrinsics of the camera.").required(true);
-      params.declare(&Trainer::json_D_, "json_D", "Distortion coefficients of the camera.");
+      params.declare(&Trainer::json_K_, "json_K", "Intrinsics of the test camera.").required(true);
+      params.declare(&Trainer::json_D_, "json_D", "Distortion coefficients of the test camera.");
+      params.declare(&Trainer::imageWidth_, "imageWidth", "Width of the test image", 640);
+      params.declare(&Trainer::imageHeight_, "imageHeight", "Height of the test image", 480);
     }
 
     static void
@@ -72,9 +74,7 @@ namespace transparent_objects
           D_ = cv::Mat(D_value).clone();
         }
 
-        //TODO: fix
-        std::cout << "WARNING: hard-coded image size: fix me" << std::endl;
-        PinholeCamera camera(K_, D_, PoseRT(), cv::Size(640, 480));
+        PinholeCamera camera(K_, D_, PoseRT(), cv::Size(*imageWidth_, *imageHeight_));
         *poseEstimator_ = new PoseEstimator(camera);
       }
     }
@@ -110,7 +110,8 @@ namespace transparent_objects
     spore<object_recognition::db::Document> document_;
     spore<cv::Ptr<PoseEstimator> > poseEstimator_;
     spore<std::string> json_submethod_;
+    spore<int> imageWidth_, imageHeight_;
   };
-} 
+}
 
 ECTO_CELL(transparent_objects_cells, transparent_objects::Trainer, "Trainer", "Train the transparent objects detection and pose estimation algorithm.");

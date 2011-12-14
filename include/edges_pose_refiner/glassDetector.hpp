@@ -52,7 +52,7 @@ public:
    * \param openingIterations Number of opening iterations in morphology
    * \param finalClosingIterations Number of final closing iterations in morphology
    */
-  void segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera = 0, const cv::Vec4f *tablePlane = 0, const pcl::PointCloud<pcl::PointXYZ> *tableHull = 0);
+  void segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera = 0, const cv::Vec4f *tablePlane = 0, const pcl::PointCloud<pcl::PointXYZ> *tableHull = 0);
 
 private:
   GlassSegmentationParams params;
