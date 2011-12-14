@@ -73,14 +73,6 @@ namespace transparent_objects
     process(const tendrils& inputs, const tendrils& outputs)
     {
       std::cout << "detector: process" << std::endl;
-      cv::Mat tmpDepth;
-      cv::resize(*depth_, tmpDepth, cv::Size(640, 480));
-      *depth_ = tmpDepth;
-
-      cv::Mat tmpColor;
-      cv::resize(*color_, tmpColor, cv::Size(640, 480));
-      *color_ = tmpColor;
-
 
 #ifdef TRANSPARENT_DEBUG
       cv::FileStorage fs("input.xml", cv::FileStorage::READ);
