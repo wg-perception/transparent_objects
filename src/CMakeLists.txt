@@ -29,6 +29,10 @@ target_link_libraries(edges_pose_refiner
   ${OpenCV_LIBS}
   )
 
+install(TARGETS edges_pose_refiner
+  DESTINATION lib
+  )
+
 #add_executable(transparentExperiments src/transparent_experiments/transparentExperiments.cpp src/transparent_experiments/TODBaseImporter.cpp src/poseError.cpp)
 #rosbuild_add_compile_flags(transparentExperiments -std=c++0x)
 #target_link_libraries(transparentExperiments ${PROJECT_NAME})
