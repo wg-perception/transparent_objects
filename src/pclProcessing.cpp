@@ -135,7 +135,7 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
   coefficients->values[2] = 1;
 }
 
-bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance)
+bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
 {
   cout << "all points: " << fullSceneCloud.points.size() << endl;
 
@@ -158,6 +158,18 @@ bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::Po
   cout << "inliers: " << inliers->indices.size () << endl;
 
   const int coeffsCount = 4;
+  //TODO: move up
+  Point3f tableNormal(coefficients->values[0],
+                      coefficients->values[1],
+                      coefficients->values[2]);
+  if (tableNormal.dot(verticalDirection) < 0)
+  {
+    for (int i = 0; i < coeffsCount; ++i)
+    {
+      coefficients->values[i] *= -1;
+    }
+  }
+
   for (int i = 0; i < coeffsCount; ++i)
   {
     tablePlane[i] = coefficients->values[i];
