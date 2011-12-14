@@ -14,7 +14,8 @@ pipeline1:
   method: 'transparent_objects'
   package: 'transparent_objects'
   submethod: ''
-  parameters: ''
+  parameters:
+    registrationMaskFilename: 'registrationMask_SXGA.png'
 
 # The list of object_ids to analyze
 object_ids: "all"
