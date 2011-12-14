@@ -61,11 +61,12 @@ void readFiducial(const std::string &filename, cv::Mat &blackBlobsObject, cv::Ma
 
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask);
 
-cv::Mat displayEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const std::string &title = "projected model");
+cv::Mat displayEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const std::string &title = "projected model", cv::Scalar color = cv::Scalar(0, 0, 255));
 std::vector<cv::Mat> displayEdgels(const std::vector<cv::Mat> &images, const std::vector<cv::Point3f> &edgels3d,
                                    const PoseRT &pose_cam,
                                    const std::vector<PinholeCamera> &cameras,
-                                   const std::string &title = "projected model");
+                                   const std::string &title = "projected model",
+                                   cv::Scalar color = cv::Scalar(0, 0, 255));
 
 void project3dPoints(const std::vector<cv::Point3f>& points, const cv::Mat& rvec, const cv::Mat& tvec, std::vector<cv::Point3f>& modif_points);
 

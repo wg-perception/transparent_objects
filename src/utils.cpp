@@ -529,7 +529,8 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask)
 vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
-                          const string &title)
+                          const string &title,
+                          cv::Scalar color)
 {
   vector<Mat> drawImages(images.size());
   for(size_t i=0; i<images.size(); i++)
@@ -549,24 +550,24 @@ vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point
     for(size_t j=0; j<projectedEdgels.size(); j++)
     {
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
-      circle(drawImages[i], projectedEdgels[j], 0, Scalar(0, 0, 255), -1);
+      circle(drawImages[i], projectedEdgels[j], 0, color, -1);
     }
 
-//#ifdef VISUALIZE_POSE_REFINEMENT
+#ifdef VISUALIZE_POSE_REFINEMENT
     std::stringstream titleStream;
     titleStream << title << " " << i;
     imshow(titleStream.str(), drawImages[i]);
-//#endif
+#endif
   }
 
   return drawImages;
 }
 
-Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title)
+Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return displayEdgels(images, edgels3d, pose_cam, allCameras, title)[0];
+  return displayEdgels(images, edgels3d, pose_cam, allCameras, title, color)[0];
 }
 
 void publishTable(const Vec4f &tablePlane, int id, Scalar color, ros::Publisher *pt_pub)

@@ -5,14 +5,15 @@ add_library(edges_pose_refiner SHARED
     utils.cpp
     glassDetector.cpp
     poseEstimator.cpp
-      edgeModel.cpp
-  registerPointClouds.cpp
-  kPartiteGraph.cpp 
-  tangentVectorsEstimator.cpp
-  poseRT.cpp
-  pinholeCamera.cpp
-  silhouette.cpp
+    edgeModel.cpp
+    registerPointClouds.cpp
+    kPartiteGraph.cpp
+    tangentVectorsEstimator.cpp
+    poseRT.cpp
+    pinholeCamera.cpp
+    silhouette.cpp
     pclProcessing.cpp
+    transparentDetector.cpp
   
     chamfer_matching/chamfer_matching.cpp
   

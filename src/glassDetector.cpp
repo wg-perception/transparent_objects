@@ -10,7 +10,7 @@ using std::endl;
 
 //#define VISUALIZE
 
-#define VISUALIZE_TABLE
+//#define VISUALIZE_TABLE
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");

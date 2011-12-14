@@ -64,16 +64,16 @@ struct PoseEstimatorParams
 class PoseEstimator
 {
 public:
-  PoseEstimator(const PinholeCamera &kinectCamera, const PoseEstimatorParams &params = PoseEstimatorParams());
+  PoseEstimator(const PinholeCamera &kinectCamera = PinholeCamera(), const PoseEstimatorParams &params = PoseEstimatorParams());
   void addObject(const EdgeModel &edgeModel);
-  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities, const cv::Vec4f *tablePlane = 0) const;
+  void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities, const cv::Vec4f *tablePlane = 0) const;
 
   void read(const std::string &filename);
   void read(const cv::FileNode& fn);
   void write(const std::string &filename) const;
   void write(cv::FileStorage& fs) const;
 
-  void visualize(const cv::Mat &image, const PoseRT &pose, const std::string &title = "estimated pose");
+  void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255));
   void visualize(const pcl::PointCloud<pcl::PointXYZ> &scene, const PoseRT &pose, const std::string &title = "estimated pose 3D");
 private:
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;

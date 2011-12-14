@@ -7,6 +7,7 @@
 #include <edges_pose_refiner/glassDetector.hpp>
 #include <edges_pose_refiner/utils.hpp>
 #include <edges_pose_refiner/pclProcessing.hpp>
+#include <edges_pose_refiner/transparentDetector.hpp>
 #include "db_transparent_objects.hpp"
 
 #include <opencv2/highgui/highgui.hpp>
@@ -28,11 +29,14 @@ namespace transparent_objects
       std::cout << "detector: ParameterCallback" << std::endl;
       BOOST_FOREACH(const object_recognition::db::Document & document, db_documents)
           {
+            PoseEstimator currentPoseEstimator;
             // Load the detector for that class
-            document.get_attachment<PoseEstimator>("detector", *poseEstimator_);
+            document.get_attachment<PoseEstimator>("detector", currentPoseEstimator);
 
             std::string object_id = document.get_value<ObjectId>("object_id");
+            detector_->addObject(object_id, currentPoseEstimator);
             printf("Loaded %s\n", object_id.c_str());
+
           }
     }
 
@@ -61,7 +65,7 @@ namespace transparent_objects
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
       std::cout << "detector: configure" << std::endl;
-      poseEstimator_ = new PoseEstimator(PinholeCamera());
+      detector_ = new TransparentDetector;
       std::cout << "detector: leaving configure" << std::endl;
     }
 
@@ -77,44 +81,7 @@ namespace transparent_objects
       fs["depth"] >> *depth_;
       fs["points3d"] >> *cloud_;
       fs.release();
-#endif
-
-      assert(cloud_->channels() == 3);
-      std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
-      pcl::PointCloud<pcl::PointXYZ> pclCloud;
-      cv2pcl(cvCloud, pclCloud);
-
-      cv::Vec4f tablePlane;
-      pcl::PointCloud<pcl::PointXYZ> tableHull;
-      int kSearch = 10;
-      float distanceThreshold = 0.02f;
-      std::cout << "WARNING: hard-coded parameters" << std::endl;
-      //TODO: fix
-      bool isEstimated = computeTableOrientation(kSearch, distanceThreshold, pclCloud, tablePlane, &tableHull);
-      if (!isEstimated)
-      {
-        std::cerr << "Cannot find a table plane" << std::endl;
-        return ecto::OK;
-      }
-      else
-      {
-        std::cout << "table plane is estimated" << std::endl;
-      }
-
-      int numberOfComponents;
-      cv::Mat glassMask;
-      GlassSegmentator glassSegmentator;
-      PinholeCamera camera(*K_);
-      glassSegmentator.segment(*color_, *depth_, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
-
-#ifdef VISUALIZE_DETECTION
-      cv::Mat segmentation = drawSegmentation(*color_, glassMask);
-      imshow("glassMask", glassMask);
-      imshow("segmentation", segmentation);
-      cv::waitKey(100);
-#endif
       
-#ifdef TRANSPARENT_DEBUG
       cv::imwrite("color.png", *color_);
       cv::imwrite("depth.png", *depth_);
       cv::imwrite("glass.png", glassMask);
@@ -124,48 +91,30 @@ namespace transparent_objects
       fs << "depth" << *depth_;
       fs << "points3d" << *cloud_;
       fs.release();
+
 #endif
 
-
-//      assert(numberOfComponents == 1);
+      assert(cloud_->channels() == 3);
+      std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
+      pcl::PointCloud<pcl::PointXYZ> pclCloud;
+      cv2pcl(cvCloud, pclCloud);
 
       std::vector<PoseRT> poses;
-      std::vector<float> posesQualities;
+      PinholeCamera camera(*K_);
+      detector_->initialize(camera);
+      detector_->detect(*color_, *depth_, pclCloud, poses, *object_ids_);
 
-
-#ifdef TRANSPARENT_DEBUG
-/*
-      cv::Mat D = cv::Mat::zeros(5, 1, CV_32FC1);
-      PinholeCamera camera(*K_, D);
-      poseEstimator_ = new PoseEstimator(camera);
-
-      std::vector<cv::Point3f> points, normals;
-      std::vector<cv::Point3i> colors;
-      readPointCloud("cloud.ply", points, colors, normals);
-
-      EdgeModel edgeModel(points, false);
-      poseEstimator_->addObject(edgeModel);
-*/      
-#endif
-      assert(!poseEstimator_.empty());
-      std::cout << "starting to estimate pose..." << std::endl;
-      poseEstimator_->estimatePose(*color_, glassMask, pclCloud, poses, posesQualities, &tablePlane);
-      std::cout << "done." << std::endl;
-      if (poses.empty())
+      for (size_t i = 0; i < poses.size(); ++i)
       {
-        std::cerr << "Cannot estimate a pose" << std::endl;
-        return ecto::OK;
+        rvecs_->push_back(poses[i].getRvec());
+        tvecs_->push_back(poses[i].getTvec());
       }
 
-      //TODO: add detection
-      rvecs_->push_back(poses[0].getRvec());
-      tvecs_->push_back(poses[0].getTvec());
-      object_ids_->push_back("object_id");
-
 #ifdef VISUALIZE_DETECTION
-      poseEstimator_->visualize(*color_, poses[0]);
-      cv::waitKey(100);
-      poseEstimator_->visualize(pclCloud, poses[0]);
+      cv::Mat visualization = color_->clone();
+      detector_->visualize(poses, *object_ids_, visualization);
+      imshow("detection", visualization);
+      cv::waitKey();
 #endif
 
       return ecto::OK;
@@ -181,7 +130,7 @@ namespace transparent_objects
     spore<std::vector<ObjectId> > object_ids_;
     spore<std::vector<cv::Mat> > rvecs_, tvecs_;
 
-    cv::Ptr<PoseEstimator> poseEstimator_;
+    cv::Ptr<TransparentDetector> detector_;
   };
 
 } // namespace ecto_linemod

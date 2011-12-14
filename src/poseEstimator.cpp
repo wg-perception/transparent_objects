@@ -35,7 +35,7 @@ void PoseEstimator::addObject(const EdgeModel &_edgeModel)
   edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
 }
 
-void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
+void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
 {
   if (silhouettes.empty())
   {
@@ -656,9 +656,14 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
   fs << "}";
 }
 
-void PoseEstimator::visualize(const cv::Mat &image, const PoseRT &pose, const std::string &title)
+void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255))
 {
-  displayEdgels(image, edgeModel.points, pose, kinectCamera, title);
+
+}
+
+void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color)
+{
+  image = displayEdgels(image, edgeModel.points, pose, kinectCamera, "", color);
 }
 
 void PoseEstimator::visualize(const pcl::PointCloud<pcl::PointXYZ> &scene, const PoseRT &pose, const std::string &title)
