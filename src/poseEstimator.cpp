@@ -629,10 +629,7 @@ void PoseEstimatorParams::read(const FileNode &fileNode)
   FileNode fn = fileNode["params"];
 
   minGlassContourLength = static_cast<int>(fn["minGlassContourLength"]);
-
-  downLeafSize = fn["downLeafSize"];
-  kSearch = fn["kSearch"];
-  distanceThreshold = fn["distanceThreshold"];
+  minGlassContourArea = fn["minGlassContourArea"];
 
   cannyThreshold1 = fn["cannyThreshold1"];
   cannyThreshold2 = fn["cannyThreshold2"];
@@ -646,10 +643,7 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
   fs << "params" << "{";
 
   fs << "minGlassContourLength" << static_cast<int>(minGlassContourLength);
-
-  fs << "downLeafSize" << downLeafSize;
-  fs << "kSearch" << kSearch;
-  fs << "distanceThreshold" << distanceThreshold;
+  fs << "minGlassContourArea" << "minGlassContourArea";
 
   fs << "cannyThreshold1" << cannyThreshold1;
   fs << "cannyThreshold2" << cannyThreshold2;

@@ -23,11 +23,6 @@ struct PoseEstimatorParams
   float downFactor;
   int closingIterationsCount;
 
-  //plane estimation parameters
-  float downLeafSize;
-  int kSearch;
-  float distanceThreshold;
-
   //edge detection parameters
   double cannyThreshold1;
   double cannyThreshold2;
@@ -45,12 +40,7 @@ struct PoseEstimatorParams
     closingIterationsCount = 10;
 
     minGlassContourLength = 10;
-    //TODO: use in persistence
     minGlassContourArea = 64.0;
-
-    downLeafSize = 0.001f;
-    kSearch = 10;
-    distanceThreshold = 0.02f;
 
     cannyThreshold1 = 25;
     cannyThreshold2 = 50;
