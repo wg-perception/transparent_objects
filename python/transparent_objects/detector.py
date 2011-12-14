@@ -17,7 +17,6 @@ class TransparentObjectsDetectionPipeline(DetectionPipeline):
         return 'transparent_objects'
 
     def detector(self, submethod, parameters, db_params, model_documents, args):
-        #visualize = args.get('visualize', False)
-        #threshold = parameters.get('threshold', 90)
+        visualize = args.get('visualize', False)
         registrationMaskFilename = parameters.get('registrationMaskFilename')
-        return transparent_objects_cells.Detector(model_documents=model_documents, registrationMaskFilename=registrationMaskFilename)
+        return transparent_objects_cells.Detector(model_documents=model_documents, registrationMaskFilename=registrationMaskFilename, visualize=visualize)

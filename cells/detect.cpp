@@ -14,7 +14,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 //#define TRANSPARENT_DEBUG
-//#define VISUALIZE_DETECTION
 
 using ecto::tendrils;
 using ecto::spore;
@@ -45,6 +44,7 @@ namespace transparent_objects
     {
       std::cout << "detector: declare_params" << std::endl;
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
+      params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
 
 //      params.declare(&LinemodDetector::threshold_, "threshold", "Matching threshold, as a percentage", 90.0f);
     }
@@ -107,13 +107,15 @@ namespace transparent_objects
       cv::Mat registrationMask = cv::imread(*registrationMaskFilename_, CV_LOAD_IMAGE_GRAYSCALE);
       detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
 
-#ifdef VISUALIZE_DETECTION
-      cv::Mat visualization = color_->clone();
-      detector_->visualize(poses, detectedObjects, visualization);
-      imshow("detection", visualization);
-      cv::waitKey(300);
-      detector_->visualize(poses, detectedObjects, pclCloud);
-#endif
+      if (*visualize_)
+      {
+        cv::Mat visualization = color_->clone();
+        detector_->visualize(poses, detectedObjects, visualization);
+        imshow("detection", visualization);
+        cv::waitKey(300);
+//        detector_->visualize(poses, detectedObjects, pclCloud);
+      }
+
 
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
       int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
@@ -139,8 +141,8 @@ namespace transparent_objects
 
 
     // Parameters
-//    spore<float> threshold_;
     spore<std::string> registrationMaskFilename_;
+    spore<bool> visualize_;
 
     // Inputs
     spore<cv::Mat> K_, color_, depth_, cloud_;
