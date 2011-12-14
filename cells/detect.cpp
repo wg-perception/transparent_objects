@@ -125,7 +125,7 @@ namespace transparent_objects
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
       int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
 
-      rvecs_->push_back(poses[bestDetectionIndex].getRvec());
+      rvecs_->push_back(poses[bestDetectionIndex].getRotationMatrix());
       tvecs_->push_back(poses[bestDetectionIndex].getTvec());
       object_ids_->push_back(detectedObjects[bestDetectionIndex]);
 
