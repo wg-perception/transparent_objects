@@ -12,6 +12,8 @@
 #include "edges_pose_refiner/pinholeCamera.hpp"
 #include "edges_pose_refiner/poseRT.hpp"
 
+#include <pcl/visualization/pcl_visualizer.h>
+
 #include <opencv2/core/core.hpp>
 
 struct PoseEstimatorParams
@@ -73,8 +75,8 @@ public:
   void write(const std::string &filename) const;
   void write(cv::FileStorage& fs) const;
 
-  void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255));
-  void visualize(const pcl::PointCloud<pcl::PointXYZ> &scene, const PoseRT &pose, const std::string &title = "estimated pose 3D");
+  void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255)) const;
+  void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
 private:
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;

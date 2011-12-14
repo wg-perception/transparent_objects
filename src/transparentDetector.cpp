@@ -10,6 +10,8 @@
 #include "edges_pose_refiner/glassDetector.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
+#include <boost/thread/thread.hpp>
+
 TransparentDetector::TransparentDetector(const PinholeCamera &_camera)
 {
   initialize(_camera);
@@ -98,7 +100,7 @@ int TransparentDetector::getObjectIndex(const std::string &name) const
   return std::distance(objectNames.begin(), it);
 }
 
-void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image)
+void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
 {
   for (size_t i = 0; i < poses.size(); ++i)
   {
@@ -106,5 +108,25 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
     int objectIndex = getObjectIndex(objectNames[i]);
     poseEstimators[objectIndex].visualize(poses[i], image, color);
   }
+}
+
+void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> sceneColor(cloud.makeShared(), 0, 255, 0);
+  viewer->addPointCloud<pcl::PointXYZ>(cloud.makeShared(), sceneColor, "scene");
+
+  for (size_t i = 0; i < poses.size(); ++i)
+  {
+    cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
+    int objectIndex = getObjectIndex(objectNames[i]);
+    poseEstimators[objectIndex].visualize(poses[i], viewer, color, objectNames[i]);
+  }
+
+  while (!viewer->wasStopped ())
+   {
+     viewer->spinOnce (100);
+     boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+   }
 }
 

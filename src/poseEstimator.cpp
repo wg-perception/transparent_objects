@@ -656,34 +656,18 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
   fs << "}";
 }
 
-void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255))
-{
-
-}
-
-void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color)
+void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color) const
 {
   image = displayEdgels(image, edgeModel.points, pose, kinectCamera, "", color);
 }
 
-void PoseEstimator::visualize(const pcl::PointCloud<pcl::PointXYZ> &scene, const PoseRT &pose, const std::string &title)
+void PoseEstimator::visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title) const
 {
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer (title));
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> sceneColor(scene.makeShared(), 0, 255, 0);
-  viewer->addPointCloud<pcl::PointXYZ>(scene.makeShared(), sceneColor, "scene");
-
-
   vector<Point3f> object;
   project3dPoints(edgeModel.points, pose.getRvec(), pose.getTvec(), object);
   pcl::PointCloud<pcl::PointXYZ> pclObject;
   cv2pcl(object, pclObject);
 
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> objectColor(pclObject.makeShared(), 255, 0, 0);
-  viewer->addPointCloud<pcl::PointXYZ>(pclObject.makeShared(), objectColor, "object");
-
-  while (!viewer->wasStopped ())
-  {
-    viewer->spinOnce (100);
-    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-  }
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> objectColor(pclObject.makeShared(), color[2], color[1], color[0]);
+  viewer->addPointCloud<pcl::PointXYZ>(pclObject.makeShared(), objectColor, title);
 }

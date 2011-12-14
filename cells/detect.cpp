@@ -114,7 +114,8 @@ namespace transparent_objects
       cv::Mat visualization = color_->clone();
       detector_->visualize(poses, *object_ids_, visualization);
       imshow("detection", visualization);
-      cv::waitKey();
+      cv::waitKey(300);
+      detector_->visualize(poses, *object_ids_, pclCloud);
 #endif
 
       return ecto::OK;
