@@ -102,21 +102,36 @@ namespace transparent_objects
       std::vector<PoseRT> poses;
       PinholeCamera camera(*K_);
       detector_->initialize(camera);
-      detector_->detect(*color_, *depth_, pclCloud, poses, *object_ids_);
-
-      for (size_t i = 0; i < poses.size(); ++i)
-      {
-        rvecs_->push_back(poses[i].getRvec());
-        tvecs_->push_back(poses[i].getTvec());
-      }
+      std::vector<float> posesQualities;
+      std::vector<std::string> detectedObjects;
+      detector_->detect(*color_, *depth_, pclCloud, poses, posesQualities, detectedObjects);
 
 #ifdef VISUALIZE_DETECTION
       cv::Mat visualization = color_->clone();
-      detector_->visualize(poses, *object_ids_, visualization);
+      detector_->visualize(poses, detectedObjects, visualization);
       imshow("detection", visualization);
       cv::waitKey(300);
-      detector_->visualize(poses, *object_ids_, pclCloud);
+      detector_->visualize(poses, detectedObjects, pclCloud);
 #endif
+
+      std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
+      int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
+
+      rvecs_->push_back(poses[bestDetectionIndex].getRvec());
+      tvecs_->push_back(poses[bestDetectionIndex].getTvec());
+      object_ids_->push_back(detectedObjects[bestDetectionIndex]);
+
+
+//      {
+//        poses.clear();
+//        poses.push_back(PoseRT((*rvecs_)[0], (*tvecs_)[0]));
+//
+//        cv::Mat visualization = color_->clone();
+//        detector_->visualize(poses, *object_ids_, visualization);
+//        imshow("detection", visualization);
+//        cv::waitKey(300);
+//        detector_->visualize(poses, *object_ids_, pclCloud);
+//      }
 
       return ecto::OK;
     }

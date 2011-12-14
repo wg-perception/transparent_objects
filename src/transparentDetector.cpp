@@ -28,7 +28,7 @@ void TransparentDetector::addObject(const std::string &name, const PoseEstimator
   objectNames.push_back(name);
 }
 
-void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<std::string> &detectedObjectNames) const
+void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
 {
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
@@ -76,6 +76,7 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
 
   poses_cam.clear();
   detectedObjectNames.clear();
+  posesQualities.clear();
   for (size_t i = 0; i < poseEstimators.size(); ++i)
   {
     std::cout << "starting to estimate pose..." << std::endl;
@@ -87,6 +88,7 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
     if (!currentPoses.empty())
     {
       poses_cam.push_back(currentPoses[0]);
+      posesQualities.push_back(currentPosesQualities[0]);
       detectedObjectNames.push_back(objectNames[i]);
     }
   }
@@ -102,6 +104,8 @@ int TransparentDetector::getObjectIndex(const std::string &name) const
 
 void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
 {
+  CV_Assert(poses.size() == objectNames.size());
+
   for (size_t i = 0; i < poses.size(); ++i)
   {
     cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
@@ -112,6 +116,8 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 
 void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
+  CV_Assert(poses.size() == objectNames.size());
+
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> sceneColor(cloud.makeShared(), 0, 255, 0);
   viewer->addPointCloud<pcl::PointXYZ>(cloud.makeShared(), sceneColor, "scene");
