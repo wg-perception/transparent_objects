@@ -12,14 +12,19 @@
 
 #include <boost/thread/thread.hpp>
 
-TransparentDetector::TransparentDetector(const PinholeCamera &_camera)
+#include <opencv2/highgui/highgui.hpp>
+
+#define VISUALIZE_DETECTION
+
+TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
 {
-  initialize(_camera);
+  initialize(_camera, _params);
 }
 
-void TransparentDetector::initialize(const PinholeCamera &_camera)
+void TransparentDetector::initialize(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
 {
   camera = _camera;
+  params = _params;
 }
 
 void TransparentDetector::addObject(const std::string &name, const PoseEstimator &estimator)
@@ -32,11 +37,7 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
 {
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
-  int kSearch = 10;
-  float distanceThreshold = 0.02f;
-  std::cout << "WARNING: hard-coded parameters" << std::endl;
-  //TODO: fix
-  bool isEstimated = computeTableOrientation(kSearch, distanceThreshold, sceneCloud, tablePlane, &tableHull);
+  bool isEstimated = computeTableOrientation(params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
@@ -55,9 +56,9 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
   std::cout << "glass is segmented" << std::endl;
 
 #ifdef VISUALIZE_DETECTION
-  cv::Mat segmentation = drawSegmentation(*color_, glassMask);
-  imshow("glassMask", glassMask);
-  imshow("segmentation", segmentation);
+  cv::Mat segmentation = drawSegmentation(bgrImage, glassMask);
+  cv::imshow("glassMask", glassMask);
+  cv::imshow("segmentation", segmentation);
   cv::waitKey(100);
 #endif
 
