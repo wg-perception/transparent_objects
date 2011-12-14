@@ -42,9 +42,10 @@ private:
   int getObjectIndex(const std::string &name) const;
 
   TransparentDetectorParams params;
-  PinholeCamera camera;
+  PinholeCamera srcCamera;
   std::vector<PoseEstimator> poseEstimators;
   std::vector<std::string> objectNames;
+  cv::Size validTestImageSize;
 };
 
 

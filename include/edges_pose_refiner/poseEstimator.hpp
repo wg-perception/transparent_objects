@@ -65,6 +65,8 @@ public:
   void write(const std::string &filename) const;
   void write(cv::FileStorage& fs) const;
 
+  cv::Size getValitTestImageSize() const;
+
   void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255)) const;
   void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
 private:

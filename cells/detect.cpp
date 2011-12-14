@@ -14,7 +14,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 //#define TRANSPARENT_DEBUG
-#define VISUALIZE_DETECTION
+//#define VISUALIZE_DETECTION
 
 using ecto::tendrils;
 using ecto::spore;
@@ -99,7 +99,7 @@ namespace transparent_objects
       cv2pcl(cvCloud, pclCloud);
 
       std::vector<PoseRT> poses;
-      PinholeCamera camera(*K_);
+      PinholeCamera camera(*K_, cv::Mat(), PoseRT(), color_->size());
       detector_->initialize(camera);
       std::vector<float> posesQualities;
       std::vector<std::string> detectedObjects;

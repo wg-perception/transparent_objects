@@ -10,6 +10,9 @@
 
 using namespace cv;
 
+using std::cout;
+using std::endl;
+
 PinholeCamera::PinholeCamera(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const PoseRT &_extrinsics, const cv::Size &_imageSize)
 {
   cameraMatrix = _cameraMatrix;
@@ -101,4 +104,20 @@ void PinholeCamera::read(const cv::FileNode &fn)
   rvec.convertTo(rvec64, CV_64FC1);
   tvec.convertTo(tvec64, CV_64FC1);
   extrinsics = PoseRT(rvec64, tvec64);
+}
+
+void PinholeCamera::resize(cv::Size destinationSize)
+{
+  CV_Assert(imageSize.width > 0 && imageSize.height > 0);
+  double fx = destinationSize.width / static_cast<double>(imageSize.width);
+  double fy = destinationSize.height / static_cast<double>(imageSize.height);
+  Mat xRow = cameraMatrix.row(0);
+  Mat newXRow = cameraMatrix.row(0) * fx;
+  newXRow.copyTo(xRow);
+
+  Mat yRow = cameraMatrix.row(1);
+  Mat newYRow = cameraMatrix.row(1) * fy;
+  newYRow.copyTo(yRow);
+
+  imageSize = destinationSize;
 }

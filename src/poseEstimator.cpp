@@ -38,7 +38,7 @@ void PoseEstimator::addObject(const EdgeModel &_edgeModel)
 void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
 {
   CV_Assert(kinectBgrImage.size() == glassMask.size());
-  CV_Assert(kinectBgrImage.size() == kinectCamera.imageSize);
+  CV_Assert(kinectBgrImage.size() == getValitTestImageSize());
 
   if (silhouettes.empty())
   {
@@ -643,7 +643,7 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
   fs << "params" << "{";
 
   fs << "minGlassContourLength" << static_cast<int>(minGlassContourLength);
-  fs << "minGlassContourArea" << "minGlassContourArea";
+  fs << "minGlassContourArea" << minGlassContourArea;
 
   fs << "cannyThreshold1" << cannyThreshold1;
   fs << "cannyThreshold2" << cannyThreshold2;
@@ -667,4 +667,9 @@ void PoseEstimator::visualize(const PoseRT &pose, const boost::shared_ptr<pcl::v
 
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> objectColor(pclObject.makeShared(), color[2], color[1], color[0]);
   viewer->addPointCloud<pcl::PointXYZ>(pclObject.makeShared(), objectColor, title);
+}
+
+cv::Size PoseEstimator::getValitTestImageSize() const
+{
+  return kinectCamera.imageSize;
 }

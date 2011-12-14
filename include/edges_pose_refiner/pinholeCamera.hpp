@@ -19,6 +19,8 @@ struct PinholeCamera
 
   void projectPoints(const std::vector<cv::Point3f> &points, const PoseRT &pose, std::vector<cv::Point2f> &projectedPoints) const;
 
+  void resize(cv::Size destinationSize);
+
 
   void write(const std::string &filename) const;
   void write(cv::FileStorage &fs) const;

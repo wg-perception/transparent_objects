@@ -12,9 +12,11 @@
 
 #include <boost/thread/thread.hpp>
 
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
-#define VISUALIZE_DETECTION
+//#define VISUALIZE_DETECTION
+
+using namespace cv;
 
 TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
 {
@@ -23,18 +25,53 @@ TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const Tra
 
 void TransparentDetector::initialize(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
 {
-  camera = _camera;
+  srcCamera = _camera;
   params = _params;
 }
 
 void TransparentDetector::addObject(const std::string &name, const PoseEstimator &estimator)
 {
+  if (poseEstimators.empty())
+  {
+    validTestImageSize = estimator.getValitTestImageSize();
+  }
+  else
+  {
+    CV_Assert(validTestImageSize == estimator.getValitTestImageSize());
+  }
+
   poseEstimators.push_back(estimator);
   objectNames.push_back(name);
 }
 
-void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
+void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
 {
+  CV_Assert(srcBgrImage.size() == srcDepth.size());
+  CV_Assert(srcRegistrationMask.size() == srcDepth.size());
+  PinholeCamera validTestCamera = srcCamera;
+  if (validTestCamera.imageSize != validTestImageSize)
+  {
+    validTestCamera.resize(validTestImageSize);
+  }
+
+  Mat bgrImage, depth, registrationMask;
+  if (bgrImage.size() != validTestImageSize)
+  {
+    resize(srcBgrImage, bgrImage, validTestImageSize);
+    resize(srcDepth, depth, validTestImageSize);
+    resize(srcRegistrationMask, registrationMask, validTestImageSize);
+  }
+  else
+  {
+    bgrImage = srcBgrImage;
+    depth = srcDepth;
+    registrationMask = srcRegistrationMask;
+  }
+
+  CV_Assert(bgrImage.size() == validTestImageSize);
+  CV_Assert(depth.size() == validTestImageSize);
+  CV_Assert(registrationMask.size() == validTestImageSize);
+
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
   bool isEstimated = computeTableOrientation(params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
@@ -51,12 +88,13 @@ void TransparentDetector::detect(const cv::Mat &bgrImage, const cv::Mat &depth, 
   int numberOfComponents;
   cv::Mat glassMask;
   GlassSegmentator glassSegmentator;
-  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &camera, &tablePlane, &tableHull);
+  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
 
   std::cout << "glass is segmented" << std::endl;
 
 #ifdef VISUALIZE_DETECTION
   cv::Mat segmentation = drawSegmentation(bgrImage, glassMask);
+  cv::imshow("depth", depth);
   cv::imshow("glassMask", glassMask);
   cv::imshow("segmentation", segmentation);
   cv::waitKey(100);
@@ -106,6 +144,10 @@ int TransparentDetector::getObjectIndex(const std::string &name) const
 void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
 {
   CV_Assert(poses.size() == objectNames.size());
+  if (image.size() != validTestImageSize)
+  {
+    resize(image, image, validTestImageSize);
+  }
 
   for (size_t i = 0; i < poses.size(); ++i)
   {
