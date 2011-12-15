@@ -43,5 +43,7 @@ int main(int argc, char *argv[])
 
   outModel.visualize();
 
+  writePointCloud("centralizedModel.asc", outModel.points);
+
   return 0;
 }
