@@ -13,6 +13,7 @@
 struct TransparentDetectorParams
 {
   //plane estimation parameters
+  float downLeafSize;
   int kSearch;
   float distanceThreshold;
   float clusterTolerance;
@@ -20,6 +21,7 @@ struct TransparentDetectorParams
 
   TransparentDetectorParams()
   {
+    downLeafSize = 0.002f;
     kSearch = 10;
     distanceThreshold = 0.02f;
     clusterTolerance = 0.05f;

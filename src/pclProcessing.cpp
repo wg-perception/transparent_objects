@@ -34,10 +34,22 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/cloud_viewer.h>
+
 using namespace cv;
 
 using std::cout;
 using std::endl;
+
+void filterNaNs(const pcl::PointCloud<pcl::PointXYZ> &inputCloud, pcl::PointCloud<pcl::PointXYZ> &outCloud)
+{
+  pcl::PassThrough<pcl::PointXYZ> passFilter;
+  passFilter.setInputCloud(inputCloud.makeShared());
+  passFilter.setFilterFieldName("z");
+  passFilter.setFilterLimits(0, std::numeric_limits<float>::max());
+  passFilter.filter(outCloud);
+}
 
 void downsample(float downLeafSize, pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
@@ -135,14 +147,17 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
   coefficients->values[2] = 1;
 }
 
-bool computeTableOrientation(int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
+bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
 {
   cout << "all points: " << fullSceneCloud.points.size() << endl;
 
+  pcl::PointCloud<pcl::PointXYZ> withoutNaNsCloud;
+  filterNaNs(fullSceneCloud, withoutNaNsCloud);
+  cout << "filtered points: " << withoutNaNsCloud.points.size() << endl;
+
   pcl::PointCloud<pcl::PointXYZ> sceneCloud;
-//  downsample(params.downLeafSize, fullSceneCloud, sceneCloud);
-//  cout << "down points: " << sceneCloud.points.size() << endl;
-  sceneCloud = fullSceneCloud;
+  downsample(downLeafSize, withoutNaNsCloud, sceneCloud);
+  cout << "down points: " << sceneCloud.points.size() << endl;
 
   pcl::PointCloud<pcl::Normal> sceneNormals;
   estimateNormals(kSearch, sceneCloud, sceneNormals);

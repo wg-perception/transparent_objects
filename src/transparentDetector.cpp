@@ -74,7 +74,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
-  bool isEstimated = computeTableOrientation(params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
+  bool isEstimated = computeTableOrientation(params.downLeafSize, params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
@@ -97,7 +97,6 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
   cv::imshow("depth", depth);
   cv::imshow("glassMask", glassMask);
   cv::imshow("segmentation", segmentation);
-  cv::waitKey(100);
 #endif
 
 #ifdef TRANSPARENT_DEBUG
