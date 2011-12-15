@@ -112,7 +112,7 @@ namespace transparent_objects
         cv::Mat visualization = color_->clone();
         detector_->visualize(poses, detectedObjects, visualization);
         imshow("detection", visualization);
-        cv::waitKey(300);
+        //cv::waitKey(2000);
 //        detector_->visualize(poses, detectedObjects, pclCloud);
       }
 
@@ -120,6 +120,9 @@ namespace transparent_objects
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
       int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
 
+      rvecs_->clear();
+      tvecs_->clear();
+      object_ids_->clear();
       rvecs_->push_back(poses[bestDetectionIndex].getRotationMatrix());
       tvecs_->push_back(poses[bestDetectionIndex].getTvec());
       object_ids_->push_back(detectedObjects[bestDetectionIndex]);
