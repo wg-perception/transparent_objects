@@ -94,11 +94,13 @@ namespace transparent_objects
       std::ofstream writer(file_name.c_str());
       writer << ss.rdbuf();
 
-      std::vector<cv::Point3f> points, normals;
-      std::vector<cv::Point3i> colors;
-      readPointCloud(file_name, points, colors, normals);
+      std::vector<cv::Point3f> points;
+      //std::vector<cv::Point3f> normals;
+      //std::vector<cv::Point3i> colors;
+      //readPointCloud(file_name, points, colors, normals);
+      readPointCloud(file_name, points);
 
-      EdgeModel edgeModel(points, true, false);
+      EdgeModel edgeModel(points, false, false);
       assert(!poseEstimator_->empty());
       (*poseEstimator_)->addObject(edgeModel);
       std::cout << "done." << std::endl;
