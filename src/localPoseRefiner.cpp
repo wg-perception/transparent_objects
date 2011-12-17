@@ -679,6 +679,9 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     setInitialPose(pose_cam);
   }
 
+  bool hasRotationSymmetry = false;
+  const int verticalDirectionIndex = 2;
+
   bool useObjectCoordinateSystem = !Rt_obj2cam_cached.empty();
   if(!useObjectCoordinateSystem)
     CV_Error(CV_StsBadArg, "camera coordinate system is not supported");
@@ -707,7 +710,15 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     newTranslationBasis2old = newBasis2old.colRange(1, 3).clone();
   }
 
-  const int paramsCount = newTranslationBasis2old.empty() ? 2*this->dim : newTranslationBasis2old.cols;
+  int paramsCount = 2*this->dim;
+  if (!newTranslationBasis2old.empty())
+  {
+    paramsCount = newTranslationBasis2old.cols;
+    if (!hasRotationSymmetry)
+    {
+      ++paramsCount;
+    }
+  }
   const int residualsCount = originalEdgeModel.stableEdgels.size() + originalEdgeModel.points.size();
 
   Mat params(paramsCount, 1, CV_64FC1, Scalar(0));
@@ -757,7 +768,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     {
       if (!newTranslationBasis2old.empty())
       {
-        tvecParams = newTranslationBasis2old * params;
+        Mat translationPart = params.rowRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+        tvecParams = newTranslationBasis2old * translationPart;
         CV_Assert(tvecParams.rows == dim);
         CV_Assert(tvecParams.cols == 1);
       }
@@ -782,7 +794,17 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 
       if (!newTranslationBasis2old.empty())
       {
-        surfaceJ = surfaceJ.colRange(dim, 2*dim) * newTranslationBasis2old;
+        Mat newSurfaceJ(surfaceJ.rows, paramsCount, surfaceJ.type());
+        if (!hasRotationSymmetry)
+        {
+          Mat rotationJ = surfaceJ.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
+          Mat theFirstCol = newSurfaceJ.col(0);
+          rotationJ.copyTo(theFirstCol);
+        }
+        Mat translationJ = surfaceJ.colRange(dim, 2*dim) * newTranslationBasis2old;
+        Mat lastCols = newSurfaceJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+        translationJ.copyTo(lastCols);
+        surfaceJ = newSurfaceJ;
       }
 
       Mat silhouetteJaW(2 * originalEdgeModel.points.size(), 2 * dim, CV_64F);
@@ -803,9 +825,18 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 
       if (!newTranslationBasis2old.empty())
       {
-        silhouetteJ = silhouetteJ.colRange(dim, 2*dim) * newTranslationBasis2old;
+        Mat newSilhouetteJ(silhouetteJ.rows, paramsCount, silhouetteJ.type());
+        if (!hasRotationSymmetry)
+        {
+          Mat rotationJ = silhouetteJ.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
+          Mat theFirstCol = newSilhouetteJ.col(0);
+          rotationJ.copyTo(theFirstCol);
+        }
+        Mat translationJ = silhouetteJ.colRange(dim, 2*dim) * newTranslationBasis2old;
+        Mat lastCols = newSilhouetteJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+        translationJ.copyTo(lastCols);
+        silhouetteJ = newSilhouetteJ;
       }
-
 
       computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
       if (silhouetteWeights.empty())
@@ -899,7 +930,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 
   if (!newTranslationBasis2old.empty())
   {
-    tvecParams = newTranslationBasis2old * params;
+    Mat translationPart = params.rowRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+    tvecParams = newTranslationBasis2old * translationPart;
   }
 
   Mat transMat;

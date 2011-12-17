@@ -151,7 +151,8 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
 
   silhouettes.clear();
   const float eps = 1e-4;
-  bool hasRotationSymmetry = norm(rotationAxis) > eps;
+  //bool hasRotationSymmetry = norm(rotationAxis) > eps;
+  bool hasRotationSymmetry = false;
   CV_Assert(silhouetteCount > 1);
   const int dim = 3;
 
