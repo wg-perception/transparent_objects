@@ -66,13 +66,14 @@ def meshlab(filename_in, filename_out):
 
 def simple_mesh_session(dbs, args):
     ply_name = args.ply_file
+    stl_name = args.stl_file
 
-    mesh_name = 'cloud_%s.stl' % args.object_id
-    meshlab(ply_name, mesh_name)
+    #mesh_name = 'cloud_%s.stl' % args.object_id
+    #meshlab(ply_name, mesh_name)
 
     if args.commit:
-        upload_mesh(dbs, args.object_id, ply_name, mesh_name)
-        os.unlink(mesh_name)
+        upload_mesh(dbs, args.object_id, ply_name, stl_name)
+#        os.unlink(mesh_name)
 
 ###################################################################################################################
 
@@ -81,6 +82,8 @@ def parse_args():
                                      'both to the database')
     parser.add_argument('-o,--object_id', dest='object_id', help='The id of the object', required=True)
     parser.add_argument('-p,--ply_file', dest='ply_file', help='The id of the object', required=True)
+    parser.add_argument('-s,--stl_file', dest='stl_file', help='The mesh of the object', required=True)
+
     object_recognition.dbtools.add_db_arguments(parser)
 
     args = parser.parse_args()
