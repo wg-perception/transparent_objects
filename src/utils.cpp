@@ -655,16 +655,48 @@ void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &point
   string ext = filename.substr(filename.size() - extSz, extSz);
   CV_Assert(ext == "ply");
 
+  bool isElementSet = false;
+  int propertyCount = 0;
+  bool arePropertiesCounted = false;
   while(!file.eof())
   {
     const int sz = 1024;
-    char line[sz];
-    file.getline(line, sz);
-    int res = strcmp("end_header", line);
+    char line_c[sz];
+    file.getline(line_c, sz);
+    string line = line_c;
+//    cout << line << endl;
+    if (!isElementSet)
+    {
+      if (line.find("element") != string::npos)
+      {
+        isElementSet = true;
+      }
+    }
+    else
+    {
+      if (!arePropertiesCounted)
+      {
+        if (line.find("property") != string::npos)
+        {
+          ++propertyCount;
+        }
+        else
+        {
+          arePropertiesCounted = true;
+        }
+      }
+    }
+
+    int res = strcmp("end_header", line_c);
 
     if(res == 0)
       break;
   }
+
+  const int pointCloutPropertiesCount = 3;
+  const int allPropertiesCount = 9;
+
+  CV_Assert(propertyCount == pointCloutPropertiesCount || propertyCount == allPropertiesCount);
 
   while(!file.eof())
   {
@@ -675,21 +707,23 @@ void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &point
     file >> pt.z;
     pointCloud.push_back(pt);
 
+    if (propertyCount == allPropertiesCount)
     {
-      Point3i pt;
-      file >> pt.x >> pt.y >> pt.z;
-      colors.push_back(pt);
-    }
+      Point3i pti;
+      file >> pti.x >> pti.y >> pti.z;
+      colors.push_back(pti);
 
-    {
-      Point3f pt;
-      file >> pt.x >> pt.y >> pt.z;
-      normals.push_back(pt);
+      Point3f ptf;
+      file >> ptf.x >> ptf.y >> ptf.z;
+      normals.push_back(ptf);
     }
   }
 
-  CV_Assert(pointCloud.size() == colors.size());
-  CV_Assert(pointCloud.size() == normals.size());
+  if (propertyCount == allPropertiesCount)
+  {
+    CV_Assert(pointCloud.size() == colors.size());
+    CV_Assert(pointCloud.size() == normals.size());
+  }
 }
 
 void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& tvec, vector<Point3f>& modif_points)

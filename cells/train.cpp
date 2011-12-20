@@ -95,10 +95,10 @@ namespace transparent_objects
       writer << ss.rdbuf();
 
       std::vector<cv::Point3f> points;
-      //std::vector<cv::Point3f> normals;
-      //std::vector<cv::Point3i> colors;
-      //readPointCloud(file_name, points, colors, normals);
-      readPointCloud(file_name, points);
+      std::vector<cv::Point3f> normals;
+      std::vector<cv::Point3i> colors;
+      //TODO: use the ply reader from PCL when a new version will be available in ROS
+      readPointCloud(file_name, points, colors, normals);
 
       EdgeModel edgeModel(points, false, false);
       assert(!poseEstimator_->empty());
