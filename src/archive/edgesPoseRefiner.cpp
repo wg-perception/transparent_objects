@@ -8,7 +8,6 @@
 #include <fstream>
 #include <set>
 #include <opencv2/highgui/highgui.hpp>
-#include <posest/pnp_ransac.h>
 
 using std::cout;
 using std::endl;

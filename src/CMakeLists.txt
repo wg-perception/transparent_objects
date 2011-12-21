@@ -1,22 +1,11 @@
 find_ros_package(pcl)
-  
+
+file(GLOB src "*.cpp" "chamfer_matching/*.cpp")
+file(GLOB inc "../include/edges_pose_refiner/*.hpp")
+
 add_library(edges_pose_refiner SHARED
-    localPoseRefiner.cpp 
-    utils.cpp
-    glassDetector.cpp
-    poseEstimator.cpp
-    edgeModel.cpp
-    registerPointClouds.cpp
-    kPartiteGraph.cpp
-    tangentVectorsEstimator.cpp
-    poseRT.cpp
-    pinholeCamera.cpp
-    silhouette.cpp
-    pclProcessing.cpp
-    transparentDetector.cpp
-  
-    chamfer_matching/chamfer_matching.cpp
-  
+    ${src}
+    ${inc}
     )
 
 set_target_properties(edges_pose_refiner
