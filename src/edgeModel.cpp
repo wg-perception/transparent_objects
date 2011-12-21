@@ -78,11 +78,13 @@ EdgeModel::EdgeModel()
 {
 }
 
-EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize)
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
 {
+  params = _params;
+
   EdgeModel inModel;
   Point3d axis(0.0, 0.0, 1.0);
-  inModel.hasRotationSymmetry = isAxisCorrect(_points, axis);
+  inModel.hasRotationSymmetry = isAxisCorrect(_points, axis, params.neighborIndex, params.distanceFactor, params.rotationCount);
   inModel.upStraightDirection = axis;
   inModel.points = _points;
   EdgeModelCreator::computeObjectSystem(inModel.points, inModel.Rt_obj2cam);
@@ -106,8 +108,8 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   {
     centralizedModel.upStraightDirection *= -1;
   }
-  setTableAnchor(centralizedModel);
-  setStableEdgels(centralizedModel);
+  setTableAnchor(centralizedModel, params.belowTableRatio);
+  setStableEdgels(centralizedModel, params.stableEdgelsRatio);
 
   EdgeModel outModel;
   if (centralize)
