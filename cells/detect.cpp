@@ -112,7 +112,7 @@ namespace transparent_objects
         cv::Mat visualization = color_->clone();
         detector_->visualize(poses, detectedObjects, visualization);
         imshow("detection", visualization);
-        //cv::waitKey(2000);
+        cv::waitKey(300);
 //        detector_->visualize(poses, detectedObjects, pclCloud);
       }
 
