@@ -36,24 +36,27 @@ void EdgeModel::projectPointsOnAxis(const EdgeModel &edgeModel, Point3d axis, ve
 
 void EdgeModel::setTableAnchor(EdgeModel &edgeModel, float belowTableRatio)
 {
-  Point3d rotationAxis = edgeModel.rotationAxis * (1.0 / norm(edgeModel.rotationAxis));
+  const float eps = 1e-4;
+  CV_Assert(fabs(norm(edgeModel.upStraightDirection) - 1.0) < eps);
   vector<float> projections;
   Point3d center_d;
-  projectPointsOnAxis(edgeModel, rotationAxis, projections, center_d);
+  projectPointsOnAxis(edgeModel, edgeModel.upStraightDirection, projections, center_d);
 
   int anchorIdx = belowTableRatio * projections.size();
   nth_element(projections.begin(), projections.begin() + anchorIdx, projections.end());
   float proj = projections[anchorIdx];
 
-  edgeModel.tableAnchor = center_d + proj * rotationAxis;
+  edgeModel.tableAnchor = center_d + proj * edgeModel.upStraightDirection;
 }
 
 void EdgeModel::setStableEdgels(EdgeModel &edgeModel, float stableEdgelsRatio)
 {
-  Point3d rotationAxis = edgeModel.rotationAxis * (1.0 / norm(edgeModel.rotationAxis));
+  const float eps = 1e-4;
+  CV_Assert(fabs(norm(edgeModel.upStraightDirection) - 1.0) < eps);
+
   vector<float> projections;
   Point3d center_d;
-  projectPointsOnAxis(edgeModel, rotationAxis, projections, center_d);
+  projectPointsOnAxis(edgeModel, edgeModel.upStraightDirection, projections, center_d);
 
   vector<float> projectionsBackup = projections;
 
@@ -78,7 +81,9 @@ EdgeModel::EdgeModel()
 EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel inModel;
-  inModel.rotationAxis = Point3d(0.0, 0.0, 1.0);
+  Point3d axis(0.0, 0.0, 1.0);
+  inModel.hasRotationSymmetry = isAxisCorrect(_points, axis);
+  inModel.upStraightDirection = axis;
   inModel.points = _points;
   EdgeModelCreator::computeObjectSystem(inModel.points, inModel.Rt_obj2cam);
 
@@ -99,7 +104,7 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   }
   if (isModelUpsideDown)
   {
-    centralizedModel.rotationAxis *= -1;
+    centralizedModel.upStraightDirection *= -1;
   }
   setTableAnchor(centralizedModel);
   setStableEdgels(centralizedModel);
@@ -136,7 +141,8 @@ EdgeModel *EdgeModel::operator=(const EdgeModel &edgeModel)
     stableEdgels = edgeModel.stableEdgels;
     orientations = edgeModel.orientations;
     normals = edgeModel.normals;
-    rotationAxis = edgeModel.rotationAxis;
+    hasRotationSymmetry = edgeModel.hasRotationSymmetry;
+    upStraightDirection = edgeModel.upStraightDirection;
     tableAnchor = edgeModel.tableAnchor;
     Rt_obj2cam = edgeModel.Rt_obj2cam.clone();
   }
@@ -151,8 +157,6 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
 
   silhouettes.clear();
   const float eps = 1e-4;
-  bool hasRotationSymmetry = norm(rotationAxis) > eps;
-  //bool hasRotationSymmetry = false;
   CV_Assert(silhouetteCount > 1);
   const int dim = 3;
 
@@ -325,7 +329,8 @@ void EdgeModel::rotate_cam(const PoseRT &transformation_cam, EdgeModel &rotatedE
   transformPoint(Rt_cam, tableAnchor, rotatedEdgeModel.tableAnchor);
 
   Rt_cam(Range(0, 3), Range(3, 4)).setTo(Scalar(0));
-  transformPoint(Rt_cam, rotationAxis, rotatedEdgeModel.rotationAxis);
+  transformPoint(Rt_cam, upStraightDirection, rotatedEdgeModel.upStraightDirection);
+  rotatedEdgeModel.hasRotationSymmetry = hasRotationSymmetry;
 
   Mat rvec_rot, tvec_rot;
   getRvecTvec(Rt_cam, rvec_rot, tvec_rot);
@@ -355,11 +360,11 @@ void EdgeModel::rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model
   transformPoint(invertedRotationalExtrinsics.getProjectiveMatrix(), zAxis, originalZAxis);
 
 
-  Point3d rotationDir = rotationAxis.cross(originalYAxis);
-//  Point3d rotationDir = rotationAxis.cross(yAxis);
+  Point3d rotationDir = upStraightDirection.cross(originalYAxis);
+//  Point3d rotationDir = upStraightDirection.cross(yAxis);
   Mat rvec_cam;
   point2col(rotationDir, rvec_cam);
-  double phi = acos(yAxis.ddot(rotationAxis) / norm(rotationAxis));
+  double phi = acos(yAxis.ddot(upStraightDirection) / norm(upStraightDirection));
   rvec_cam = phi * rvec_cam / norm(rvec_cam);
 
   Mat tvec_cam = Mat::zeros(3, 1, CV_64FC1);
@@ -481,7 +486,8 @@ void EdgeModel::write(cv::FileStorage &fs) const
   fs << "stableEdgels" << Mat(stableEdgels);
   fs << "normals" << Mat(normals);
   fs << "orientations" << Mat(orientations);
-  fs << "rotationAxis" << Mat(rotationAxis);
+  fs << "hasRotationSymmetry" << hasRotationSymmetry;
+  fs << "upStraightDirection" << Mat(upStraightDirection);
   fs << "tableAnchor" << Mat(tableAnchor);
   fs << "Rt_obj2cam" << Rt_obj2cam;
 
@@ -541,11 +547,13 @@ void EdgeModel::read(const cv::FileNode &fn)
     orientations = orientationsMat;
   }
 
-  Mat rotationAxisMat;
-  fn["rotationAxis"] >> rotationAxisMat;
-  CV_Assert(!rotationAxisMat.empty());
-  rotationAxis = Point3d(rotationAxisMat);
-  
+  hasRotationSymmetry = static_cast<int>(fn["hasRotationSymmetry"]);
+
+  Mat upStraightDirectionMat;
+  fn["upStraightDirection"] >> upStraightDirectionMat;
+  CV_Assert(!upStraightDirectionMat.empty());
+  upStraightDirection = Point3d(upStraightDirectionMat);
+
   Mat tableAnchorMat;
   fn["tableAnchor"] >> tableAnchorMat;
   CV_Assert(!tableAnchorMat.empty());
@@ -555,6 +563,57 @@ void EdgeModel::read(const cv::FileNode &fn)
   CV_Assert(!Rt_obj2cam.empty());
 }
 
+bool EdgeModel::isAxisCorrect(const std::vector<cv::Point3f> &points, cv::Point3f rotationAxis, int neighborIndex, float distanceFactor, int rotationCount)
+{
+  if (points.empty())
+  {
+    return true;
+  }
+
+  Scalar centerScalar = mean(points);
+  Point3f center(centerScalar[0], centerScalar[1], centerScalar[2]);
+
+  Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
+  vector<Mat> descriptors;
+  descriptors.push_back(Mat(points).reshape(1));
+  matcher->add(descriptors);
+
+  vector<vector<DMatch> > selfMatches;
+  matcher->knnMatch(Mat(points).reshape(1), selfMatches, neighborIndex + 1);
+  vector<float> distances(selfMatches.size());
+  for (size_t i = 0; i < selfMatches.size(); ++i)
+  {
+    distances[i] = selfMatches[i][neighborIndex].distance;
+  }
+  size_t medianIndex = distances.size() / 2;
+  std::nth_element(distances.begin(), distances.begin() + medianIndex,  distances.end());
+  float medianDistance = distances[medianIndex];
+  float largestDistance = 0.0f;
+  for (int rotationIndex = 1; rotationIndex < rotationCount; ++rotationIndex)
+  {
+    float rotationAngle = rotationIndex * (2.0 * CV_PI / rotationCount);
+
+    const int dim = 3;
+    Mat tvec = Mat::zeros(dim, 1, CV_64FC1);
+    Mat rvec;
+    Point3d rotationAxis_double = rotationAxis;
+    point2col(rotationAxis_double, rvec);
+
+    vector<Point3f> rotatedPoints;
+    project3dPoints(points, rvec, tvec, rotatedPoints);
+
+    vector<DMatch> matches;
+    matcher->match(Mat(rotatedPoints).reshape(1), matches);
+
+    float currentDistance = std::max_element(matches.begin(), matches.end())->distance;
+    if (currentDistance > largestDistance)
+    {
+      largestDistance = currentDistance;
+    }
+  }
+
+  return (largestDistance < distanceFactor * medianDistance);
+}
 
 bool EdgeModelCreator::TrainSample::isValid() const
 {

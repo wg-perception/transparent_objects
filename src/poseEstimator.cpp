@@ -158,7 +158,7 @@ void PoseEstimator::findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f 
 
   const int dim = 3;
 
-  Point3d rotatedAxis = rotatedEdgeModel.rotationAxis;
+  Point3d rotatedAxis = rotatedEdgeModel.upStraightDirection;
   Point3d tableNormal(tablePlane[0], tablePlane[1], tablePlane[2]);
 
   Mat Rot_obj2cam = rotatedEdgeModel.Rt_obj2cam.clone();

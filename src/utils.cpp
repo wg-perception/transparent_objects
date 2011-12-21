@@ -745,4 +745,3 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
 
 
 
-

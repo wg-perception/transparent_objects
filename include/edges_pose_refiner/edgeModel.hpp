@@ -48,9 +48,9 @@ struct EdgeModel
    */
   cv::Mat Rt_obj2cam;
 
-  /** \brief The rotation axis of the object */
-  cv::Point3d rotationAxis;
+  cv::Point3d upStraightDirection;
 
+  bool hasRotationSymmetry;
   /** \brief Point on the rotation axis and a table */
   cv::Point3d tableAnchor;
 
@@ -150,6 +150,8 @@ struct EdgeModel
   void read(const cv::FileNode &fn);
 
 private:
+  //TODO: remove default parameters
+  static bool isAxisCorrect(const std::vector<cv::Point3f> &points, cv::Point3f rotationAxis, int neighborIndex = 1, float distanceFactor = 2.0f, int rotationCount = 60);
   //TODO: remove the default parameter
   void rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model2canonicalPose, float distance = 1.0f);
   static void projectPointsOnAxis(const EdgeModel &edgeModel, cv::Point3d axis, std::vector<float> &projections, cv::Point3d &center_d);

@@ -679,7 +679,7 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     setInitialPose(pose_cam);
   }
 
-  bool hasRotationSymmetry = true;
+  bool hasRotationSymmetry = rotatedEdgeModel.hasRotationSymmetry;
   const int verticalDirectionIndex = 2;
 
   bool useObjectCoordinateSystem = !Rt_obj2cam_cached.empty();
