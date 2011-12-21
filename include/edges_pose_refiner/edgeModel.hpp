@@ -12,6 +12,40 @@
 #include "edges_pose_refiner/utils.hpp"
 #include "edges_pose_refiner/silhouette.hpp"
 
+struct EdgeModelCreationParams
+{
+  /** \brief Index of a neighbor to compute a median distance of all points */
+  int neighborIndex;
+
+  /** \brief maximum ratio between the largest Chamfer distance and the median distance to consider an object as symmetric */
+  float distanceFactor;
+
+  /** \brief number of rotations to compute Chamfer distance */
+  int rotationCount;
+
+  /** \brief ratio of object points below table
+   *
+   *  It is used to be robust to outliers
+   */
+  float belowTableRatio;
+
+  /** \brief ratio of object points which are considered as unstable edgels
+   *
+   *  Stable edgels are located on the top of an object because they produces edges often.
+   */
+  float stableEdgelsRatio;
+
+  EdgeModelCreationParams()
+  {
+    neighborIndex = 1;
+    distanceFactor = 2.0f;
+    rotationCount = 60;
+
+    belowTableRatio = 0.01f;
+    stableEdgelsRatio = 0.9f;
+  }
+};
+
 /** \brief The 3D model that represents edges of an object in 3D
  *
  * The model is a collection of 3d points.
@@ -48,17 +82,19 @@ struct EdgeModel
    */
   cv::Mat Rt_obj2cam;
 
+ /** \brief Direction of a normal to a table when the object is placed on this table */
   cv::Point3d upStraightDirection;
 
+ /** \brief Does the object have rotation symmetry aroung upStraightDirection or not */
   bool hasRotationSymmetry;
+
   /** \brief Point on the rotation axis and a table */
   cv::Point3d tableAnchor;
-
 
   /** \brief Empty constructor */
   EdgeModel();
 
-  EdgeModel(const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize);
+  EdgeModel(const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &params = EdgeModelCreationParams());
 
   /** \brief Create deep copy of the edgeModel object */
   EdgeModel(const EdgeModel &edgeModel);
@@ -139,26 +175,42 @@ struct EdgeModel
    */
   void visualize(const ros::Publisher &points_pub);
 
+  /** \brief Visualize the edge model in a PCL viewer */
   void visualize();
 
-  /** Write a model to a file */
+  /** \brief Write a model to a file
+   *
+   *  \param filename Name of the file to write the model
+   */
   void write(const std::string &filename);
+
+  /** \brief Write a model to a file storage
+   *
+   *  \param fs file storage to write the model
+   */
   void write(cv::FileStorage &fs) const;
 
-  /** Read a model from a file */
+  /** \brief Read a model from a file
+   *
+   *  \param filename Name of the file to read the model
+   */
   void read(const std::string &filename);
+
+  /** \brief Read a model from a file node
+   *
+   *  \param fn file node to read the model
+   */
   void read(const cv::FileNode &fn);
 
 private:
-  //TODO: remove default parameters
-  static bool isAxisCorrect(const std::vector<cv::Point3f> &points, cv::Point3f rotationAxis, int neighborIndex = 1, float distanceFactor = 2.0f, int rotationCount = 60);
+  EdgeModelCreationParams params;
+
+  static bool isAxisCorrect(const std::vector<cv::Point3f> &points, cv::Point3f rotationAxis, int neighborIndex, float distanceFactor, int rotationCount);
   //TODO: remove the default parameter
   void rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model2canonicalPose, float distance = 1.0f);
   static void projectPointsOnAxis(const EdgeModel &edgeModel, cv::Point3d axis, std::vector<float> &projections, cv::Point3d &center_d);
-  //TODO: remove the default parameter
-  static void setTableAnchor(EdgeModel &edgeModel, float belowTableRatio = 0.01f);
-  //TODO: remove the default parameter
-  static void setStableEdgels(EdgeModel &edgeModel, float stableEdgelsRatio = 0.9f);
+  static void setTableAnchor(EdgeModel &edgeModel, float belowTableRatio);
+  static void setStableEdgels(EdgeModel &edgeModel, float stableEdgelsRatio);
 };
 
 /** \brief Parameters of the edge model creating */
