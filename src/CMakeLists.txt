@@ -1,27 +1,35 @@
 find_ros_package(pcl)
-  
+
 add_library(edges_pose_refiner SHARED
-    localPoseRefiner.cpp 
+    localPoseRefiner.cpp
     utils.cpp
     glassDetector.cpp
     poseEstimator.cpp
       edgeModel.cpp
   registerPointClouds.cpp
-  kPartiteGraph.cpp 
+  kPartiteGraph.cpp
   tangentVectorsEstimator.cpp
   poseRT.cpp
   pinholeCamera.cpp
   silhouette.cpp
     pclProcessing.cpp
-  
+
     chamfer_matching/chamfer_matching.cpp
-  
+
     )
 
-set_target_properties(edges_pose_refiner
- PROPERTIES
- COMPILE_FLAGS "-std=c++0x -Wno-deprecated"
- )
+#
+# Hey!  if you're going to do this, you better test it, thoroughly.  In this case
+# it appears the first person to attempt to build on natty was a user.  I'm guessing
+# the code worked on lucid.  Or something.
+#
+# set_target_properties(edges_pose_refiner
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x -Wno-deprecated"
+#  )
+
+# Thanks a lot, vtk.  Why are we dependent on vtk?
+add_definitions(-Wno-deprecated)
 
 target_link_libraries(edges_pose_refiner
   ${pcl_LIBRARIES}
