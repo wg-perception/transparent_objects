@@ -703,7 +703,31 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     CV_Assert(norm(t1) > eps);
     Point3d t2 = tableNormal_obj.cross(t1);
 
+#if 0
+    //
+    // A dependency on C++11... for this?
+    //
+    // This code is fine, but to compile it, the -std=c++0x flag
+    // pulls in the entirety of boost C++11 support, and the boost.thread library
+    // in 1.42.0 has some problem involving rvalue refs that has probably been fixed
+    // in more recent versions.
+    //
+    // PLEASE: *always* test on all common platforms.  It is much,
+    // much easier to have the original author catch these things as
+    // they're being written than for, 1.  some unsuspecting user to
+    // lose hours trying to figure out if it is "just them" or not
+    // and, 2. somebody like me to drop what they're doing, just to
+    // tell said user that it isn't their fault.  In this case the
+    // user was one of the Good Ones with a carefully prepared
+    // machine, no funny customizations.
+    //
     vector<Point3d> basis = {tableNormal_obj, t1, t2};
+#else
+    vector<Point3d> basis;
+    basis.push_back(tableNormal_obj);
+    basis.push_back(t1);
+    basis.push_back(t2);
+#endif
     Mat oldBasis2new = Mat(basis).reshape(1);
     Mat newBasis2old = oldBasis2new.inv(DECOMP_SVD);
 
