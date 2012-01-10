@@ -14,6 +14,7 @@
 
 class EdgeModel;
 
+//TODO: use robust statistics
 class Silhouette
 {
 public:
@@ -27,7 +28,7 @@ public:
   void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, PoseRT &pose_cam) const;
 
   void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test) const;
-  void draw(cv::Mat &image) const;
+  void draw(cv::Mat &image, int thickness = 1) const;
 
   void read(const cv::FileNode &fn);
   void write(cv::FileStorage &fs) const;

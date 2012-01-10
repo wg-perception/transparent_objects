@@ -123,6 +123,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 
     poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane);
     std::cout << "done." << std::endl;
+    std::cout << "detected poses: " << currentPoses.size() << std::endl;
     if (!currentPoses.empty())
     {
       poses_cam.push_back(currentPoses[0]);

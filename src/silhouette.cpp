@@ -11,6 +11,8 @@
 #include <opencv2/opencv.hpp>
 
 using namespace cv;
+using std::cout;
+using std::endl;
 
 //#define VISUALIZE_TRANSFORMS
 
@@ -57,7 +59,7 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
   pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
 }
 
-void Silhouette::draw(cv::Mat &image) const
+void Silhouette::draw(cv::Mat &image, int thickness) const
 {
   CV_Assert(image.type() == CV_8UC1);
   vector<Point2f> edgelsVec = edgels;
@@ -66,7 +68,7 @@ void Silhouette::draw(cv::Mat &image) const
     Point pt = edgelsVec[i];
     CV_Assert(isPointInside(image, pt));
 
-    image.at<uchar>(pt) = 255;
+    circle(image, pt, 1, Scalar(255), thickness);
   }
 }
 
@@ -227,6 +229,28 @@ void Silhouette::match(const cv::Mat &inputEdgels, cv::Mat &silhouette2test) con
   Mat transformedModel;
   transform(edgels, transformedModel, transformationMatrix);
   showNormalizedPoints(transformedModel, "transformed model");
+
+  //TODO: remove fixed resolution
+  Mat initImage(480, 640, CV_8UC3, Scalar(0));
+  vector<Point2f> testEdgelsVec = testEdgels;
+  drawPoints(testEdgelsVec, initImage, Scalar(0, 255, 0), 3);
+  vector<Point2f> modelEdgelsVec = initialTransformedModel;
+  drawPoints(modelEdgelsVec, initImage, Scalar(0, 0, 255), 3);
+
+  Mat finalImage(480, 640, CV_8UC3, Scalar(0));
+  drawPoints(testEdgelsVec, finalImage, Scalar(0, 255, 0), 3);
+  vector<Point2f> finalModelEdgelsVec = transformedModel;
+  drawPoints(finalModelEdgelsVec, finalImage, Scalar(0, 0, 255), 3);
+
+  Mat testImage(480, 640, CV_8UC3, Scalar(0));
+  drawPoints(testEdgelsVec, testImage, Scalar(0, 255, 0), 3);
+  vector<Point2f> templateEdgelsVec = edgels;
+  drawPoints(templateEdgelsVec, testImage, Scalar(0, 0, 255), 3);
+
+  imshow("initTransformation", initImage);
+  imshow("finalTransformation", finalImage);
+  imshow("testEdgels", testImage);
+
   waitKey();
 #endif
 

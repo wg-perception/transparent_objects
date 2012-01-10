@@ -17,6 +17,10 @@ void showSegmentation(const Mat &image, const Mat &mask, const string &title = "
 
 void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentationParams &params)
 {
+#ifdef VISUALIZE
+  imshow("before grabcut", rawMask);
+#endif
+
   refinedMask = Mat(rawMask.size(), CV_8UC1, Scalar(0));
   Mat erodedMask;
   erode(rawMask, erodedMask, Mat(), Point(-1, -1), params.grabCutErosionsIterations);
@@ -29,6 +33,9 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
   findContours(tmpRawMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 
 //  cout << "Running grabCut on " << contours.size() << " contours" << endl;
+#ifdef VISUALIZE
+  Mat commonMask(rawMask.size(), CV_8UC1, Scalar(4));
+#endif
   for(size_t i = 0; i < contours.size(); ++i)
   {
     Rect roi = boundingRect(Mat(contours[i]));
@@ -48,18 +55,21 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     curMask(roi).setTo(GC_PR_FGD, rawMask(roi));
     curMask(roi).setTo(GC_FGD, erodedMask(roi));
 
-#ifdef VISUALIZE
-    showGrabCutResults(curMask, "init mask");
-    waitKey();
-#endif
-
-
-
     Mat bgdModel, fgdModel;
     Mat roiMask = curMask(fullRoi);
+
+#ifdef VISUALIZE
+    showGrabCutResults(curMask, "initMask");
+    Mat commonMaskRoi = commonMask(fullRoi);
+    roiMask.copyTo(commonMaskRoi);
+#endif
+
     grabCut(bgrImage(fullRoi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
     curMask.copyTo(refinedMask, curMask);
   }
+#ifdef VISUALIZE
+  showGrabCutResults(commonMask, "initMask");
+#endif
 }
 
 void snakeImage(const Mat &image, vector<Point> &points)
@@ -195,6 +205,20 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
 
 void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
+#ifdef VISUALIZE
+  vector<Point3f> cvTableHull;
+  pcl2cv(*tableHull, cvTableHull);
+  vector<Point2f> projectedHull;
+  camera->projectPoints(cvTableHull, PoseRT(), projectedHull);
+
+  Mat visualizedGlassMask = bgrImage.clone();
+  for (size_t i = 0; i < projectedHull.size(); ++i)
+  {
+    line(visualizedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0), 3);
+  }
+  imshow("table hull", visualizedGlassMask);
+#endif
+
 //  Mat srcMask = depthMat == 0;
   Mat srcMask = (depthMat != depthMat);
   //TODO: fix

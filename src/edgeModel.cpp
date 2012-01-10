@@ -194,7 +194,8 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
   for(size_t i = 0; i < silhouettes.size(); ++i)
   {
     Mat image(pinholeCamera->imageSize, CV_8UC1, Scalar(0));
-    silhouettes[i].draw(image);
+    const int thickness = 3;
+    silhouettes[i].draw(image, thickness);
     imshow("silhouette", image);
     waitKey();
   }

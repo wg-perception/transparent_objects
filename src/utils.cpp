@@ -514,7 +514,7 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
   CV_Assert(!blackBlobsObject.empty() && !whiteBlobsObject.empty());
 }
 
-cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask)
+cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness)
 {
   Mat drawImage = image.clone();
   CV_Assert(drawImage.channels() == 3);
@@ -522,7 +522,7 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask)
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;
   findContours(glassMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-  drawContours(drawImage, contours, -1, Scalar(0, 255, 0), 1);
+  drawContours(drawImage, contours, -1, Scalar(0, 255, 0), thickness);
   return drawImage;
 }
 
@@ -550,7 +550,7 @@ vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point
     for(size_t j=0; j<projectedEdgels.size(); j++)
     {
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
-      circle(drawImages[i], projectedEdgels[j], 0, color, -1);
+      circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
 
 #ifdef VISUALIZE_POSE_REFINEMENT
@@ -743,5 +743,14 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
   }
 }
 
-
+void drawPoints(const std::vector<cv::Point2f> &points, cv::Mat &image, Scalar color, int thickness)
+{
+  CV_Assert(!image.empty());
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    Point2f pt = points[i];
+    CV_Assert(isPointInside(image, pt));
+    circle(image, pt, 1, color, thickness);
+  }
+}
 
