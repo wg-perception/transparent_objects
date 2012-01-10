@@ -12,7 +12,9 @@
 #include "edges_pose_refiner/pinholeCamera.hpp"
 #include "edges_pose_refiner/poseRT.hpp"
 
+#ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
+#endif
 
 #include <opencv2/core/core.hpp>
 
@@ -68,7 +70,9 @@ public:
   cv::Size getValitTestImageSize() const;
 
   void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255)) const;
+#ifdef USE_3D_VISUALIZATION
   void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
+#endif
 private:
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;

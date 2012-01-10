@@ -9,8 +9,10 @@
 #include "edges_pose_refiner/localPoseRefiner.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
+#ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
+#endif
 
 #include <opencv2/opencv.hpp>
 #include <boost/thread/thread.hpp>
@@ -658,6 +660,7 @@ void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar col
   image = displayEdgels(image, edgeModel.points, pose, kinectCamera, "", color);
 }
 
+#ifdef USE_3D_VISUALIZATION
 void PoseEstimator::visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title) const
 {
   vector<Point3f> object;
@@ -668,6 +671,7 @@ void PoseEstimator::visualize(const PoseRT &pose, const boost::shared_ptr<pcl::v
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> objectColor(pclObject.makeShared(), color[2], color[1], color[0]);
   viewer->addPointCloud<pcl::PointXYZ>(pclObject.makeShared(), objectColor, title);
 }
+#endif
 
 cv::Size PoseEstimator::getValitTestImageSize() const
 {

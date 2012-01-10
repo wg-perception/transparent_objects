@@ -34,8 +34,10 @@
 
 #include <opencv2/opencv.hpp>
 
+#ifdef VISUALIZE_TABLE_ESTIMATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
+#endif
 
 using namespace cv;
 

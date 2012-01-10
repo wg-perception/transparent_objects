@@ -6,8 +6,7 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
 
-#define USE_PCL_VISUALIZATION 1
-#if USE_PCL_VISUALIZATION
+#ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #endif
@@ -458,7 +457,7 @@ void EdgeModel::visualize()
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclPoints(new pcl::PointCloud<pcl::PointXYZ>), pclStablePoints(new pcl::PointCloud<pcl::PointXYZ>);
   cv2pcl(points, *pclPoints);
   cv2pcl(stableEdgels, *pclStablePoints);
-#if USE_PCL_VISUALIZATION
+#ifdef USE_3D_VISUALIZATION
   pcl::visualization::CloudViewer viewer ("all points");
   viewer.showCloud(pclPoints, "points");
 

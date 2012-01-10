@@ -117,7 +117,9 @@ namespace transparent_objects
         detector_->visualize(poses, detectedObjects, visualization);
         imshow("detection", visualization);
         cv::waitKey(300);
-//        detector_->visualize(poses, detectedObjects, pclCloud);
+#ifdef USE_3D_VISUALIZATION
+        detector_->visualize(poses, detectedObjects, pclCloud);
+#endif
       }
 
       rvecs_->clear();

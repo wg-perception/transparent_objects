@@ -10,7 +10,9 @@
 #include "edges_pose_refiner/glassDetector.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
+#ifdef USE_3D_VISUALIZATION
 #include <boost/thread/thread.hpp>
+#endif
 
 #include <opencv2/opencv.hpp>
 
@@ -159,6 +161,7 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 
 void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
+#ifdef USE_3D_VISUALIZATION
   CV_Assert(poses.size() == objectNames.size());
 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));
@@ -177,5 +180,6 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
      viewer->spinOnce (100);
      boost::this_thread::sleep (boost::posix_time::microseconds (100000));
    }
+#endif
 }
 
