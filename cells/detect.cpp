@@ -75,22 +75,26 @@ namespace transparent_objects
     {
       std::cout << "detector: process" << std::endl;
 #ifdef TRANSPARENT_DEBUG
-//      cv::FileStorage fs("input.xml", cv::FileStorage::READ);
-//      fs["K"] >> *K_;
-//      fs["image"] >> *color_;
-//      fs["depth"] >> *depth_;
-//      fs["points3d"] >> *cloud_;
-//      fs.release();
-      
-      cv::imwrite("color.png", *color_);
-      cv::imwrite("depth.png", *depth_);
-      cv::FileStorage fs("input.xml", cv::FileStorage::WRITE);
-      fs << "K" << *K_;
-      fs << "image" << *color_;
-      fs << "depth" << *depth_;
-      fs << "points3d" << *cloud_;
+      cv::FileStorage fs("input.xml", cv::FileStorage::READ);
+      if (fs.isOpened())
+      {
+        fs["K"] >> *K_;
+        fs["image"] >> *color_;
+        fs["depth"] >> *depth_;
+        fs["points3d"] >> *cloud_;
+      }
+      else
+      {
+        cv::imwrite("color.png", *color_);
+        cv::imwrite("depth.png", *depth_);
+        cv::FileStorage outFs("input.xml", cv::FileStorage::WRITE);
+        outFs << "K" << *K_;
+        outFs << "image" << *color_;
+        outFs << "depth" << *depth_;
+        outFs << "points3d" << *cloud_;
+        outFs.release();
+      }
       fs.release();
-
 #endif
 
       assert(cloud_->channels() == 3);
