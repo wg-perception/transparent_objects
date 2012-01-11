@@ -333,33 +333,9 @@ void TODBaseImporter::importEdgeModel(const std::string &modelsPath, const std::
   catch(cv::Exception &e)
   {
     cout << "Cannot read edge model: " << modelFilename << endl;
-/*
-    exportTrainPointClouds("clouds/");
-    string alignedModelFilename = "alignedModels/" + objectName + ".xml";
-    try
-    {
-      edgeModel.read(alignedModelFilename);
-    }
-    catch(cv::Exception &e2)
-    {
-      vector<vector<Point3f> > registeredClouds;
-      readRegisteredClouds("registeredClouds/config.txt", registeredClouds);
-      matchRegisteredClouds(registeredClouds, edgeModel);
-      alignModel(edgeModel);
-      edgeModel.write(alignedModelFilename);
-    }
-*/
-    edgeModel.rotationAxis = Point3d(0.0, 0.0, 1.0);
-
-//    computeStableEdgels(edgeModel);
-//    writePointCloud("alignedModel.asc", edgeModel.points);
-//    namedWindow("waiting downsampled point cloud...");
-//    waitKey();
-
-//    readPointCloud("downModels/" + objectName + ".ply", edgeModel.points, &edgeModel.normals);
-    readPointCloud("downModels/" + objectName + ".ply", edgeModel.points);
-    EdgeModelCreator::computeObjectSystem(edgeModel.points, edgeModel.Rt_obj2cam);
-
+    vector<Point3f> points;
+    readPointCloud(modelsPath + "/downPointClouds/" + objectName + ".ply", points);
+    edgeModel = EdgeModel(points, true, true);
     edgeModel.write(modelFilename);
   }
 }

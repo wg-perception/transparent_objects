@@ -29,7 +29,7 @@ PoseEstimator::PoseEstimator(const PinholeCamera &_kinectCamera, const PoseEstim
   params = _params;
 }
 
-void PoseEstimator::addObject(const EdgeModel &_edgeModel)
+void PoseEstimator::setModel(const EdgeModel &_edgeModel)
 {
   edgeModel = _edgeModel;
 
@@ -58,6 +58,7 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
 
 void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities, ros::Publisher *pt_pub) const
 {
+  cout << "refine poses by table orientation" << endl;
   if (poses_cam.empty())
   {
     return;
@@ -243,109 +244,6 @@ void PoseEstimator::findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f 
   pose_cam = transform2table_cam * pose_cam;
 }
 
-bool PoseEstimator::tmpComputeTableOrientation(const cv::Mat &centralBgrImage, Vec4f &tablePlane, ros::Publisher *pt_pub) const
-{
-  Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
-  readFiducial("fiducial.yml", blackBlobsObject, whiteBlobsObject, allBlobsObject);
-
-  SimpleBlobDetector::Params params;
-  params.filterByInertia = true;
-  params.minArea = 10;
-  params.minDistBetweenBlobs = 5;
-
-  params.blobColor = 0;
-  Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
-
-  params.blobColor = 255;
-  Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
-
-  const Size boardSize(4, 11);
-
-  Mat blackBlobs, whiteBlobs;
-  bool isBlackFound = findCirclesGrid(centralBgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
-  bool isWhiteFound = findCirclesGrid(centralBgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
-  if (!isBlackFound && !isWhiteFound)
-  {
-    cout << isBlackFound << " " << isWhiteFound << endl;
-    imshow("can't estimate", centralBgrImage);
-    waitKey();
-    return false;
-  }
-
-  Mat rvec, tvec;
-  Mat allBlobs = blackBlobs.clone();
-  allBlobs.push_back(whiteBlobs);
-
-  Mat blobs, blobsObject;
-  if (isBlackFound && isWhiteFound)
-  {
-    blobs = allBlobs;
-    blobsObject = allBlobsObject;
-  }
-  else
-  {
-    if (isBlackFound)
-    {
-      blobs = blackBlobs;
-      blobsObject = blackBlobsObject;
-    }
-    if (isWhiteFound)
-    {
-      blobs = whiteBlobs;
-      blobsObject = whiteBlobsObject;
-    }
-  }
-
-  solvePnP(blobsObject, blobs, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, rvec, tvec);
-
-  PoseRT pose_cam(rvec, tvec);
-
-  Point3d tableAnchor;
-  transformPoint(pose_cam.getProjectiveMatrix(), Point3d(0.0, 0.0, 0.0), tableAnchor);
-
-/*
-  if (pt_pub != 0)
-  {
-    vector<Point3f> points;
-
-    vector<Point3f> objectPoints = blackBlobsObject;
-
-    for (size_t i = 0; i < objectPoints.size(); ++i)
-    {
-      Point3d pt;
-      transformPoint(pose_cam.getProjectiveMatrix(), objectPoints[i], pt);
-      points.push_back(pt);
-      tableAnchor = pt;
-    }
-    objectPoints = whiteBlobsObject;
-    for (size_t i = 0; i < objectPoints.size(); ++i)
-    {
-      Point3d pt;
-      transformPoint(pose_cam.getProjectiveMatrix(), objectPoints[i], pt);
-      points.push_back(pt);
-    }
-
-
-    publishPoints(points, *pt_pub, 234, Scalar(255, 0, 255));
-  }
-*/
-
-
-  pose_cam.tvec = Mat::zeros(3, 1, CV_64FC1);
-  Point3d tableNormal;
-  transformPoint(pose_cam.getProjectiveMatrix(), Point3d(0.0, 0.0, -1.0), tableNormal);
-
-  const int dim = 3;
-  for (int i = 0; i < dim; ++i)
-  {
-    tablePlane[i] = Vec3d(tableNormal)[i];
-  }
-  tablePlane[dim] = -tableNormal.ddot(tableAnchor);
-
-  return true;
-}
-
-
 void PoseEstimator::computeCentralEdges(const Mat &centralBgrImage, const Mat &glassMask, Mat &centralEdges, Mat &silhouetteEdges) const
 {
   Mat centralGrayImage;
@@ -378,6 +276,7 @@ void PoseEstimator::computeCentralEdges(const Mat &centralBgrImage, const Mat &g
 
 void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const
 {
+  cout << "get initial poses..." << endl;
   initialPoses.clear();
   initialPosesQualities.clear();
 
@@ -401,6 +300,8 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 
   vector<vector<PoseRT> > candidatePoses(allGlassContours.size());
   vector<vector<float> > candidateQualities(allGlassContours.size());
+  cout << "Number of glass contours: " << allGlassContours.size() << endl;
+  cout << "Silhouettes size: " << silhouettes.size() << endl;
   for (size_t contourIndex = 0; contourIndex < allGlassContours.size(); ++contourIndex)
   {
     if (allGlassContours[contourIndex].size() < params.minGlassContourLength)
@@ -517,6 +418,8 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
     }
   }
 
+  cout << "Number of initial poses: " << initialPoses.size() << endl;
+
 //  int bestContourIndex = -1;
 //  float bestQuality = std::numeric_limits<float>::max();
 //  for (int i = 0; i < static_cast<int>(candidateQualities.size()); ++i)
@@ -543,6 +446,7 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 
 void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities) const
 {
+  cout << "refine initial poses" << endl;
   if (initPoses_cam.empty())
   {
     return;

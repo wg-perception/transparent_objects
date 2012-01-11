@@ -102,7 +102,7 @@ namespace transparent_objects
 
       EdgeModel edgeModel(points, false, false);
       assert(!poseEstimator_->empty());
-      (*poseEstimator_)->addObject(edgeModel);
+      (*poseEstimator_)->setModel(edgeModel);
       std::cout << "done." << std::endl;
       return ecto::OK;
     }

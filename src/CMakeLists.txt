@@ -46,3 +46,9 @@ install(TARGETS edges_pose_refiner
   DESTINATION lib
   )
 
+#add_executable(transparentExperiments transparent_experiments/transparentExperiments.cpp transparent_experiments/TODBaseImporter.cpp)
+#set_target_properties(transparentExperiments
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x"
+#  )
+#target_link_libraries(transparentExperiments edges_pose_refiner)

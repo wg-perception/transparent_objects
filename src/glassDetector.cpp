@@ -186,7 +186,7 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
     circle(visualizedGlassMask, projectedHull[i], 2, Scalar(0, 0, 255), -1);
     line(visualizedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0));
   }
-  imshow("table", visualizedGlassMask);
+  imshow("table hull", visualizedGlassMask);
 #endif
 
   vector<vector<Point> > contours;
@@ -205,20 +205,6 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
 
 void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
-#ifdef VISUALIZE
-  vector<Point3f> cvTableHull;
-  pcl2cv(*tableHull, cvTableHull);
-  vector<Point2f> projectedHull;
-  camera->projectPoints(cvTableHull, PoseRT(), projectedHull);
-
-  Mat visualizedGlassMask = bgrImage.clone();
-  for (size_t i = 0; i < projectedHull.size(); ++i)
-  {
-    line(visualizedGlassMask, projectedHull[i], projectedHull[(i + 1) % projectedHull.size()], Scalar(255, 0, 0), 3);
-  }
-  imshow("table hull", visualizedGlassMask);
-#endif
-
 //  Mat srcMask = depthMat == 0;
   Mat srcMask = (depthMat != depthMat);
   //TODO: fix
@@ -231,14 +217,19 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
 
   CV_Assert(!registrationMask.empty());
   CV_Assert(registrationMask.size() == depthMat.size());
+  CV_Assert(registrationMask.type() == CV_8UC1);
   srcMask.setTo(0, registrationMask);
+#ifdef VISUALIZE
+  imshow("mask without registration", srcMask);
+#endif
+
   if (camera != 0 && tablePlane != 0 && tableHull != 0)
   {
     refineGlassMaskByTableOrientation(*camera, *tablePlane, *tableHull, srcMask);
   }
 
 #ifdef VISUALIZE
-  imshow("mask without registration", srcMask);
+  imshow("mask with table", srcMask);
 #endif
 
   Mat mask = srcMask.clone();

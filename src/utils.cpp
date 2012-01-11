@@ -21,6 +21,8 @@ using namespace cv;
 
 //#define USE_RVIZ
 
+//#define VISUALIZE_POSE_REFINEMENT
+
 //TODO: is Projective right name?
 void createProjectiveMatrix(const cv::Mat &R, const cv::Mat &t, cv::Mat &Rt)
 {
@@ -345,6 +347,17 @@ void interpolatePointCloud(const cv::Mat &mask, const std::vector<cv::Point3f> &
   waitKey();
 */
 }
+
+#ifdef USE_3D_VISUALIZATION
+void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title)
+{
+  pcl::PointCloud<pcl::PointXYZ> pclPoints;
+  cv2pcl(points, pclPoints);
+
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> pointsColor(pclPoints.makeShared(), color[2], color[1], color[0]);
+  viewer->addPointCloud<pcl::PointXYZ>(pclPoints.makeShared(), pointsColor, title);
+}
+#endif
 
 void publishPoints(const std::vector<cv::Point3f>& points, const ros::Publisher &points_pub, int id, cv::Scalar color)
 {

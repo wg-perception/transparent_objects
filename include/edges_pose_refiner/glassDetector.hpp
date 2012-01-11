@@ -5,6 +5,9 @@
  *      Author: Ilya Lysenkov
  */
 
+#ifndef GLASSDETECTOR_HPP_
+#define GLASSDETECTOR_HPP_
+
 #include <opencv2/core/core.hpp>
 #include <pcl/pcl_base.h>
 #include <pcl/point_types.h>
@@ -74,3 +77,5 @@ public:
 private:
   GlassSegmentationParams params;
 };
+
+#endif

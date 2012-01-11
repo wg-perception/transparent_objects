@@ -19,6 +19,8 @@
 //#define VISUALIZE_DETECTION
 
 using namespace cv;
+using std::cout;
+using std::endl;
 
 TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
 {
@@ -29,6 +31,20 @@ void TransparentDetector::initialize(const PinholeCamera &_camera, const Transpa
 {
   srcCamera = _camera;
   params = _params;
+}
+
+void TransparentDetector::addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
+{
+  EdgeModel edgeModel(points, isModelUpsideDown, centralize);
+  addModel(name, edgeModel);
+}
+
+void TransparentDetector::addModel(const std::string &name, const EdgeModel &edgeModel)
+{
+  PoseEstimator estimator(srcCamera);
+  estimator.setModel(edgeModel);
+
+  addObject(name, estimator);
 }
 
 void TransparentDetector::addObject(const std::string &name, const PoseEstimator &estimator)
@@ -74,9 +90,16 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
   CV_Assert(depth.size() == validTestImageSize);
   CV_Assert(registrationMask.size() == validTestImageSize);
 
+#ifdef VISUALIZE_DETECTION
+  cv::imshow("bgrImage", bgrImage);
+  cv::imshow("depth", depth);
+  cv::waitKey(100);
+#endif
+
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
   bool isEstimated = computeTableOrientation(params.downLeafSize, params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
+//  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane, 0);
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
@@ -89,16 +112,20 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 
   int numberOfComponents;
   cv::Mat glassMask;
-  GlassSegmentator glassSegmentator;
+  GlassSegmentator glassSegmentator(params.glassSegmentationParams);
   glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
-
+//  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
   std::cout << "glass is segmented" << std::endl;
+  if (numberOfComponents == 0)
+  {
+    CV_Error(CV_StsOk, "Cannot segment a transparent object");
+  }
 
 #ifdef VISUALIZE_DETECTION
   cv::Mat segmentation = drawSegmentation(bgrImage, glassMask);
-  cv::imshow("depth", depth);
   cv::imshow("glassMask", glassMask);
   cv::imshow("segmentation", segmentation);
+  cv::waitKey(100);
 #endif
 
 #ifdef TRANSPARENT_DEBUG
@@ -183,3 +210,105 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 #endif
 }
 
+bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane, ros::Publisher *pt_pub) const
+{
+  Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
+  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
+  readFiducial(fiducialFilename, blackBlobsObject, whiteBlobsObject, allBlobsObject);
+
+  SimpleBlobDetector::Params params;
+  params.filterByInertia = true;
+  params.minArea = 10;
+  params.minDistBetweenBlobs = 5;
+
+  params.blobColor = 0;
+  Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
+
+  params.blobColor = 255;
+  Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
+
+  const Size boardSize(4, 11);
+
+  Mat blackBlobs, whiteBlobs;
+  bool isBlackFound = findCirclesGrid(centralBgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
+  bool isWhiteFound = findCirclesGrid(centralBgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
+  if (!isBlackFound && !isWhiteFound)
+  {
+    cout << isBlackFound << " " << isWhiteFound << endl;
+    imshow("can't estimate", centralBgrImage);
+    waitKey();
+    return false;
+  }
+
+  Mat rvec, tvec;
+  Mat allBlobs = blackBlobs.clone();
+  allBlobs.push_back(whiteBlobs);
+
+  Mat blobs, blobsObject;
+  if (isBlackFound && isWhiteFound)
+  {
+    blobs = allBlobs;
+    blobsObject = allBlobsObject;
+  }
+  else
+  {
+    if (isBlackFound)
+    {
+      blobs = blackBlobs;
+      blobsObject = blackBlobsObject;
+    }
+    if (isWhiteFound)
+    {
+      blobs = whiteBlobs;
+      blobsObject = whiteBlobsObject;
+    }
+  }
+
+  solvePnP(blobsObject, blobs, camera.cameraMatrix, camera.distCoeffs, rvec, tvec);
+
+  PoseRT pose_cam(rvec, tvec);
+
+  Point3d tableAnchor;
+  transformPoint(pose_cam.getProjectiveMatrix(), Point3d(0.0, 0.0, 0.0), tableAnchor);
+
+/*
+  if (pt_pub != 0)
+  {
+    vector<Point3f> points;
+
+    vector<Point3f> objectPoints = blackBlobsObject;
+
+    for (size_t i = 0; i < objectPoints.size(); ++i)
+    {
+      Point3d pt;
+      transformPoint(pose_cam.getProjectiveMatrix(), objectPoints[i], pt);
+      points.push_back(pt);
+      tableAnchor = pt;
+    }
+    objectPoints = whiteBlobsObject;
+    for (size_t i = 0; i < objectPoints.size(); ++i)
+    {
+      Point3d pt;
+      transformPoint(pose_cam.getProjectiveMatrix(), objectPoints[i], pt);
+      points.push_back(pt);
+    }
+
+
+    publishPoints(points, *pt_pub, 234, Scalar(255, 0, 255));
+  }
+*/
+
+
+  pose_cam.tvec = Mat::zeros(3, 1, CV_64FC1);
+  Point3d tableNormal;
+  transformPoint(pose_cam.getProjectiveMatrix(), Point3d(0.0, 0.0, -1.0), tableNormal);
+
+  const int dim = 3;
+  for (int i = 0; i < dim; ++i)
+  {
+    tablePlane[i] = Vec3d(tableNormal)[i];
+  }
+  tablePlane[dim] = -tableNormal.ddot(tableAnchor);
+
+  return true;
+}

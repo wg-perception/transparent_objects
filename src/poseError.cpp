@@ -20,7 +20,7 @@ PoseRT PoseError::getPosesDifference() const
 std::ostream& operator<<(std::ostream& output, const PoseError& poseError)
 {
   const double rad2deg = 180.0 / CV_PI;
-  output << "trans.: " << poseError.translationDiff << "   rot (deg): " << poseError.rotationDifference * rad2deg;
+  output << "trans. (m): " << poseError.translationDiff << "   rot (deg): " << poseError.rotationDifference * rad2deg;
   return output;
 }
 
@@ -93,6 +93,7 @@ void PoseError::computeStats(const vector<PoseError> &poses, double cmThreshold,
       ++goodPoseCount;
     }
   }
+  CV_Assert(goodPoseCount != 0);
   meanError /= goodPoseCount;
   CV_Assert(poses.size() != 0);
   successRate = static_cast<float>(goodPoseCount) / poses.size();

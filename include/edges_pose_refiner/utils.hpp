@@ -15,6 +15,10 @@
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
+#ifdef USE_3D_VISUALIZATION
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/cloud_viewer.h>
+#endif
 
 void createProjectiveMatrix(const cv::Mat &R, const cv::Mat &t, cv::Mat &Rt);
 void getRvecTvec(const cv::Mat &projectiveMatrix, cv::Mat &rvec, cv::Mat &tvec);
@@ -27,6 +31,9 @@ void vec2mats(const std::vector<double> &point6d, cv::Mat &rvec, cv::Mat &tvec);
 void interpolatePointCloud(const cv::Mat &mask, const std::vector<cv::Point3f> &pointCloud, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, std::vector<cv::Point3f> &interpolatedPointCloud);
 
 void publishPoints(const std::vector<cv::Point3f>& points, const ros::Publisher &points_pub, int id = 0, cv::Scalar color = cv::Scalar(0, 0, 255));
+#ifdef USE_3D_VISUALIZATION
+void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "");
+#endif
 void publishPoints(const std::vector<cv::Point3f>& points, const cv::Mat &rvec, const cv::Mat &tvec, const ros::Publisher &points_pub, int id = 0, cv::Scalar color = cv::Scalar(0, 0, 255), const cv::Mat &extrinsicsRt = cv::Mat());
 void publishPoints(const std::vector<std::vector<cv::Point3f> >& points, const ros::Publisher &points_pub);
 void publishTable(const cv::Vec4f &tablePlane, int id, cv::Scalar color, ros::Publisher *pt_pub = 0);

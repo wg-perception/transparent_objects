@@ -109,7 +109,13 @@ namespace transparent_objects
       std::vector<std::string> detectedObjects;
 
       cv::Mat registrationMask = cv::imread(*registrationMaskFilename_, CV_LOAD_IMAGE_GRAYSCALE);
-      detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
+      try
+      {
+        detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
+      }
+      catch(const cv::Exception &)
+      {
+      }
 
       if (*visualize_)
       {
