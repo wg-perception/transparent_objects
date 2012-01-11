@@ -2,6 +2,7 @@
 #include <boost/foreach.hpp>
 
 #include <object_recognition/db/ModelReader.h>
+#include <object_recognition/common/pose_result.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
 #include <edges_pose_refiner/glassDetector.hpp>
@@ -18,6 +19,8 @@
 using ecto::tendrils;
 using ecto::spore;
 using object_recognition::db::ObjectId;
+using object_recognition::common::PoseResult;
+using object_recognition::db::ObjectDbParameters;
 
 namespace transparent_objects
 {
@@ -45,7 +48,7 @@ namespace transparent_objects
       std::cout << "detector: declare_params" << std::endl;
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
       params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
-
+      params.declare(&TransparentObjectsDetector::db_params_, "db_params", "The DB parameters").required(true);
 //      params.declare(&LinemodDetector::threshold_, "threshold", "Matching threshold, as a percentage", 90.0f);
     }
 
@@ -57,9 +60,7 @@ namespace transparent_objects
       inputs.declare(&TransparentObjectsDetector::depth_, "depth", "The 16bit depth image.");
       inputs.declare(&TransparentObjectsDetector::cloud_, "points3d", "The scene cloud.");
 
-      outputs.declare(&TransparentObjectsDetector::rvecs_, "Rs", "Rotations of detected objects");
-      outputs.declare(&TransparentObjectsDetector::tvecs_, "Ts", "Translations of detected objects");
-      outputs.declare(&TransparentObjectsDetector::object_ids_, "object_ids", "The ids of the objects");
+      outputs.declare(&TransparentObjectsDetector::pose_results_, "pose_results", "The results of object recognition");
     }
 
     void
@@ -128,19 +129,18 @@ namespace transparent_objects
 #endif
       }
 
-      rvecs_->clear();
-      tvecs_->clear();
-      object_ids_->clear();
+      pose_results_->clear();
 
       if (!posesQualities.empty())
       {
-
         std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
         int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
 
-        rvecs_->push_back(poses[bestDetectionIndex].getRotationMatrix());
-        tvecs_->push_back(poses[bestDetectionIndex].getTvec());
-        object_ids_->push_back(detectedObjects[bestDetectionIndex]);
+        PoseResult pose_result;
+        pose_result.set_R(poses[bestDetectionIndex].getRotationMatrix());
+        pose_result.set_T(poses[bestDetectionIndex].getTvec());
+        pose_result.set_object_id(*db_params_, detectedObjects[bestDetectionIndex]);
+        pose_results_->push_back(pose_result);
       }
 
 //      {
@@ -165,9 +165,10 @@ namespace transparent_objects
     // Inputs
     spore<cv::Mat> K_, color_, depth_, cloud_;
 
-    // Outputs
-    spore<std::vector<ObjectId> > object_ids_;
-    spore<std::vector<cv::Mat> > rvecs_, tvecs_;
+    /** The object recognition results */
+    ecto::spore<std::vector<PoseResult> > pose_results_;
+    /** The DB parameters */
+    ecto::spore<ObjectDbParameters> db_params_;
 
     cv::Ptr<TransparentDetector> detector_;
   };

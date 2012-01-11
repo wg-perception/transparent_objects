@@ -23,3 +23,9 @@ add_subdirectory(python)
 ecto_python_env_gen(${CMAKE_BINARY_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/python)
 add_subdirectory(cells)
 
+option(BUILD_TEST "Build tests" ON)
+if(BUILD_TEST)
+  enable_testing()
+  add_subdirectory(test)
+endif()  
+

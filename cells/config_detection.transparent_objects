@@ -15,7 +15,7 @@ pipeline1:
     registrationMaskFilename: '/tmp/registrationMask_SXGA.png'
     db:
       type: 'CouchDB'
-      root: 'http://lsd:5984'
+      root: 'http://localhost:5984'
       collection: 'object_recognition'
 
     # The list of object_ids to analyze
