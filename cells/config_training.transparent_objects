@@ -12,11 +12,28 @@ pipeline1:
   sources: [1]
   sinks: [1]
   parameters:
-    registrationMaskFilename: '/tmp/registrationMask_SXGA.png'
     db:
       type: 'CouchDB'
-      root: 'http://lsd:5984'
+      root: 'http://localhost:5984'
       collection: 'object_recognition'
+
+# Kinect VGA
+#    D: []
+#    K: [525., 0., 319.5, 0., 525., 239.5, 0., 0., 1.]
+#    imageWidth: 640
+#    imageHeight: 480
+
+# Kinect SXGA scaled to VGA (use it to work with interactive manipulation)
+    D: []
+    K: [525, 0, 319.75, 0, 492.1875, 224.765625, 0, 0, 1]
+    imageWidth: 640
+    imageHeight: 480
+
+# Kinect SXGA -- don't use it now
+#    D: []
+#    K: [1050.0, 0.0, 639.5, 0.0, 1050.0, 479.5, 0.0, 0.0, 1.0]
+#    imageWidth: 1280
+#    imageHeight: 1024
 
     # The list of object_ids to analyze
     #object_ids: "all"
