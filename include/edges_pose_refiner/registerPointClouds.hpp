@@ -11,7 +11,6 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <opencv2/core/core.hpp>
-#include <opencv2/flann/flann.hpp>
 
 /** \brief Parameters of multi-view registration */
 struct MultiViewRegistratorParams
@@ -82,7 +81,6 @@ public:
 private:
   //void getPCLPointClouds(Object *object, vector<pcl::PointCloud<pcl::PointXYZ> > &pointClouds);
 
-  float getNearestNeighborDistance(cv::flann::Index &flannIndex, const pcl::PointXYZ &pt) const;
   void filterPointCloudByNearestNeighborDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr &targetCloudPtr, const pcl::PointCloud<pcl::PointXYZ> &inputCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filteredCloudPtr) const;
 
   MultiViewRegistratorParams params;

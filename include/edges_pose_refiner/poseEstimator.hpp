@@ -77,8 +77,8 @@ private:
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
   void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities) const;
-  void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, ros::Publisher *pt_pub = 0, const cv::Mat finalJacobian = cv::Mat()) const;
-  void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities, ros::Publisher *pt_pub = 0) const;
+  void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
+  void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
 
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;

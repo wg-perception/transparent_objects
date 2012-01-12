@@ -7,7 +7,6 @@
 
 #include "TODBaseImporter.hpp"
 #include <fstream>
-//#include <posest/pnp_ransac.h>
 #include <iomanip>
 #include "pcl/io/pcd_io.h"
 #include "pcl/point_types.h"
@@ -21,11 +20,10 @@ TODBaseImporter::TODBaseImporter()
 {
 }
 
-TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder, ros::Publisher *pt_pub)
+TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder)
 {
   trainFolder = _trainFolder;
   testFolder = _testFolder;
-  pointsPublisher = pt_pub;
 
   PinholeCamera camera;
   readCameraParams(trainFolder, camera);
@@ -184,30 +182,16 @@ void TODBaseImporter::readTrainSamples()
 }
 
 
-void TODBaseImporter::createEdgeModel(EdgeModel &edgeModel, const ros::Publisher &pointsPublisher)
+void TODBaseImporter::createEdgeModel(EdgeModel &edgeModel)
 {
   cout << "Started create edge model" << endl;
   EdgeModelCreatorParams params;
   params.useOnlyEdges = false;
-  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, &pointsPublisher, params);
+  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, false, params);
   //edgeModelCreator.createEdgeModel(trainSamples, edgeModel);
   edgeModelCreator.createEdgeModel(trainSamples, edgeModel);
   cout << "done" << endl;
 }
-
-void drawAxis2(const Point3d &origin, const Point3d &direction, const ros::Publisher &points_pub, int id, Scalar color)
-{
-  vector<Point3f> points;
-  const int pointsCount = 1000;
-  for(int i=0; i<pointsCount; i++)
-  {
-    points.push_back(origin + direction * i * 0.001);
-    points.push_back(origin - direction * i * 0.001);
-  }
-
-  publishPoints(points, points_pub, id, color);
-}
-
 
 void TODBaseImporter::readRawEdgeModel(const string &filename, EdgeModel &edgeModel)
 {
@@ -224,7 +208,7 @@ void TODBaseImporter::readRawEdgeModel(const string &filename, EdgeModel &edgeMo
 
   EdgeModelCreatorParams params;
   params.useOnlyEdges = false;
-  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, pointsPublisher, params);
+  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, false, params);
   edgeModelCreator.alignModel(trainSamples, edgeModel);
 
 //  {
@@ -313,13 +297,13 @@ void TODBaseImporter::alignModel(EdgeModel &edgeModel) const
   EdgeModelCreatorParams params;
   params.useOnlyEdges = false;
 
-  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, pointsPublisher, params);
+  EdgeModelCreator edgeModelCreator(cameraMatrix, distCoeffs, false, params);
   edgeModelCreator.alignModel(trainSamples, edgeModel);
 }
 
 void TODBaseImporter::computeStableEdgels(EdgeModel &edgeModel) const
 {
-  EdgeModelCreator verboseEdgeModelCreator(cameraMatrix, distCoeffs, pointsPublisher);
+  EdgeModelCreator verboseEdgeModelCreator(cameraMatrix, distCoeffs, false);
   verboseEdgeModelCreator.computeStableEdgels(trainSamples, edgeModel);
 }
 
@@ -399,6 +383,6 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) co
 void TODBaseImporter::importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
   std::stringstream pointCloudFilename;
-  pointCloudFilename << testFolder << "/cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
+  pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
   pcl::io::loadPCDFile(pointCloudFilename.str(), cloud);
 }

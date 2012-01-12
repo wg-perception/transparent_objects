@@ -49,7 +49,7 @@ public:
 
   int getObjectIndex(const std::string &name) const;
 private:
-  bool tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, cv::Vec4f &tablePlane, ros::Publisher *pt_pub = 0) const;
+  bool tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, cv::Vec4f &tablePlane) const;
 
   TransparentDetectorParams params;
   PinholeCamera srcCamera;

@@ -99,7 +99,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
   bool isEstimated = computeTableOrientation(params.downLeafSize, params.kSearch, params.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.clusterTolerance, params.verticalDirection);
-//  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane, 0);
+//  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
@@ -210,7 +210,7 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 #endif
 }
 
-bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane, ros::Publisher *pt_pub) const
+bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
   const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";

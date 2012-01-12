@@ -6,6 +6,7 @@
  */
 
 #include "edges_pose_refiner/kPartiteGraph.hpp"
+#include "opencv2/flann/flann.hpp"
 
 using namespace cv;
 //using KPartiteGraph::VertexID;

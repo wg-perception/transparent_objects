@@ -56,41 +56,13 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
   }
 }
 
-void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities, ros::Publisher *pt_pub) const
+void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
 {
   cout << "refine poses by table orientation" << endl;
   if (poses_cam.empty())
   {
     return;
   }
-
-  //bool isEstimated = tmpComputeTableOrientation(centralBgrImage, tablePlane, pt_pub);
-
-  if (pt_pub != 0)
-  {
-//    publishTable(tablePlane, 3234, Scalar(0, 0, 0), pt_pub);
-//    namedWindow("table is published");
-//    waitKey();
-//    destroyWindow("table is published");
-  }
-
-
-
-
-
-//  Vec4f tablePlane1, tablePlane2;
-//  isEstimated = tmpComputeTableOrientation(centralBgrImage, centralCamera, tablePlane1, pt_pub);
-//  isEstimated = computeTableOrientation(fullSceneCloud, tablePlane2);
-//  if (pt_pub != 0)
-//  {
-//    publishTable(tablePlane1, 3234, Scalar(0, 0, 0), pt_pub);
-//    publishTable(tablePlane2, 32234, Scalar(255, 0, 255), pt_pub);
-////    namedWindow("table is published");
-////    waitKey();
-////    destroyWindow("table is published");
-//  }
-
-
 
   Mat centralEdges, silhouetteEdges;
   computeCentralEdges(centralBgrImage, glassMask, centralEdges, silhouetteEdges);
@@ -119,7 +91,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
     }
 #endif
 
-    findTransformationToTable(initialPose_cam, tablePlane, rotationAngles[initPoseIdx], pt_pub, finalJacobian);
+    findTransformationToTable(initialPose_cam, tablePlane, rotationAngles[initPoseIdx], finalJacobian);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
     displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "after alignment to a table plane");
@@ -154,7 +126,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
   initPosesQualities.push_back(bestPoseQuality);
 }
 
-void PoseEstimator::findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, ros::Publisher *pt_pub, const Mat finalJacobian) const
+void PoseEstimator::findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const Mat finalJacobian) const
 {
   EdgeModel rotatedEdgeModel;
   edgeModel.rotate_cam(pose_cam, rotatedEdgeModel);

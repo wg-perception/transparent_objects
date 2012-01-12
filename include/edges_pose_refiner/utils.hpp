@@ -9,15 +9,15 @@
 #define UTILS_HPP_
 
 #include <opencv2/core/core.hpp>
-#include <ros/ros.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
+//#define USE_3D_VISUALIZATION
+
 #ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/visualization/cloud_viewer.h>
 #endif
 
 void createProjectiveMatrix(const cv::Mat &R, const cv::Mat &t, cv::Mat &Rt);
@@ -30,13 +30,12 @@ void vec2mats(const std::vector<double> &point6d, cv::Mat &rvec, cv::Mat &tvec);
 
 void interpolatePointCloud(const cv::Mat &mask, const std::vector<cv::Point3f> &pointCloud, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, std::vector<cv::Point3f> &interpolatedPointCloud);
 
-void publishPoints(const std::vector<cv::Point3f>& points, const ros::Publisher &points_pub, int id = 0, cv::Scalar color = cv::Scalar(0, 0, 255));
 #ifdef USE_3D_VISUALIZATION
-void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "");
+void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "", const PoseRT &pose = PoseRT());
 #endif
-void publishPoints(const std::vector<cv::Point3f>& points, const cv::Mat &rvec, const cv::Mat &tvec, const ros::Publisher &points_pub, int id = 0, cv::Scalar color = cv::Scalar(0, 0, 255), const cv::Mat &extrinsicsRt = cv::Mat());
-void publishPoints(const std::vector<std::vector<cv::Point3f> >& points, const ros::Publisher &points_pub);
-void publishTable(const cv::Vec4f &tablePlane, int id, cv::Scalar color, ros::Publisher *pt_pub = 0);
+void publishPoints(const std::vector<cv::Point3f>& points, cv::Scalar color = cv::Scalar(0, 255, 0), const std::string &id = "", const PoseRT &pose = PoseRT());
+void publishPoints(const std::vector<std::vector<cv::Point3f> >& points);
+//void publishTable(const cv::Vec4f &tablePlane, int id, cv::Scalar color, ros::Publisher *pt_pub = 0);
 
 void writePointCloud(const std::string &filename, const std::vector<cv::Point3f> &pointCloud);
 void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &pointCloud, std::vector<cv::Point3f> *normals = 0);

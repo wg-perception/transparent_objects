@@ -70,7 +70,7 @@ void publishPose(const ros::Publisher &points_pub, TrainingSet &tr, const pcl::P
 }
 */
 
-float MultiViewRegistrator::getNearestNeighborDistance(cv::flann::Index &flannIndex, const pcl::PointXYZ &pt) const
+float getNearestNeighborDistance(cv::flann::Index &flannIndex, const pcl::PointXYZ &pt, const MultiViewRegistratorParams &params)
 {
   vector<float> query;
   query.push_back(pt.x);
@@ -94,7 +94,7 @@ void MultiViewRegistrator::filterPointCloudByNearestNeighborDistance(pcl::PointC
   vector<float> allDists;
   for(size_t i=0; i<inputCloud.points.size(); i++)
   {
-    allDists.push_back(getNearestNeighborDistance(flannIndex, inputCloud.points[i]));
+    allDists.push_back(getNearestNeighborDistance(flannIndex, inputCloud.points[i], params));
   }
   vector<float> sortedDists = allDists;
   std::sort(sortedDists.begin(), sortedDists.end());

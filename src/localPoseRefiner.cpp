@@ -10,12 +10,9 @@
 #include "edges_pose_refiner/poseRT.hpp"
 //#include <posest/pnp_ransac.h>
 #include <iostream>
-#include <opencv2/highgui/highgui.hpp>
 #include "edges_pose_refiner/utils.hpp"
 
-//TODO: fix
-#include <cv.h>
-#include <opencv2/core/core_c.h>
+#include <opencv2/opencv.hpp>
 
 //#define VISUALIZE_NLOPT
 

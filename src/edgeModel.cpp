@@ -1,10 +1,9 @@
 #include "edges_pose_refiner/edgeModel.hpp"
 #include "edges_pose_refiner/kPartiteGraph.hpp"
-#include <opencv2/highgui/highgui.hpp>
-//#include <visualization_msgs/Marker.h>
 #include <pcl/registration/icp_nl.h>
-#include <opencv2/core/eigen.hpp>
+#include <boost/make_shared.hpp>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/eigen.hpp>
 
 #ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
@@ -447,11 +446,6 @@ void EdgeModel::clear()
   Rt_obj2cam = Mat();
 }
 
-void EdgeModel::visualize(const ros::Publisher &points_pub)
-{
-  publishPoints(points, points_pub);
-}
-
 void EdgeModel::visualize()
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclPoints(new pcl::PointCloud<pcl::PointXYZ>), pclStablePoints(new pcl::PointCloud<pcl::PointXYZ>);
@@ -623,13 +617,13 @@ bool EdgeModelCreator::TrainSample::isValid() const
   return !isInvalid;
 }
 
-EdgeModelCreator::EdgeModelCreator(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const ros::Publisher *_pointsPublisher,
+EdgeModelCreator::EdgeModelCreator(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, bool _visualize,
                                    const EdgeModelCreatorParams &_params)
 {
   cameraMatrix = _cameraMatrix.clone();
   distCoeffs = _distCoeffs.clone();
 
-  pointsPublisher = _pointsPublisher;
+  visualize = _visualize;
   params = _params;
 }
 
@@ -673,11 +667,11 @@ void EdgeModelCreator::getEdgePointClouds(const std::vector<TrainSample> &trainS
 
 void EdgeModelCreator::alignModel(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, int numberOfICPs, int numberOfIterationsInICP)
 {
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("Ready to publish original model");
     waitKey();
-    publishPoints(edgeModel.points, *pointsPublisher);
+    publishPoints(edgeModel.points);
     namedWindow("Done");
     waitKey();
   }
@@ -686,11 +680,11 @@ void EdgeModelCreator::alignModel(const std::vector<TrainSample> &trainSamples, 
   getEdgePointClouds(trainSamples, initialPointClouds);
   CV_Assert(initialPointClouds.size() == trainSamples.size());
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("ready to publish initial point clouds");
     waitKey();
-    publishPoints(initialPointClouds, *pointsPublisher);
+    publishPoints(initialPointClouds);
     namedWindow("Done");
     waitKey();
   }
@@ -757,11 +751,11 @@ void EdgeModelCreator::alignModel(const std::vector<TrainSample> &trainSamples, 
     edgeModel = rotatedEdgeModel;
   }
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("Ready to publish aligned model");
     waitKey();
-    publishPoints(edgeModel.points, *pointsPublisher);
+    publishPoints(edgeModel.points);
     namedWindow("Done");
     waitKey();
   }
@@ -804,11 +798,11 @@ void EdgeModelCreator::computeModelEdgels(const std::vector<TrainSample> &trainS
   getEdgePointClouds(trainSamples, initialPointClouds);
   CV_Assert(initialPointClouds.size() == trainSamples.size());
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("ready to publish initial point clouds");
     waitKey();
-    publishPoints(initialPointClouds, *pointsPublisher);
+    publishPoints(initialPointClouds);
     namedWindow("Done");
     waitKey();
   }
@@ -818,22 +812,22 @@ void EdgeModelCreator::computeModelEdgels(const std::vector<TrainSample> &trainS
   registrator.align(initialPointClouds, alignedPointClouds);
   CV_Assert(alignedPointClouds.size() == trainSamples.size());
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("ready to publish aligned point clouds");
     waitKey();
-    publishPoints(alignedPointClouds, *pointsPublisher);
+    publishPoints(alignedPointClouds);
     namedWindow("Done");
     waitKey();
   }
 
   matchPointClouds(alignedPointClouds, edgels);
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("Ready to publish the full edge model");
     waitKey();
-    publishPoints(edgels, *pointsPublisher);
+    publishPoints(edgels);
     namedWindow("Done");
     waitKey();
   }
@@ -945,11 +939,11 @@ void EdgeModelCreator::createEdgeModel(const std::vector<TrainSample> &trainSamp
   downsamplePointCloud(edgels, edgeModel.points, indices);
   //edgeModel.points = points;
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
     namedWindow("Ready to publish the downsampled edge model");
     waitKey();
-    publishPoints(edgeModel.points, *pointsPublisher);
+    publishPoints(edgeModel.points);
     namedWindow("Done");
     waitKey();
   }
@@ -1070,9 +1064,9 @@ void EdgeModelCreator::computeStableEdgels(const std::vector<TrainSample> &train
   std::swap(stableEdgels, edgeModel.stableEdgels);
 
 
-  if(pointsPublisher != 0)
+  if (visualize)
   {
-    publishPoints(edgeModel.stableEdgels, *pointsPublisher, 0, Scalar(0, 0, 0));
+    publishPoints(edgeModel.stableEdgels, Scalar(0, 0, 0), "stable edgels");
     namedWindow("stable edgels are published");
     waitKey();
     destroyWindow("stable edgels are published");

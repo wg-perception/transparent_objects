@@ -15,7 +15,7 @@ class TODBaseImporter
 {
 public:
   TODBaseImporter();
-  TODBaseImporter(const std::string &trainFolder, const std::string &testFolder, ros::Publisher *pointsPublisher=0);
+  TODBaseImporter(const std::string &trainFolder, const std::string &testFolder);
 
   void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
   void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true);
@@ -36,15 +36,13 @@ private:
   void alignModel(EdgeModel &edgeModel) const;
   void computeStableEdgels(EdgeModel &edgeModel) const;
   void readRawEdgeModel(const std::string &filename, EdgeModel &edgeModel);
-  void createEdgeModel(EdgeModel &edgeModel, const ros::Publisher &pointsPublisher);
+  void createEdgeModel(EdgeModel &edgeModel);
 
 
   std::vector<EdgeModelCreator::TrainSample> trainSamples;
 
   std::string trainFolder, testFolder;
   cv::Mat cameraMatrix, distCoeffs;
-
-  ros::Publisher *pointsPublisher;
 };
 
 bool isNan(const cv::Point3f& p);

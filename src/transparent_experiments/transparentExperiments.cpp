@@ -20,11 +20,6 @@
 
 #include "edges_pose_refiner/transparentDetector.hpp"
 
-#ifdef USE_3D_VISUALIZATION
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/visualization/cloud_viewer.h>
-#include <boost/thread/thread.hpp>
-#endif
 
 using namespace cv;
 using std::cout;
@@ -37,19 +32,11 @@ using std::stringstream;
 //#define PROFILE
 //#define WRITE_GLASS_SEGMENTATION
 
-#ifdef VISUALIZE_POSE_REFINEMENT
-void drawAxis(const Point3d &origin, const Point3d &direction, const ros::Publisher &points_pub, int id, Scalar color)
-{
-  vector<Point3f> points;
-  const int pointsCount = 1000;
-  for(int i=0; i<pointsCount; i++)
-  {
-    points.push_back(origin + direction * i * 0.001);
-    points.push_back(origin - direction * i * 0.001);
-  }
 
-  publishPoints(points, points_pub, id, color);
-}
+#ifdef VISUALIZE_POSE_REFINEMENT
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/visualization/cloud_viewer.h>
+#include <boost/thread/thread.hpp>
 #endif
 
 void evaluatePose(const EdgeModel &testEdgeModel, const cv::Mat &rvec_est_cam, const cv::Mat &tvec_est_cam, const PoseRT &ground_cam, string prefix = "")
@@ -77,7 +64,7 @@ void evaluatePose(const EdgeModel &testEdgeModel, const cv::Mat &rvec_est_cam, c
   cout << "Tvec diff: " << norm(tvec_diff_obj) << endl;
 }
 
-void evaluatePoseWithRotation(const EdgeModel &originalEdgeModel, const PoseRT &est_cam, const PoseRT &ground_cam, PoseError &poseError, ros::Publisher *pointsPublisher = 0)
+void evaluatePoseWithRotation(const EdgeModel &originalEdgeModel, const PoseRT &est_cam, const PoseRT &ground_cam, PoseError &poseError)
 {
   EdgeModel groundModel, estimatedModel;
   originalEdgeModel.rotate_cam(ground_cam, groundModel);
@@ -177,22 +164,8 @@ int main(int argc, char **argv)
   const vector<string> objectNames = {testObjectName};
 
 
-#ifdef VISUALIZE_POSE_REFINEMENT
-//  ros::init(argc, argv, "transparent4");
-//  ros::NodeHandle nh("~");
-//  ros::Publisher pt_pub = nh.advertise<visualization_msgs::Marker> ("pose_points", 0);
-//  ros::Publisher *publisher = &pt_pub;
-#else
-//  ros::Publisher *publisher = 0;
-#endif
 
-#ifdef USE_3D_VISUALIZATION
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));
-#endif
-
-
-  ros::Publisher *publisher = 0;
-  TODBaseImporter dataImporter(trainFolder, testFolder, publisher);
+  TODBaseImporter dataImporter(trainFolder, testFolder);
 
   PinholeCamera kinectCamera;
   if(!kinectCameraFilename.empty())
@@ -209,47 +182,9 @@ int main(int argc, char **argv)
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
 
-#ifdef VISUALIZE_POSE_REFINEMENT
-//  publishPoints(edgeModels[0].points, pt_pub, 0, Scalar(255, 255, 0));
-//  publishPoints(edgeModels[0].stableEdgels, pt_pub, 1, Scalar(0, 0, 0));
-
-  Scalar meanVal = mean(Mat(edgeModels[0].points));
-  Point3d center(meanVal[0], meanVal[1], meanVal[2]);
-
-//  drawAxis(center, Point3d(0, 0, 1), pt_pub, 40, Scalar(255, 0, 255));
-
-//  publishPoints(vector<Point3f>(1, edgeModels[0].tableAnchor), pt_pub, 11203, Scalar(0, 255, 0));
-//  publishPoints(vector<Point3f>(1, edgeModels[0].tableAnchor + 0.1 * edgeModels[0].rotationAxis), pt_pub, 11205, Scalar(0, 0, 0));
-//  namedWindow("edge model is published");
-//  waitKey();
-
-
-/*
-  //load test point cloud
-  {
-    vector<vector<Point3f> > publishedPointClouds(2);
-
-    string testCloudFilename = testFolder + "/cloud_00000.pcd";
-    pcl::PointCloud<pcl::PointXYZ> testPointCloud;
-    pcl::io::loadPCDFile(testCloudFilename.c_str(), testPointCloud);
-//    std::ofstream fout("testCloud.asc");
-    for(size_t ptIdx=0; ptIdx < testPointCloud.points.size(); ptIdx++)
-    {
-      pcl::PointXYZ ptXYZ = testPointCloud.points[ptIdx];
-      Point3f pt3f(ptXYZ.x, ptXYZ.y, ptXYZ.z);
-      if(isNan(pt3f))
-        continue;
-
-      publishedPointClouds[0].push_back(pt3f);
-//      fout << format(mat, "csv") << endl;
-    }
-//    fout.close();
-    publishPoints(publishedPointClouds[0], pt_pub, 23552, Scalar(0, 255, 0));
-//    namedWindow("stop");
-//    waitKey();
-  }
-*/
-#endif
+//#ifdef VISUALIZE_POSE_REFINEMENT
+//  edgeModels[0].visualize();
+//#endif
 
 //  TransparentDetectorParams params;
 //  params.glassSegmentationParams.closingIterations = 8;
@@ -275,6 +210,9 @@ int main(int argc, char **argv)
   vector<int> indicesOfRecognizedObjects;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
+#ifdef VISUALIZE_POSE_REFINEMENT
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("transparent experiments"));
+#endif
     int testImageIdx = testIndices[ testIdx ];
     cout << "Test: " << testIdx << " " << testImageIdx << endl;
 
@@ -302,62 +240,6 @@ int main(int argc, char **argv)
     exit(-1);
 */
 
-
-#ifdef VISUALIZE_POSE_REFINEMENT
-    {
-      stringstream pointCloudFilename;
-      pointCloudFilename << testFolder << "/cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
-      pcl::PointCloud<pcl::PointXYZ> testPointCloudPCL;
-      pcl::io::loadPCDFile(pointCloudFilename.str().c_str(), testPointCloudPCL);
-      vector<Point3f> testPointCloud;
-      pcl2cv(testPointCloudPCL, testPointCloud);
-      vector<Point3f> filteredPointCloud;
-      for(size_t i = 0; i < testPointCloud.size(); i++)
-      {
-        if(isNan(testPointCloud[i]))
-          continue;
-
-        filteredPointCloud.push_back(testPointCloud[i]);
-      }
-      std::swap(filteredPointCloud, testPointCloud);
-      cout << "test point cloud size: " <<testPointCloud.size() << endl;
-//      publishPoints(testPointCloud, pt_pub, 222, Scalar(0, 255, 0));
-    }
-
-/*
-      Mat rvecZeros = Mat::zeros(3, 1, CV_64FC1);
-      Mat tvecZeros = Mat::zeros(3, 1, CV_64FC1);
-      vector<Point2f> imagePoints;
-      //projectPoints(Mat(testPointCloud), rvecZeros, tvecZeros, centerCameraMatrix, centerDistCoeffs, imagePoints);
-
-
-      Mat rvec, tvec;
-      getRvecTvec(allExtrinsicsRt[1] * centerExtrinsicsRt.inv(DECOMP_SVD), rvec, tvec);
-      projectPoints(Mat(testPointCloud), rvec, tvec, allCameraMatrices[1], allDistCoeffs[1], imagePoints);
-
-//      getRvecTvec(centerExtrinsicsRt.inv(DECOMP_SVD), rvec, tvec);
-//      projectPoints(Mat(testPointCloud), rvec, tvec, allCameraMatrices[0], allDistCoeffs[0], imagePoints);
-      Mat drawImage;
-      //cvtColor(centerMask, drawImage, CV_GRAY2BGR);
-      cvtColor(images[1], drawImage, CV_GRAY2BGR);
-      for(size_t i = 0; i < imagePoints.size(); ++i)
-      {
-        Point pt = imagePoints[i];
-        if(pt.x < 0 || pt.x >= drawImage.cols || pt.y < 0 || pt.y >= drawImage.rows)
-          continue;
-
-
-
-        //circle(drawImage, imagePoints[i], 3, Scalar(255, 0, 255), -1);
-        drawImage.at<Vec3b>(pt) = Vec3b(255, 0, 255);
-      }
-
-      imshow("kps", drawImage);
-      waitKey();
-    }
-*/
-#endif
-
     PoseRT model2test_ground;
     dataImporter.importGroundTruth(testImageIdx, model2test_ground);
 //    cout << "Ground truth: " << model2test_ground << endl;
@@ -366,14 +248,27 @@ int main(int argc, char **argv)
     dataImporter.importPointCloud(testImageIdx, testPointCloud);
 
 #ifdef VISUALIZE_POSE_REFINEMENT
+    {
+      vector<Point3f> cvTestPointCloud;
+      pcl2cv(testPointCloud, cvTestPointCloud);
+      cout << "test point cloud size: " << cvTestPointCloud.size() << endl;
+      publishPoints(cvTestPointCloud, viewer, Scalar(0, 255, 0), "test point cloud");
+    }
+
     if(!kinectCameraFilename.empty())
     {
 //      displayEdgels(glassMask, edgeModels[0].points, model2test_ground, kinectCamera, "kinect");
       displayEdgels(kinectBgrImage, edgeModels[0].points, model2test_ground, kinectCamera, "ground truth");
       displayEdgels(kinectBgrImage, edgeModels[0].stableEdgels, model2test_ground, kinectCamera, "ground truth surface");
     }
-//    publishPoints(edgeModels[0].points, model2test_ground.getRvec(), model2test_ground.getTvec(), pt_pub, 1, Scalar(0, 0, 255), kinectCamera.extrinsics.getProjectiveMatrix());
+    publishPoints(edgeModels[0].points, viewer, Scalar(0, 0, 255), "ground object", model2test_ground);
     namedWindow("ground truth");
+    while (!viewer->wasStopped ())
+    {
+      viewer->spinOnce (100);
+      boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+    }
+    viewer->resetStoppedFlag();
     waitKey();
     destroyWindow("ground truth");
 #endif
@@ -432,10 +327,16 @@ int main(int argc, char **argv)
 
   #ifdef VISUALIZE_POSE_REFINEMENT
 //        displayEdgels(glassMask, edgeModels[objectIndex].points, initPoses_cam[objectIndex][i], kinectCamera, "initial");
-//        publishPoints(edgeModels[objectIndex].points, initPoses_cam[objectIndex][i].rvec, initPoses_cam[objectIndex][i].tvec, pt_pub, 1, Scalar(0, 0, 255), kinectCamera.extrinsics.getProjectiveMatrix());
+        publishPoints(edgeModels[objectIndex].points, viewer, Scalar(255, 0, 0), "final object", poses_cam[i]);
         displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[i], kinectCamera, "final");
         displayEdgels(kinectBgrImage, edgeModels[objectIndex].stableEdgels, poses_cam[i], kinectCamera, "final surface");
         namedWindow("initial pose");
+
+        while (!viewer->wasStopped ())
+        {
+          viewer->spinOnce (100);
+          boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+        }
         waitKey();
         destroyWindow("initial pose");
   #endif

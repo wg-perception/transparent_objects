@@ -8,9 +8,11 @@
 #include "edges_pose_refiner/utils.hpp"
 //#include "opencv2/calib3d/calib3d.hpp"
 #include <opencv2/opencv.hpp>
-//#include <visualization_msgs/Marker.h>
 #include "edges_pose_refiner/poseRT.hpp"
-//#include <posest/pnp_ransac.h>
+
+#ifdef USE_3D_VISUALIZATION
+#include <boost/thread/thread.hpp>
+#endif
 
 #include <fstream>
 
@@ -22,6 +24,8 @@ using namespace cv;
 //#define USE_RVIZ
 
 //#define VISUALIZE_POSE_REFINEMENT
+
+//#define USE_3D_VISUALIZATION
 
 //TODO: is Projective right name?
 void createProjectiveMatrix(const cv::Mat &R, const cv::Mat &t, cv::Mat &Rt)
@@ -349,65 +353,33 @@ void interpolatePointCloud(const cv::Mat &mask, const std::vector<cv::Point3f> &
 }
 
 #ifdef USE_3D_VISUALIZATION
-void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title)
+void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title, const PoseRT &pose)
 {
+  vector<Point3f> rotatedPoints;
+  project3dPoints(points, pose.getRvec(), pose.getTvec(), rotatedPoints);
   pcl::PointCloud<pcl::PointXYZ> pclPoints;
-  cv2pcl(points, pclPoints);
+  cv2pcl(rotatedPoints, pclPoints);
 
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> pointsColor(pclPoints.makeShared(), color[2], color[1], color[0]);
   viewer->addPointCloud<pcl::PointXYZ>(pclPoints.makeShared(), pointsColor, title);
 }
 #endif
 
-void publishPoints(const std::vector<cv::Point3f>& points, const ros::Publisher &points_pub, int id, cv::Scalar color)
+void publishPoints(const std::vector<cv::Point3f>& points, cv::Scalar color, const std::string &id, const PoseRT &pose)
 {
-#ifdef USE_RVIZ
-  visualization_msgs::Marker cammark;
-  cammark.header.frame_id = "/high_def_frame";
-  cammark.header.stamp = ros::Time();
-  cammark.ns = "high_def_frame";
-  cammark.id = id;
-  cammark.action = visualization_msgs::Marker::ADD;
-  cammark.pose.position.x = 0;
-  cammark.pose.position.y = 0;
-  cammark.pose.position.z = 0;
-  cammark.pose.orientation.x = 0.0;
-  cammark.pose.orientation.y = 0.0;
-  cammark.pose.orientation.z = 0.0;
-  cammark.pose.orientation.w = 1.0;
-//  cammark.scale.x = 0.1;
-//  cammark.scale.y = 0.1;
-//  cammark.scale.z = 0.1;
+#ifdef USE_3D_VISUALIZATION
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("id"));
+  publishPoints(points, viewer, color, id, pose);
 
-  cammark.scale.x = 1;
-  cammark.scale.y = 1;
-  cammark.scale.z = 1;
-
-  const int maxVal = 255;
-  cammark.color.r = color[2] / maxVal;
-  cammark.color.g = color[1] / maxVal;
-  cammark.color.b = color[0] / maxVal;
-  cammark.color.a = 1.0f;
-
-  cammark.lifetime = ros::Duration();
-  cammark.type = visualization_msgs::Marker::POINTS;
-  cammark.points.resize(points.size());
-  //const float scale = 1000.0f;
-  const float scale = 400.0f;
-
-  //TODO: why rviz doesn't publish point without this line?
-  sleep(1);
-  for (size_t m = 0; m < points.size(); m++)
+  while (!viewer->wasStopped ())
   {
-    cammark.points[m].x = points[m].x * scale;
-    cammark.points[m].y = points[m].y * scale;
-    cammark.points[m].z = points[m].z * scale;
+    viewer->spinOnce (100);
+    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
   }
-  points_pub.publish(cammark);
 #endif
 }
 
-void publishPoints(const std::vector<std::vector<cv::Point3f> >& points, const ros::Publisher &points_pub)
+void publishPoints(const std::vector<std::vector<cv::Point3f> >& points)
 {
   cout << "publising..." << endl;
   const int minVal = 128;
@@ -422,18 +394,12 @@ void publishPoints(const std::vector<std::vector<cv::Point3f> >& points, const r
       color[j] = minVal + rand() % (maxVal - minVal + 1);
     }
 
-    publishPoints(points[i], points_pub, i, color);
+    std::stringstream str;
+    str << i;
+    publishPoints(points[i], color, str.str());
   }
 }
 
-void publishPoints(const std::vector<cv::Point3f>& points, const cv::Mat &rvec, const cv::Mat &tvec, const ros::Publisher &points_pub, int id, cv::Scalar color, const cv::Mat &extrinsicsRt)
-{
-  PoseRT pose = PoseRT(extrinsicsRt) * PoseRT(rvec, tvec);
-  vector<Point3f> rotatedPointCloud;
-  project3dPoints(points, pose.getRvec(), pose.getTvec(), rotatedPointCloud);
-
-  publishPoints(rotatedPointCloud, points_pub, id, color);
-}
 
 void pcl2cv(const pcl::PointCloud<pcl::PointXYZ> &pclCloud, std::vector<cv::Point3f> &cvCloud)
 {
@@ -583,6 +549,7 @@ Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const P
   return displayEdgels(images, edgels3d, pose_cam, allCameras, title, color)[0];
 }
 
+/*
 void publishTable(const Vec4f &tablePlane, int id, Scalar color, ros::Publisher *pt_pub)
 {
   float bound = 0.5;
@@ -595,11 +562,11 @@ void publishTable(const Vec4f &tablePlane, int id, Scalar color, ros::Publisher 
       float z = (-tablePlane[3] - x * tablePlane[0] - y * tablePlane[1]) / tablePlane[2];
       points.push_back(Point3f(x, y, z));
     }
-
   }
 
   publishPoints(points, *pt_pub, id, color);
 }
+*/
 
 void writePointCloud(const string &filename, const std::vector<cv::Point3f> &pointCloud)
 {

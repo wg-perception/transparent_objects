@@ -168,13 +168,6 @@ struct EdgeModel
   /** \brief Clear all data in the edge model */
   void clear();
 
-  /** \brief Visualize the edge model in rviz
-   *
-   *  Currently the point cloud of edges is displayed
-   * \param points_pub A publisher of a point cloud
-   */
-  void visualize(const ros::Publisher &points_pub);
-
   /** \brief Visualize the edge model in a PCL viewer */
   void visualize();
 
@@ -309,10 +302,10 @@ public:
   /**
    * \param cameraMatrix intrinsic parameters of the train camera matrix
    * \param distCoeffs distortion coefficients of the train camera matrix
-   * \param pointsPublisher pass non-null pointer if you want to see visualization of the algorithm work in rviz (used for debugging)
+   * \param visualize pass true if you want to see visualization
    * \param params Parameters of the edge model creating
    */
-  EdgeModelCreator(const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, const ros::Publisher *pointsPublisher = 0,  const EdgeModelCreatorParams &params =
+  EdgeModelCreator(const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, bool visualize = false, const EdgeModelCreatorParams &params =
       EdgeModelCreatorParams());
 
   /** \brief Set parameters of the edge model creating
@@ -379,7 +372,7 @@ private:
 
   cv::Mat cameraMatrix, distCoeffs;
   EdgeModelCreatorParams params;
-  const ros::Publisher *pointsPublisher;
+  bool visualize;
 };
 
 #endif /* EDGEMODEL_HPP_ */
