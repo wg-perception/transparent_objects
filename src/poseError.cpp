@@ -17,6 +17,16 @@ PoseRT PoseError::getPosesDifference() const
   return posesDifference;
 }
 
+double PoseError::getTranslationDifference() const
+{
+  return translationDiff;
+}
+
+double PoseError::getRotationDifference() const
+{
+  return rotationDifference;
+}
+
 std::ostream& operator<<(std::ostream& output, const PoseError& poseError)
 {
   const double rad2deg = 180.0 / CV_PI;
@@ -26,6 +36,7 @@ std::ostream& operator<<(std::ostream& output, const PoseError& poseError)
 
 PoseError::PoseError()
 {
+  init(PoseRT(), 0.0, 0.0);
 }
 
 void PoseError::init(const PoseRT &_posesDifference, double _rotationDifference, double _translationDifference)
@@ -130,8 +141,8 @@ void PoseError::evaluateErrors(const std::vector<PoseError> &poseErrors, double 
 
   PoseRT meanPose;
   PoseRT::computeMeanPose(poseDiffs, meanPose);
-  cout << "Mean pose: " << endl;
-  cout << meanPose << endl;
+//  cout << "Mean pose: " << endl;
+//  cout << meanPose << endl;
 
 
   double meanRvecError = 0.0;
@@ -152,9 +163,8 @@ void PoseError::evaluateErrors(const std::vector<PoseError> &poseErrors, double 
   meanRvecError /= termsCount;
   meanTvecError /= termsCount;
 
-  cout << "norm(mean rvec): " << norm(meanPose.rvec) << endl;
-  cout << "mean rvec error (deg): " << meanRvecError * 180 / CV_PI << endl;
+//  cout << "norm(mean rvec): " << norm(meanPose.rvec) << endl;
+//  cout << "norm(mean tvec): " << norm(meanPose.tvec) << endl;
 
-  cout << "norm(mean tvec): " << norm(meanPose.tvec) << endl;
-  cout << "mean tvec error (m): " << meanTvecError << endl;
+  cout << "Mean relative error: " << "trans. (m): " << meanTvecError << "  " << "rot (deg): " << meanRvecError * 180 / CV_PI << endl;
 }

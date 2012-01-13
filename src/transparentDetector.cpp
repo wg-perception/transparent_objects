@@ -62,7 +62,14 @@ void TransparentDetector::addObject(const std::string &name, const PoseEstimator
   objectNames.push_back(name);
 }
 
+/*
 void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
+{
+  detect(srcBgrImage, srcDepth, srcRegistrationMask, sceneCloud, poses_cam, posesQualities, objectNames);
+}
+*/
+
+cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -103,7 +110,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
-    return;
+    return cv::Mat();
   }
   else
   {
@@ -160,6 +167,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
       detectedObjectNames.push_back(objectNames[i]);
     }
   }
+  return glassMask;
 }
 
 int TransparentDetector::getObjectIndex(const std::string &name) const

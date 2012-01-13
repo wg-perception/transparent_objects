@@ -28,7 +28,7 @@ using std::stringstream;
 
 //#define VISUALIZE_POSE_REFINEMENT
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
-//#define WRITE_RESULTS
+#define WRITE_RESULTS
 //#define PROFILE
 //#define WRITE_GLASS_SEGMENTATION
 
@@ -74,10 +74,13 @@ void evaluatePoseWithRotation(const EdgeModel &originalEdgeModel, const PoseRT &
   CV_Assert(groundModel.hasRotationSymmetry);
   CV_Assert(estimatedModel.hasRotationSymmetry);
 
-  double hartleyDiff, tvecDiff;
   Point3d tvecPoint = groundModel.getObjectCenter() - estimatedModel.getObjectCenter();
-  tvecDiff = norm(tvecPoint);
-  hartleyDiff = acos(groundModel.upStraightDirection.ddot(estimatedModel.upStraightDirection));
+  double tvecDiff = norm(tvecPoint);
+
+  double cosAngle = groundModel.upStraightDirection.ddot(estimatedModel.upStraightDirection);
+  cosAngle = std::min(cosAngle, 1.0);
+  cosAngle = std::max(cosAngle, -1.0);
+  double hartleyDiff = acos(cosAngle);
 
   PoseRT diff_cam = est_cam * ground_cam.inv();
   Mat Rt_diff_obj = groundModel.Rt_obj2cam.inv(DECOMP_SVD) * diff_cam.getProjectiveMatrix() * groundModel.Rt_obj2cam;
@@ -153,10 +156,10 @@ int main(int argc, char **argv)
   const string trainFolder ="/media/2Tb/transparentBases/base_with_ground_truth/base/wh_" + testObjectName + "/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
 
-  const string camerasListFilename = baseFolder + "/cameras.txt";
+//  const string camerasListFilename = baseFolder + "/cameras.txt";
   const string kinectCameraFilename = baseFolder + "/center.yml";
-  const string visualizationPath = "visualized_results/";
-  //const string errorsVisualizationPath = "errors/" + objectName;
+//  const string visualizationPath = "visualized_results/";
+  const string errorsVisualizationPath = "/home/ilysenkov/errors/";
   //const vector<string> objectNames = {"bank", "bucket"};
   //const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
@@ -186,10 +189,12 @@ int main(int argc, char **argv)
 //  edgeModels[0].visualize();
 //#endif
 
-//  TransparentDetectorParams params;
-//  params.glassSegmentationParams.closingIterations = 8;
-//  params.glassSegmentationParams.openingIterations = 15;
-//  params.glassSegmentationParams.finalClosingIterations = 8;
+  TransparentDetectorParams params;
+  params.glassSegmentationParams.closingIterations = 8;
+  params.glassSegmentationParams.openingIterations = 15;
+  params.glassSegmentationParams.finalClosingIterations = 8;
+
+//  TransparentDetector detector(kinectCamera, params);
   TransparentDetector detector(kinectCamera);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
@@ -273,14 +278,6 @@ int main(int argc, char **argv)
     destroyWindow("ground truth");
 #endif
 
-#ifdef WRITE_RESULTS
-    if(testIdx == 0)
-    {
-      vector<Mat> groundTruthImages = displayEdgels(images, edgeModel.points, rvec_model2test_ground, tvec_model2test_ground, allCameraMatrices, allDistCoeffs, allExtrinsicsRt);;
-      writeImages(groundTruthImages, errorsVisualizationPath, 0, 0, 0, "ground");
-    }
-#endif
-
     vector<PoseRT> poses_cam;
     vector<float> posesQualities;
     vector<string> detectedObjectsNames;
@@ -288,11 +285,15 @@ int main(int argc, char **argv)
     TickMeter recognitionTime;
     recognitionTime.start();
 
+    Mat glassMask;
     try
     {
-      detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames);
+      glassMask = detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames);
     }
     catch(const cv::Exception &)
+    {
+    }
+    if (poses_cam.size() == 0)
     {
       ++segmentationFailuresCount;
       continue;
@@ -300,6 +301,7 @@ int main(int argc, char **argv)
 
     recognitionTime.stop();
 
+    cout << poses_cam.size() << endl;
     CV_Assert(poses_cam.size() == 1);
 
     int detectedObjectIndex = detector.getObjectIndex(detectedObjectsNames[0]);
@@ -345,6 +347,23 @@ int main(int argc, char **argv)
       int bestPoseIdx = std::distance(currentPoseErrors.begin(), bestPoseIt);
       cout << "Best pose: " << currentPoseErrors[bestPoseIdx] << endl;
       bestPoses.push_back(currentPoseErrors[bestPoseIdx]);
+
+#ifdef WRITE_RESULTS
+      const float maxTrans = 0.02;
+      if (currentPoseErrors[bestPoseIdx].getTranslationDifference > maxTrans)
+      {
+        std::stringstream str;
+        str << testImageIdx;
+        Mat segmentation = drawSegmentation(kinectBgrImage, glassMask);
+        imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_mask.png", segmentation);
+
+        Mat poseImage = displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[bestPoseIdx], kinectCamera, "final");
+        imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_pose.png", poseImage);
+
+        const float depthNormalizationFactor = 100;
+        imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_depth.png", kinectDepth * depthNormalizationFactor);
+      }
+#endif
     }
 
 #ifdef PROFILE

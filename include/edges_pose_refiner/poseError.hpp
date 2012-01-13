@@ -24,6 +24,8 @@ public:
   static void evaluateErrors(const std::vector<PoseError> &poseErrors, double cmThreshold);
 
   PoseRT getPosesDifference() const;
+  double getTranslationDifference() const;
+  double getRotationDifference() const;
 private:
   void computeSingleCriteria();
   PoseError operator+(const PoseError &poseError) const;
