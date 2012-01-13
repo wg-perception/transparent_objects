@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 
 #ifdef WRITE_RESULTS
       const float maxTrans = 0.02;
-      if (currentPoseErrors[bestPoseIdx].getTranslationDifference > maxTrans)
+      if (currentPoseErrors[bestPoseIdx].getTranslationDifference() > maxTrans)
       {
         std::stringstream str;
         str << testImageIdx;
