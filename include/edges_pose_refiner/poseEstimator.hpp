@@ -34,6 +34,8 @@ struct PoseEstimatorParams
   double minGlassContourArea;
 
   float confidentDomination;
+  int icp2dIterationsCount;
+  float min2dScaleChange;
 
   PoseEstimatorParams()
   {
@@ -49,6 +51,8 @@ struct PoseEstimatorParams
     dilationsForEdgesRemovalCount = 10;
 
     confidentDomination = 1.5f;
+    icp2dIterationsCount = 50;
+    min2dScaleChange = 0.001f;
   }
 
   void read(const cv::FileNode &fn);

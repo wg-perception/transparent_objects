@@ -117,7 +117,16 @@ void composeAffineTransformations(const Mat &transformation1, const Mat &transfo
   composedTransformation = composedHomography.rowRange(0, 2).clone();
 }
 
-void Silhouette::findSimilarityTransformation(const cv::Mat &src, const cv::Mat &dst, Mat &transformationMatrix)
+float estimateScale(const Mat &src, const Mat &transformationMatrix)
+{
+  Mat transformedPoints;
+  transform(src, transformedPoints, transformationMatrix);
+  Mat covar, mean;
+  calcCovarMatrix(transformedPoints.reshape(1), covar, mean, CV_COVAR_NORMAL + CV_COVAR_SCALE + CV_COVAR_ROWS);
+  return determinant(covar);
+}
+
+void Silhouette::findSimilarityTransformation(const cv::Mat &src, const cv::Mat &dst, Mat &transformationMatrix, int iterationsCount, float min2dScaleChange)
 {
   CV_Assert(src.type() == CV_32FC2);
   CV_Assert(dst.type() == CV_32FC2);
@@ -127,7 +136,8 @@ void Silhouette::findSimilarityTransformation(const cv::Mat &src, const cv::Mat 
   Ptr<cv::flann::IndexParams> flannIndexParams = new cv::flann::LinearIndexParams();
   cv::flann::Index flannIndex(dst.reshape(1), *flannIndexParams);
 
-  const int iterationsCount = 50;
+  Mat srcTransformationMatrix = transformationMatrix.clone();
+
   for (int iter = 0; iter < iterationsCount; ++iter)
   {
     Mat transformedPoints;
@@ -157,11 +167,25 @@ void Silhouette::findSimilarityTransformation(const cv::Mat &src, const cv::Mat 
     CvMat matA = srcTwoChannels, matB = correspondingPoints, matM = currentTransformationMatrix;
     bool isTransformEstimated = cvEstimateRigidTransform(&matA, &matB, &matM, isFullAffine );
     if (!isTransformEstimated)
+    {
       break;
+    }
 
     Mat composedTransformation;
     composeAffineTransformations(transformationMatrix, currentTransformationMatrix, composedTransformation);
     transformationMatrix = composedTransformation;
+  }
+
+  float srcScale = estimateScale(src, srcTransformationMatrix);
+  float finalScale = estimateScale(src, transformationMatrix);
+  const float eps = 1e-06;
+  if (srcScale > eps)
+  {
+    float scaleChange = finalScale / srcScale;
+    if (scaleChange < min2dScaleChange)
+    {
+      transformationMatrix = srcTransformationMatrix;
+    }
   }
 }
 
@@ -185,7 +209,7 @@ void Silhouette::showNormalizedPoints(const cv::Mat &points, const std::string &
   imshow(title, image);
 }
 
-void Silhouette::match(const cv::Mat &inputEdgels, cv::Mat &silhouette2test) const
+void Silhouette::match(const cv::Mat &inputEdgels, cv::Mat &silhouette2test, int icpIterationsCount, float min2dScaleChange) const
 {
   Mat testEdgels;
   if (inputEdgels.type() != CV_32FC2)
@@ -212,13 +236,7 @@ void Silhouette::match(const cv::Mat &inputEdgels, cv::Mat &silhouette2test) con
   showNormalizedPoints(initialTransformedModel, "initial transformed model");
 #endif
 
-  //TODO: why it doesn't work without scale?
-  const double scale = 100.0;
-  transformationMatrix.at<double>(0, 2) /= scale;
-  transformationMatrix.at<double>(1, 2) /= scale;
-  findSimilarityTransformation(edgels / scale, testEdgels / scale, transformationMatrix);
-  transformationMatrix.at<double>(0, 2) *= scale;
-  transformationMatrix.at<double>(1, 2) *= scale;
+  findSimilarityTransformation(edgels, testEdgels, transformationMatrix, icpIterationsCount, min2dScaleChange);
 
 #ifdef VISUALIZE_TRANSFORMS
   cout << "final: " << endl << transformationMatrix << endl;

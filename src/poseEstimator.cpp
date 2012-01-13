@@ -19,6 +19,8 @@
 
 //#define VISUALIZE_TABLE_ESTIMATION
 
+//#define VISUALIZE_INITIAL_POSE_REFINEMENT
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -80,35 +82,35 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, Vec4f::all(0.0f), &finalJacobian);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "before alignment to a table plane");
+    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "before alignment to a table plane");
 
-    if (pt_pub != 0)
-    {
-      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
-      namedWindow("ready to align pose to a table plane");
-      waitKey();
-      destroyWindow("ready to align pose to a table plane");
-    }
+//    if (pt_pub != 0)
+//    {
+//      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
+//      namedWindow("ready to align pose to a table plane");
+//      waitKey();
+//      destroyWindow("ready to align pose to a table plane");
+//    }
 #endif
 
     findTransformationToTable(initialPose_cam, tablePlane, rotationAngles[initPoseIdx], finalJacobian);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "after alignment to a table plane");
-    if (pt_pub != 0)
-    {
-      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
-      namedWindow("aligned pose to a table plane");
-      waitKey();
-      destroyWindow("aligned pose to a table plane");
-    }
+    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "after alignment to a table plane");
+//    if (pt_pub != 0)
+//    {
+//      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
+//      namedWindow("aligned pose to a table plane");
+//      waitKey();
+//      destroyWindow("aligned pose to a table plane");
+//    }
 #endif
 
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "central pose refined by LM with a table plane");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, centralCamera, "stable edgels refined by LM with a table plane");
+    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined by LM with a table plane");
+    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels refined by LM with a table plane");
     waitKey();
 #endif
   }
@@ -291,7 +293,7 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 
     for (size_t i = 0; i < silhouettes.size(); ++i)
     {
-      silhouettes[i].match(Mat(allGlassContours[contourIndex]), affineTransformations[i]);
+      silhouettes[i].match(Mat(allGlassContours[contourIndex]), affineTransformations[i], params.icp2dIterationsCount, params.min2dScaleChange);
       Mat transformedEdgels;
       Mat edgels;
       silhouettes[i].getEdgels(edgels);
@@ -436,14 +438,14 @@ void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv:
     PoseRT &initialPose_cam = initPoses_cam[initPoseIdx];
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "central pose");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, centralCamera, "stable edgels");
+    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose");
+    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels");
     waitKey();
 #endif
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true);
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, centralCamera, "central pose refined");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, centralCamera, "stable edges refined");
+    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined");
+    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edges refined");
     waitKey();
 #endif
   }

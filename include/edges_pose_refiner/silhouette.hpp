@@ -27,14 +27,14 @@ public:
 
   void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, PoseRT &pose_cam) const;
 
-  void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test) const;
+  void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test, int icpIterationsCount, float min2dScaleChange) const;
   void draw(cv::Mat &image, int thickness = 1) const;
 
   void read(const cv::FileNode &fn);
   void write(cv::FileStorage &fs) const;
 private:
   static void getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform);
-  static void findSimilarityTransformation(const cv::Mat &src, const cv::Mat &dst, cv::Mat &transformationMatrix);
+  static void findSimilarityTransformation(const cv::Mat &src, const cv::Mat &dst, cv::Mat &transformationMatrix, int iterationsCount, float min2dScaleChange);
 
   static void showNormalizedPoints(const cv::Mat &points, const std::string &title = "normalized points");
 
