@@ -28,7 +28,7 @@ using std::stringstream;
 
 //#define VISUALIZE_POSE_REFINEMENT
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
-#define WRITE_RESULTS
+//#define WRITE_RESULTS
 //#define PROFILE
 //#define WRITE_GLASS_SEGMENTATION
 
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 //  const string visualizationPath = "visualized_results/";
   const string errorsVisualizationPath = "/home/ilysenkov/errors/";
   //const vector<string> objectNames = {"bank", "bucket"};
-  //const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
+//  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
 
   const vector<string> objectNames = {testObjectName};
@@ -302,16 +302,21 @@ int main(int argc, char **argv)
     recognitionTime.stop();
 
     cout << poses_cam.size() << endl;
-    CV_Assert(poses_cam.size() == 1);
 
-    int detectedObjectIndex = detector.getObjectIndex(detectedObjectsNames[0]);
-    indicesOfRecognizedObjects.push_back(detectedObjectIndex);
+    if (!posesQualities.empty())
+    {
+      std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
+      int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
+      int detectedObjectIndex = detector.getObjectIndex(detectedObjectsNames[bestDetectionIndex]);
+      indicesOfRecognizedObjects.push_back(detectedObjectIndex);
+      cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
+    }
 
-    cout << "Recognized object: " << detectedObjectsNames[0] << endl;
     cout << "Recognition time: " << recognitionTime.getTimeSec() << "s" << endl;
 
     if (objectNames.size() == 1)
     {
+      CV_Assert(poses_cam.size() == 1);
       int objectIndex = 0;
       initialPoseCount.push_back(poses_cam.size());
 

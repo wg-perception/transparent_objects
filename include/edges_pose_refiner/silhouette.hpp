@@ -25,7 +25,7 @@ public:
 
   void clear();
 
-  void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, PoseRT &pose_cam) const;
+  void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const;
 
   void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test, int icpIterationsCount, float min2dScaleChange) const;
   void draw(cv::Mat &image, int thickness = 1) const;

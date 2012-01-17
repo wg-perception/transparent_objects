@@ -21,14 +21,29 @@ PoseRT::PoseRT(const cv::Mat &projectiveMatrix)
 
 PoseRT::PoseRT(const cv::Mat &rotation, const cv::Mat &translation)
 {
-  dim = 3;
-  CV_Assert(rotation.rows == 3 && rotation.cols == 1);
-  CV_Assert(translation.rows == 3 && translation.cols == 1);
   CV_Assert(rotation.type() == CV_64FC1);
   CV_Assert(translation.type() == CV_64FC1);
 
-  rvec = rotation.clone();
+  dim = 3;
+
+  CV_Assert(translation.rows == dim && translation.cols == 1);
   tvec = translation.clone();
+
+  if (rotation.rows == dim && rotation.cols == 1)
+  {
+    rvec = rotation.clone();
+  }
+  else
+  {
+    if (rotation.rows == dim && rotation.cols == dim)
+    {
+      Rodrigues(rotation, rvec);
+    }
+    else
+    {
+      CV_Assert(false);
+    }
+  }
 }
 
 PoseRT::PoseRT(const PoseRT &pose)

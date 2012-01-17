@@ -351,7 +351,7 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
         continue;
       }
 
-      silhouettes[i].affine2poseRT(edgeModel, kinectCamera, affineTransformations[i], poses[i]);
+      silhouettes[i].affine2poseRT(edgeModel, kinectCamera, affineTransformations[i], params.useClosedFormPnP, poses[i]);
     }
 
   //TODO: filter by distance

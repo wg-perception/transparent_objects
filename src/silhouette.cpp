@@ -16,6 +16,30 @@ using std::endl;
 
 //#define VISUALIZE_TRANSFORMS
 
+Mat affine2homography(const cv::Mat &transformationMatrix)
+{
+  const Size affineTransformationSize(3, 2);
+  const Size homographyTransformationSize(3, 3);
+
+  CV_Assert(transformationMatrix.size() == affineTransformationSize);
+
+  Mat homography = Mat::eye(homographyTransformationSize, transformationMatrix.type());
+  Mat affinePart = homography.rowRange(0, 2);
+  transformationMatrix.copyTo(affinePart);
+  return homography;
+}
+
+void composeAffineTransformations(const Mat &transformation1, const Mat &transformation2, Mat &composedTransformation)
+{
+  CV_Assert(transformation1.type() == transformation2.type());
+
+  Mat homography1 = affine2homography(transformation1);
+  Mat homography2 = affine2homography(transformation2);
+  Mat composedHomography = homography2 * homography1;
+
+  composedTransformation = composedHomography.rowRange(0, 2).clone();
+}
+
 Silhouette::Silhouette()
 {
 }
@@ -44,18 +68,54 @@ void Silhouette::clear()
   silhouette2normalized = Mat();
 }
 
-void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, PoseRT &pose_cam) const
+void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const
 {
+  PoseRT poseWithExtrinsics_cam;
+  if (useClosedFormPnP)
+  {
+    Mat homography = affine2homography(affineTransformation);
+    //TODO: which inversion method is better?
+    Mat fullTransform = camera.cameraMatrix.inv() * homography * camera.cameraMatrix;
+    const int dim = 3;
+    CV_Assert(fullTransform.rows == dim && fullTransform.cols == dim);
+    CV_Assert(fullTransform.type() == CV_64FC1);
+    Mat rotationalComponentWithScale = fullTransform(Range(0, 2), Range(0, 2));
+    double det = determinant(rotationalComponentWithScale);
+    const float eps = 1e-6;
+    CV_Assert(det > eps);
+    double scale = 1.0 / sqrt(det);
+
+    Point3d objectCenter = edgeModel.getObjectCenter();
+    Point3d initialObjectCenter;
+    transformPoint(initialPose_cam.getProjectiveMatrix(), objectCenter, initialObjectCenter);
+    double meanZ = initialObjectCenter.z;
+    CV_Assert(meanZ > eps);
+
+    Point3d tvec;
+    tvec.z = (scale - 1.0) * meanZ;
+    tvec.x = fullTransform.at<double>(0, 2) * (scale * meanZ);
+    tvec.y = fullTransform.at<double>(1, 2) * (scale * meanZ);
+
+    Mat R = Mat::eye(dim, dim, fullTransform.type());
+    Mat rotation2d = R(Range(0, 2), Range(0, 2));
+    Mat pureRotationalComponent = rotationalComponentWithScale * scale;
+    pureRotationalComponent.copyTo(rotation2d);
+
+    Mat tvecMat;
+    point2col(tvec, tvecMat);
+    PoseRT pose2d_cam(R, tvecMat);
+
+    poseWithExtrinsics_cam = pose2d_cam * initialPose_cam;
+  //  pose_cam = camera.extrinsics.inv() * pose2d_cam * initialPose_cam;
+  }
+
   vector<Point2f> projectedObjectPoints;
   camera.projectPoints(edgeModel.points, initialPose_cam, projectedObjectPoints);
 
   Mat transformedObjectPoints;
   transform(Mat(projectedObjectPoints), transformedObjectPoints, affineTransformation);
 
-  PoseRT poseWithExtrinsics_cam;
-  //TODO: specify initial guess
-  solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec);
-
+  solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec, useClosedFormPnP);
   pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
 }
 
@@ -91,30 +151,6 @@ void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &norma
   normalizationTransform = scale * (Mat_<double>(2, 3) <<
                   1.0, 0.0, tx,
                   0.0, 1.0, ty);
-}
-
-Mat affine2homography(const cv::Mat &transformationMatrix)
-{
-  const Size affineTransformationSize(3, 2);
-  const Size homographyTransformationSize(3, 3);
-
-  CV_Assert(transformationMatrix.size() == affineTransformationSize);
-
-  Mat homography = Mat::eye(homographyTransformationSize, transformationMatrix.type());
-  Mat affinePart = homography.rowRange(0, 2);
-  transformationMatrix.copyTo(affinePart);
-  return homography;
-}
-
-void composeAffineTransformations(const Mat &transformation1, const Mat &transformation2, Mat &composedTransformation)
-{
-  CV_Assert(transformation1.type() == transformation2.type());
-
-  Mat homography1 = affine2homography(transformation1);
-  Mat homography2 = affine2homography(transformation2);
-  Mat composedHomography = homography2 * homography1;
-
-  composedTransformation = composedHomography.rowRange(0, 2).clone();
 }
 
 float estimateScale(const Mat &src, const Mat &transformationMatrix)

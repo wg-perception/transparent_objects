@@ -36,6 +36,7 @@ struct PoseEstimatorParams
   float confidentDomination;
   int icp2dIterationsCount;
   float min2dScaleChange;
+  bool useClosedFormPnP;
 
   PoseEstimatorParams()
   {
@@ -53,6 +54,8 @@ struct PoseEstimatorParams
     confidentDomination = 1.5f;
     icp2dIterationsCount = 50;
     min2dScaleChange = 0.001f;
+
+    useClosedFormPnP = false;
   }
 
   void read(const cv::FileNode &fn);

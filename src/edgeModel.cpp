@@ -169,6 +169,7 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
         continue;
       }
 
+      //TODO: generate silhouettes uniformly on the viewing sphere
       double xAngle = i * (2 * CV_PI) / silhouetteCount;
       double yAngle = j * (2 * CV_PI) / silhouetteCount;
       Mat x_rvec_obj = (Mat_<double>(dim, 1) << xAngle, 0.0, 0.0);
