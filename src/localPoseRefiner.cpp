@@ -8,7 +8,6 @@
 #include "edges_pose_refiner/localPoseRefiner.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 #include "edges_pose_refiner/poseRT.hpp"
-//#include <posest/pnp_ransac.h>
 #include <iostream>
 #include "edges_pose_refiner/utils.hpp"
 
@@ -22,7 +21,9 @@
 //#define VERBOSE
 //#define VISUALIZE
 
+#ifdef USE_ORIENTED_CHAMFER_MATCHING
 #include "chamfer_matching/chamfer_matching.h"
+#endif
 
 using namespace cv;
 using std::cout;
@@ -41,6 +42,8 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
 
   if(params.useOrientedChamferMatching)
   {
+    CV_Assert(false);
+#ifdef USE_ORIENTED_CHAMFER_MATCHING
     //otherwise chamfer matching doesn't work
     edgesImage.row(0).setTo(Scalar(0));
     edgesImage.row(edgesImage.rows - 1).setTo(Scalar(0));
@@ -108,6 +111,7 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
     cvReleaseImage(&annotated_img);
     cvReleaseImage(&dist_img);
     cvReleaseImage(&orientation_img);
+#endif
   }
 
   cameraMatrix.convertTo(cameraMatrix64F, CV_64FC1);

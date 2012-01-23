@@ -16,7 +16,6 @@ set(src
     tangentVectorsEstimator.cpp
     transparentDetector.cpp
     utils.cpp
-    chamfer_matching/chamfer_matching.cpp
 )
 
 #EAR: is there a reason to list headers in this target?
