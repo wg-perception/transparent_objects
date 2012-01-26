@@ -153,7 +153,6 @@ int main(int argc, char **argv)
   //const string modelFilename = "finalModels/" + objectName + ".xml";
   const string modelsPath = "/media/2Tb/transparentBases/trainedModels/";
 
-  const string trainFolder ="/media/2Tb/transparentBases/base_with_ground_truth/base/wh_" + testObjectName + "/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
 
 //  const string camerasListFilename = baseFolder + "/cameras.txt";
@@ -168,7 +167,7 @@ int main(int argc, char **argv)
 
 
 
-  TODBaseImporter dataImporter(trainFolder, testFolder);
+  TODBaseImporter dataImporter(testFolder);
 
   PinholeCamera kinectCamera;
   if(!kinectCameraFilename.empty())

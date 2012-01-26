@@ -15,7 +15,8 @@ class TODBaseImporter
 {
 public:
   TODBaseImporter();
-  TODBaseImporter(const std::string &trainFolder, const std::string &testFolder);
+//  TODBaseImporter(const std::string &trainFolder, const std::string &testFolder);
+  TODBaseImporter(const std::string &testFolder);
 
   void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
   void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true);

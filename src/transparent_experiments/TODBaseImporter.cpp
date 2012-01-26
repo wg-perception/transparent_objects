@@ -20,16 +20,17 @@ TODBaseImporter::TODBaseImporter()
 {
 }
 
-TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder)
+//TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder)
+TODBaseImporter::TODBaseImporter(const std::string &_testFolder)
 {
-  trainFolder = _trainFolder;
+//  trainFolder = _trainFolder;
   testFolder = _testFolder;
 
-  PinholeCamera camera;
-  readCameraParams(trainFolder, camera);
-  cameraMatrix = camera.cameraMatrix;
-  distCoeffs = camera.distCoeffs;
-  readTrainSamples();
+//  PinholeCamera camera;
+//  readCameraParams(trainFolder, camera);
+//  cameraMatrix = camera.cameraMatrix;
+//  distCoeffs = camera.distCoeffs;
+//  readTrainSamples();
 }
 
 void TODBaseImporter::readCameraParams(const string &folder, PinholeCamera &camera, bool addFilename)
