@@ -535,7 +535,7 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
 
 void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color) const
 {
-  image = displayEdgels(image, edgeModel.points, pose, kinectCamera, "", color);
+  image = displayEdgels(image, edgeModel.points, pose, kinectCamera, color);
 }
 
 #ifdef USE_3D_VISUALIZATION

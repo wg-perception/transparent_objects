@@ -508,7 +508,6 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thicknes
 vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
-                          const string &title,
                           cv::Scalar color)
 {
   vector<Mat> drawImages(images.size());
@@ -531,22 +530,39 @@ vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
       circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
-
-#ifdef VISUALIZE_POSE_REFINEMENT
-    std::stringstream titleStream;
-    titleStream << title << " " << i;
-    imshow(titleStream.str(), drawImages[i]);
-#endif
   }
 
   return drawImages;
 }
 
-Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
+Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return displayEdgels(images, edgels3d, pose_cam, allCameras, title, color)[0];
+  return displayEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
+}
+
+vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
+                       const PoseRT &pose_cam,
+                       const std::vector<PinholeCamera> &cameras,
+                       const string &title,
+                       cv::Scalar color)
+{
+  vector<Mat> drawImages = displayEdgels(images, edgels3d, pose_cam, cameras, color);
+  for (size_t i = 0; i < images.size(); ++i)
+  {
+    std::stringstream titleStream;
+    titleStream << title << " " << i;
+    imshow(titleStream.str(), drawImages[i]);
+  }
+  return drawImages;
+}
+
+Mat showEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
+{
+  Mat drawImage = displayEdgels(image, edgels3d, pose_cam, camera, color);
+  imshow(title, drawImage);
+  return drawImage;
 }
 
 /*
@@ -733,4 +749,3 @@ void drawPoints(const std::vector<cv::Point2f> &points, cv::Mat &image, Scalar c
     circle(image, pt, 1, color, thickness);
   }
 }
-

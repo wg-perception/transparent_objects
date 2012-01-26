@@ -33,7 +33,7 @@ using std::stringstream;
 //#define WRITE_GLASS_SEGMENTATION
 
 
-#ifdef VISUALIZE_POSE_REFINEMENT
+#if defined(VISUALIZE_POSE_REFINEMENT) && USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <boost/thread/thread.hpp>
@@ -214,7 +214,7 @@ int main(int argc, char **argv)
   vector<int> indicesOfRecognizedObjects;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
-#ifdef VISUALIZE_POSE_REFINEMENT
+#if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("transparent experiments"));
 #endif
     int testImageIdx = testIndices[ testIdx ];
@@ -252,6 +252,7 @@ int main(int argc, char **argv)
     dataImporter.importPointCloud(testImageIdx, testPointCloud);
 
 #ifdef VISUALIZE_POSE_REFINEMENT
+#ifdef USE_3D_VISUALIZATION
     {
       vector<Point3f> cvTestPointCloud;
       pcl2cv(testPointCloud, cvTestPointCloud);
@@ -259,20 +260,24 @@ int main(int argc, char **argv)
       publishPoints(cvTestPointCloud, viewer, Scalar(0, 255, 0), "test point cloud");
     }
 
+    publishPoints(edgeModels[0].points, viewer, Scalar(0, 0, 255), "ground object", model2test_ground);
+#endif
+
     if(!kinectCameraFilename.empty())
     {
 //      displayEdgels(glassMask, edgeModels[0].points, model2test_ground, kinectCamera, "kinect");
-      displayEdgels(kinectBgrImage, edgeModels[0].points, model2test_ground, kinectCamera, "ground truth");
-      displayEdgels(kinectBgrImage, edgeModels[0].stableEdgels, model2test_ground, kinectCamera, "ground truth surface");
+      showEdgels(kinectBgrImage, edgeModels[0].points, model2test_ground, kinectCamera, "ground truth");
+      showEdgels(kinectBgrImage, edgeModels[0].stableEdgels, model2test_ground, kinectCamera, "ground truth surface");
     }
-    publishPoints(edgeModels[0].points, viewer, Scalar(0, 0, 255), "ground object", model2test_ground);
     namedWindow("ground truth");
+#ifdef USE_3D_VISUALIZATION
     while (!viewer->wasStopped ())
     {
       viewer->spinOnce (100);
       boost::this_thread::sleep (boost::posix_time::microseconds (100000));
     }
     viewer->resetStoppedFlag();
+#endif
     waitKey();
     destroyWindow("ground truth");
 #endif
@@ -292,6 +297,10 @@ int main(int argc, char **argv)
     catch(const cv::Exception &)
     {
     }
+#ifdef VISUALIZE_POSE_REFINEMENT
+    imshow("glassMask", glassMask);
+    waitKey();
+#endif
     if (poses_cam.size() == 0)
     {
       ++segmentationFailuresCount;
@@ -329,20 +338,21 @@ int main(int argc, char **argv)
         namedWindow("pose is ready");
         waitKey();
         destroyWindow("pose is ready");
-#endif
-
-  #ifdef VISUALIZE_POSE_REFINEMENT
 //        displayEdgels(glassMask, edgeModels[objectIndex].points, initPoses_cam[objectIndex][i], kinectCamera, "initial");
+#ifdef USE_3D_VISUALIZATION
         publishPoints(edgeModels[objectIndex].points, viewer, Scalar(255, 0, 0), "final object", poses_cam[i]);
-        displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[i], kinectCamera, "final");
-        displayEdgels(kinectBgrImage, edgeModels[objectIndex].stableEdgels, poses_cam[i], kinectCamera, "final surface");
+#endif
+        showEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[i], kinectCamera, "final");
+        showEdgels(kinectBgrImage, edgeModels[objectIndex].stableEdgels, poses_cam[i], kinectCamera, "final surface");
         namedWindow("initial pose");
 
+#ifdef USE_3D_VISUALIZATION
         while (!viewer->wasStopped ())
         {
           viewer->spinOnce (100);
           boost::this_thread::sleep (boost::posix_time::microseconds (100000));
         }
+#endif
         waitKey();
         destroyWindow("initial pose");
   #endif

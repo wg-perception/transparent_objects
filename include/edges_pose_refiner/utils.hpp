@@ -67,12 +67,19 @@ void readFiducial(const std::string &filename, cv::Mat &blackBlobsObject, cv::Ma
 
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness = 1);
 
-cv::Mat displayEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const std::string &title = "projected model", cv::Scalar color = cv::Scalar(0, 0, 255));
+cv::Mat displayEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color = cv::Scalar(0, 0, 255));
 std::vector<cv::Mat> displayEdgels(const std::vector<cv::Mat> &images, const std::vector<cv::Point3f> &edgels3d,
                                    const PoseRT &pose_cam,
                                    const std::vector<PinholeCamera> &cameras,
-                                   const std::string &title = "projected model",
                                    cv::Scalar color = cv::Scalar(0, 0, 255));
+
+cv::Mat showEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const std::string &title = "projected model", cv::Scalar color = cv::Scalar(0, 0, 255));
+std::vector<cv::Mat> showEdgels(const std::vector<cv::Mat> &images, const std::vector<cv::Point3f> &edgels3d,
+                                const PoseRT &pose_cam,
+                                const std::vector<PinholeCamera> &cameras,
+                                const std::string &title = "projected model",
+                                cv::Scalar color = cv::Scalar(0, 0, 255));
+
 
 void drawPoints(const std::vector<cv::Point2f> &points, cv::Mat &image, cv::Scalar color = cv::Scalar::all(255), int thickness = 1);
 
