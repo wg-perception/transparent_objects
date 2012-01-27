@@ -505,7 +505,7 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thicknes
   return drawImage;
 }
 
-vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
+vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
                           cv::Scalar color)
@@ -535,11 +535,11 @@ vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point
   return drawImages;
 }
 
-Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
+Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return displayEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
+  return drawEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
 }
 
 vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
@@ -548,7 +548,7 @@ vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
                        const string &title,
                        cv::Scalar color)
 {
-  vector<Mat> drawImages = displayEdgels(images, edgels3d, pose_cam, cameras, color);
+  vector<Mat> drawImages = drawEdgels(images, edgels3d, pose_cam, cameras, color);
   for (size_t i = 0; i < images.size(); ++i)
   {
     std::stringstream titleStream;
@@ -560,7 +560,7 @@ vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
 
 Mat showEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
 {
-  Mat drawImage = displayEdgels(image, edgels3d, pose_cam, camera, color);
+  Mat drawImage = drawEdgels(image, edgels3d, pose_cam, camera, color);
   imshow(title, drawImage);
   return drawImage;
 }
@@ -736,16 +736,5 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
         * points[i].z + tvec.at<double> (1, 0);
     modif_points[i].z = R.at<double> (2, 0) * points[i].x + R.at<double> (2, 1) * points[i].y + R.at<double> (2, 2)
         * points[i].z + tvec.at<double> (2, 0);
-  }
-}
-
-void drawPoints(const std::vector<cv::Point2f> &points, cv::Mat &image, Scalar color, int thickness)
-{
-  CV_Assert(!image.empty());
-  for (size_t i = 0; i < points.size(); ++i)
-  {
-    Point2f pt = points[i];
-    CV_Assert(isPointInside(image, pt));
-    circle(image, pt, 1, color, thickness);
   }
 }

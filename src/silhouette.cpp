@@ -16,7 +16,7 @@ using std::endl;
 
 //#define VISUALIZE_TRANSFORMS
 
-Mat affine2homography(const cv::Mat &transformationMatrix)
+cv::Mat affine2homography(const cv::Mat &transformationMatrix)
 {
   const Size affineTransformationSize(3, 2);
   const Size homographyTransformationSize(3, 3);
@@ -29,19 +29,117 @@ Mat affine2homography(const cv::Mat &transformationMatrix)
   return homography;
 }
 
-void composeAffineTransformations(const Mat &transformation1, const Mat &transformation2, Mat &composedTransformation)
+cv::Mat homography2affine(const cv::Mat &homography)
 {
-  CV_Assert(transformation1.type() == transformation2.type());
+  return homography.rowRange(0, 2).clone();
+}
 
-  Mat homography1 = affine2homography(transformation1);
-  Mat homography2 = affine2homography(transformation2);
-  Mat composedHomography = homography2 * homography1;
+void composeAffineTransformations(const Mat &firstTransformation, const Mat &secondTransformation, Mat &composedTransformation)
+{
+  CV_Assert(firstTransformation.type() == secondTransformation.type());
 
-  composedTransformation = composedHomography.rowRange(0, 2).clone();
+  Mat firstHomography = affine2homography(firstTransformation);
+  Mat secondHomography = affine2homography(secondTransformation);
+  Mat composedHomography = secondHomography * firstHomography;
+
+  composedTransformation = homography2affine(composedHomography);
 }
 
 Silhouette::Silhouette()
 {
+}
+
+void findSimilarityTransformation(const cv::Point2f &pt1, const cv::Point2f &pt2, cv::Mat &similarityTransformation)
+{
+//  cout << pt1 << " " << pt2 << endl;
+  Point2f diff = pt2 - pt1;
+  float distance = norm(diff);
+  const float eps = 1e-4;
+  CV_Assert(distance > eps);
+  float cosAngle = diff.x / distance;
+  float sinAngle = diff.y / distance;
+
+  float cosRotationAngle = cosAngle;
+  float sinRotationAngle = -sinAngle;
+  Mat rotationMatrix = (Mat_<float>(2, 3) << cosRotationAngle, -sinRotationAngle, 0.0,
+                                             sinRotationAngle, cosRotationAngle, 0.0);
+
+  Point2f translation = -0.5 * (pt1 + pt2);
+  Mat translationMatrix = (Mat_<float>(2, 3) << 1.0, 0.0, translation.x,
+                                                0.0, 1.0, translation.y);
+  Mat euclideanMatrix;
+  composeAffineTransformations(translationMatrix, rotationMatrix, euclideanMatrix);
+
+  float scale = 1.0 / distance;
+  similarityTransformation = scale * euclideanMatrix;
+}
+
+void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels)
+{
+  CV_Assert(firstIndex != secondIndex);
+  CV_Assert(edgels.type() == CV_32FC2);
+
+  vector<Point2f> edgelsVec = edgels;
+  CV_Assert(0 <= firstIndex && firstIndex < edgelsVec.size());
+  CV_Assert(0 <= secondIndex && secondIndex < edgelsVec.size());
+
+  Mat similarityTransformation;
+  ::findSimilarityTransformation(edgelsVec[firstIndex], edgelsVec[secondIndex], similarityTransformation);
+
+  transform(edgels, transformedEdgels, similarityTransformation);
+
+  const Vec2f firstPoint(-0.5f, 0.0f);
+  const Vec2f secondPoint(0.5f, 0.0f);
+  const float eps = 1e-4;
+  CV_Assert(norm(transformedEdgels.at<Vec2f>(firstIndex) - firstPoint) < eps);
+  CV_Assert(norm(transformedEdgels.at<Vec2f>(secondIndex) - secondPoint) < eps);
+
+//  Mat xChannel = transformedEdgels.reshape(1).col(0);
+//  Mat yChannel = transformedEdgels.reshape(1).col(1);
+//  double min_x, min_y, max_x, max_y;
+//  minMaxLoc(xChannel, &min_x, &max_x);
+//  minMaxLoc(yChannel, &min_y, &max_y);
+//  cout << min_x << " " << min_y << " " << max_x << " " << max_y << endl;
+
+/*
+  float granularity = 10.0;
+  for (int i = 0; i < transformedEdgels.size(); ++i)
+  {
+    Point pt = transformedEdgels[i] * granularity;
+  }
+*/
+}
+
+void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, float granularity)
+{
+  for (int firstIndex = 0; firstIndex < edgels.rows; ++firstIndex)
+  {
+    //TODO: use symmetry (i, j) and (j, i)
+    for (int secondIndex = 0; secondIndex < edgels.rows; ++secondIndex)
+    {
+      if (firstIndex == secondIndex)
+      {
+        continue;
+      }
+      GHValue basisIndices(silhouetteIndex, firstIndex, secondIndex);
+      Mat transformedEdgels;
+      generateHashForBasis(firstIndex, secondIndex, transformedEdgels);
+      vector<Point2f> transformedEdgelsVec = transformedEdgels;
+      for (int i = 0; i < transformedEdgelsVec.size(); ++i)
+      {
+        if (i == firstIndex || i == secondIndex)
+        {
+          continue;
+        }
+        float invertedGranularity = 1.0 / granularity;
+        Point pt = transformedEdgelsVec[i] * invertedGranularity;
+//        cout << pt << endl;
+        GHKey ptPair(pt.x, pt.y);
+        std::pair<GHKey, GHValue> value(ptPair, basisIndices);
+        hashTable.insert(value);
+      }
+    }
+  }
 }
 
 void Silhouette::init(const cv::Mat &_edgels, const PoseRT &_initialPose_cam)
@@ -62,6 +160,11 @@ void Silhouette::getInitialPose(PoseRT &pose_cam) const
   pose_cam = initialPose_cam;
 }
 
+int Silhouette::size() const
+{
+  return edgels.rows;
+}
+
 void Silhouette::clear()
 {
   edgels = Mat();
@@ -74,6 +177,14 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
   if (useClosedFormPnP)
   {
     Mat homography = affine2homography(affineTransformation);
+    CV_Assert(camera.cameraMatrix.type() == CV_64FC1);
+    if (homography.type() != CV_64FC1)
+    {
+      Mat homographyDouble;
+      homography.convertTo(homographyDouble, CV_64FC1);
+      homography = homographyDouble;
+    }
+
     //TODO: which inversion method is better?
     Mat fullTransform = camera.cameraMatrix.inv() * homography * camera.cameraMatrix;
     const int dim = 3;
@@ -119,17 +230,12 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
   pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
 }
 
-void Silhouette::draw(cv::Mat &image, int thickness) const
+void Silhouette::visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color) const
 {
-  CV_Assert(image.type() == CV_8UC1);
-  vector<Point2f> edgelsVec = edgels;
-  for (size_t i = 0; i < edgelsVec.size(); ++i)
-  {
-    Point pt = edgelsVec[i];
-    CV_Assert(isPointInside(image, pt));
-
-    circle(image, pt, 1, Scalar(255), thickness);
-  }
+  Mat transformedEdgels;
+  transform(edgels, transformedEdgels, similarityTransformation);
+  vector<Point2f> transformedEdgelsVec = transformedEdgels;
+  drawPoints(transformedEdgelsVec, image, color);
 }
 
 void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform)

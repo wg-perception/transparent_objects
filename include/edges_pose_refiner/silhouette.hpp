@@ -12,7 +12,35 @@
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
+//TODO: test it on other platforms before merging with the master branch
+#include <tr1/unordered_map>
+
 class EdgeModel;
+
+typedef std::pair<int, int> GHKey;
+typedef cv::Vec3i GHValue;
+//TODO: experiment with different structures: unordered map, distance transform, FLANN
+//typedef std::multimap<GHKey, GHValue> GHTable;
+typedef std::tr1::unordered_multimap<GHKey, GHValue> GHTable;
+
+namespace std
+{
+  namespace tr1
+  {
+    template <>
+    struct hash<GHKey>
+    {
+      public:
+        size_t operator()(const GHKey &key) const
+        {
+          const int maxCoordinate = 100000;
+          int keyNumber = key.first * maxCoordinate + key.second;
+          std::tr1::hash<int> hasher;
+          return hasher(keyNumber);
+        }
+      };
+  }
+}
 
 //TODO: use robust statistics
 class Silhouette
@@ -23,16 +51,21 @@ public:
   void getEdgels(cv::Mat &edgels) const;
   void getInitialPose(PoseRT &pose_cam) const;
 
+  int size() const;
   void clear();
+
+  void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, float granularity);
 
   void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const;
 
   void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test, int icpIterationsCount, float min2dScaleChange) const;
-  void draw(cv::Mat &image, int thickness = 1) const;
 
   void read(const cv::FileNode &fn);
   void write(cv::FileStorage &fs) const;
+
+  void visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color = cv::Scalar::all(255)) const;
 private:
+  void generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels);
   static void getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform);
   static void findSimilarityTransformation(const cv::Mat &src, const cv::Mat &dst, cv::Mat &transformationMatrix, int iterationsCount, float min2dScaleChange);
 
@@ -47,5 +80,11 @@ private:
 
   PoseRT initialPose_cam;
 };
+
+void findSimilarityTransformation(const cv::Point2f &pt1, const cv::Point2f &pt2, cv::Mat &similarityTransformation);
+
+cv::Mat affine2homography(const cv::Mat &transformationMatrix);
+cv::Mat homography2affine(const cv::Mat &homography);
+void composeAffineTransformations(const cv::Mat &firstTransformation, const cv::Mat &secondTransformation, cv::Mat &composedTransformation);
 
 #endif /* SILHOUETTE_HPP_ */

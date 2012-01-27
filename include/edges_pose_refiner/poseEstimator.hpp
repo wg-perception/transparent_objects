@@ -38,6 +38,8 @@ struct PoseEstimatorParams
   float min2dScaleChange;
   bool useClosedFormPnP;
 
+  float ghGranularity;
+
   PoseEstimatorParams()
   {
     silhouetteCount = 10;
@@ -55,7 +57,8 @@ struct PoseEstimatorParams
     icp2dIterationsCount = 50;
     min2dScaleChange = 0.001f;
 
-    useClosedFormPnP = false;
+    useClosedFormPnP = true;
+    ghGranularity = 0.04f;
   }
 
   void read(const cv::FileNode &fn);
@@ -81,14 +84,20 @@ public:
   void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
 #endif
 private:
+  static void suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed);
+
+  void generateGeometricHashes();
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
+  void getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
   void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities) const;
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
   void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
 
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;
+  //TODO: remove mutable
+  mutable GHTable ghTable;
 
   PoseEstimatorParams params;
   PinholeCamera kinectCamera;

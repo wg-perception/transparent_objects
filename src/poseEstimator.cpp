@@ -20,6 +20,7 @@
 //#define VISUALIZE_TABLE_ESTIMATION
 
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
+//#define VISUALIZE_GEOMETRIC_HASHING
 
 using namespace cv;
 using std::cout;
@@ -37,6 +38,16 @@ void PoseEstimator::setModel(const EdgeModel &_edgeModel)
 
   Ptr<const PinholeCamera> centralCameraPtr = new PinholeCamera(kinectCamera);
   edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
+  generateGeometricHashes();
+}
+
+void PoseEstimator::generateGeometricHashes()
+{
+  ghTable.clear();
+  for (size_t i = 0; i < silhouettes.size(); ++i)
+  {
+    silhouettes[i].generateGeometricHash(i, ghTable, params.ghGranularity);
+  }
 }
 
 void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
@@ -50,7 +61,9 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
     return;
   }
 
-  getInitialPoses(glassMask, poses_cam, posesQualities);
+//  getInitialPoses(glassMask, poses_cam, posesQualities);
+  getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities);
+
   refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
   {
@@ -248,6 +261,259 @@ void PoseEstimator::computeCentralEdges(const Mat &centralBgrImage, const Mat &g
 
 }
 
+struct BasisCorrespondence
+{
+  float votes;
+
+  int firstTrain, secondTrain;
+  int firstTest, secondTest;
+
+  BasisCorrespondence();
+};
+
+BasisCorrespondence::BasisCorrespondence()
+{
+  votes = 0.0f;
+  firstTrain = 0;
+  secondTrain = 0;
+  firstTest = 0;
+  secondTest = 0;
+}
+
+void suppressNonMaximum(const cv::Mat &confidences, int windowSize, float absoluteSuppressionFactor, std::vector<cv::Point> &maxLocations)
+{
+  CV_Assert(windowSize % 2 == 1);
+  CV_Assert(confidences.type() == CV_32FC1);
+  double maxValDouble;
+  minMaxLoc(confidences, 0, &maxValDouble);
+  float maxVal = maxValDouble;
+
+  int halfWindowSize = windowSize / 2;
+  maxLocations.clear();
+  Mat wideConfidences(confidences.rows + windowSize - 1, confidences.cols + windowSize - 1, confidences.type(), Scalar(0));
+  Mat roi = wideConfidences(Rect(halfWindowSize, halfWindowSize, confidences.cols, confidences.rows));
+  confidences.copyTo(roi);
+
+  Mat isSuppressed(wideConfidences.size(), CV_8UC1, Scalar(0));
+
+  for (int row = 0; row < confidences.rows; ++row)
+  {
+    for (int col = 0; col < confidences.cols; ++col)
+    {
+      float mainVal = wideConfidences.at<float>(row + halfWindowSize, col + halfWindowSize);
+      if (mainVal * absoluteSuppressionFactor < maxVal)
+      {
+        isSuppressed.at<uchar>(row + halfWindowSize, col + halfWindowSize) = 255;
+        continue;
+      }
+
+      for (int dy = -halfWindowSize; dy < halfWindowSize; ++dy)
+      {
+        for (int dx = -halfWindowSize; dx < halfWindowSize; ++dx)
+        {
+          int x = col + halfWindowSize + dx;
+          int y = row + halfWindowSize + dy;
+
+          float val = wideConfidences.at<float>(y, x);
+          if (mainVal > val)
+          {
+            isSuppressed.at<uchar>(y, x) = 255;
+          }
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < isSuppressed.rows; ++i)
+  {
+    for (int j = 0; j < isSuppressed.cols; ++j)
+    {
+      if (isSuppressed.at<uchar>(i, j) == 0)
+      {
+        maxLocations.push_back(Point(j, i));
+      }
+    }
+  }
+}
+
+void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const
+{
+  cout << "get initial poses by geometric hashing..." << endl;
+  initialPoses.clear();
+  initialPosesQualities.clear();
+
+  Mat maskClone = glassMask.clone();
+  vector<vector<Point> > allGlassContours;
+  findContours(maskClone, allGlassContours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+  cout << "Number of glass contours: " << allGlassContours.size() << endl;
+  cout << "Silhouettes size: " << silhouettes.size() << endl;
+
+  for (size_t contourIndex = 0; contourIndex < allGlassContours.size(); ++contourIndex)
+  {
+    vector<Point> &currentContour = allGlassContours[contourIndex];
+    if (currentContour.size() < params.minGlassContourLength)
+    {
+      continue;
+    }
+
+    if (contourArea(currentContour) < params.minGlassContourArea)
+    {
+      continue;
+    }
+
+    Mat currentContourMat = Mat(currentContour);
+    Mat currentContourFloatMat;
+    currentContourMat.convertTo(currentContourFloatMat, CV_32FC2);
+
+    vector<BasisCorrespondence> bestCorrespondences(silhouettes.size());
+
+//    const int iterationNumber = 200;
+    const int iterationNumber = 16;
+    for (int iterationIndex = 0; iterationIndex < iterationNumber; ++iterationIndex)
+    {
+      vector<Mat> votes(silhouettes.size());
+      for (size_t i = 0; i < silhouettes.size(); ++i)
+      {
+        votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1, Scalar(0));
+      }
+
+      int firstIndex = rand() % currentContour.size();
+      int secondIndex = rand() % currentContour.size();
+      if (currentContour[firstIndex] == currentContour[secondIndex])
+      {
+        continue;
+      }
+
+      Mat similarityTransformation;
+      findSimilarityTransformation(currentContour[firstIndex], currentContour[secondIndex], similarityTransformation);
+      Mat transformedContour;
+      transform(currentContourFloatMat, transformedContour, similarityTransformation);
+      vector<Point2f> transformedContourVec = transformedContour;
+      for (size_t i = 0; i < transformedContourVec.size(); ++i)
+      {
+        if (i == firstIndex || i == secondIndex)
+        {
+          continue;
+        }
+
+        float invertedGranularity = 1.0 / params.ghGranularity;
+        Point pt = transformedContourVec[i] * invertedGranularity;
+        GHKey key(pt.x, pt.y);
+
+        std::pair<GHTable::iterator, GHTable::iterator> range = ghTable.equal_range(key);
+//        std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable.equal_range(key);
+        for(GHTable::iterator it = range.first; it != range.second; ++it)
+        {
+          GHValue value = it->second;
+          votes[value[0]].at<int>(value[1], value[2]) += 1;
+        }
+      }
+
+      for (size_t i = 0; i < votes.size(); ++i)
+      {
+        Mat currentVotes;
+        votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].size());
+        int windowSize = 5;
+        float factor = 1.5f;
+        vector<Point> maxLocations;
+        suppressNonMaximum(currentVotes, windowSize, factor, maxLocations);
+        cout << "max locations: " << maxLocations.size() << endl;
+
+        double maxVotes;
+        Point maxLoc;
+        minMaxLoc(currentVotes, 0, &maxVotes, 0, &maxLoc);
+        if (maxVotes > bestCorrespondences[i].votes)
+        {
+          bestCorrespondences[i].votes = maxVotes;
+          bestCorrespondences[i].firstTest = firstIndex;
+          bestCorrespondences[i].secondTest= secondIndex;
+          bestCorrespondences[i].firstTrain = maxLoc.y;
+          bestCorrespondences[i].secondTrain = maxLoc.x;
+        }
+      }
+    }
+
+    vector<float> errors(bestCorrespondences.size());
+    for (size_t i = 0; i < bestCorrespondences.size(); ++i)
+    {
+      CV_Assert(bestCorrespondences[i].votes != 0);
+      errors[i] = 1.0 / bestCorrespondences[i].votes;
+    }
+    vector<bool> isSuppressed;
+    //TODO: use spatial locations of transformed silhouettes in suppression
+    //that is allow a silhouette to be in several places
+    //TODO: fix problem with suppresion on the FixedOnTable base
+    suppressNonMinimum(errors, params.confidentDomination, isSuppressed);
+    for (size_t i = 0; i < bestCorrespondences.size(); ++i)
+    {
+      if (isSuppressed[i])
+      {
+        continue;
+      }
+
+      Mat testTransformation, trainTransformation;
+      findSimilarityTransformation(currentContour[bestCorrespondences[i].firstTest], currentContour[bestCorrespondences[i].secondTest], testTransformation);
+      Mat edgels;
+      silhouettes[i].getEdgels(edgels);
+      vector<Point2f> edgelsVec = edgels;
+      findSimilarityTransformation(edgelsVec[bestCorrespondences[i].firstTrain], edgelsVec[bestCorrespondences[i].secondTrain], trainTransformation);
+
+      Mat testHomography = affine2homography(testTransformation);
+      Mat invertedTestTransformation(homography2affine(testHomography.inv()));
+      Mat finalSimilarityTransformation;
+      composeAffineTransformations(trainTransformation, invertedTestTransformation, finalSimilarityTransformation);
+
+#ifdef VISUALIZE_GEOMETRIC_HASHING
+      Mat visualization = glassMask.clone();
+      silhouettes[i].visualizeSimilarityTransformation(finalSimilarityTransformation, visualization, Scalar(255, 0, 0));
+      imshow("transformation by geometric hashing", visualization);
+      waitKey();
+#endif
+
+      PoseRT pose;
+      silhouettes[i].affine2poseRT(edgeModel, kinectCamera, finalSimilarityTransformation, params.useClosedFormPnP, pose);
+      initialPoses.push_back(pose);
+      initialPosesQualities.push_back(-bestCorrespondences[i].votes);
+    }
+  }
+  cout << "Initial pose count: " << initialPoses.size() << endl;
+}
+
+void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed)
+{
+  isSuppressed.resize(errors.size(), false);
+  for (size_t i = 0; i < errors.size(); ++i)
+  {
+    for (size_t j = 0; j < errors.size(); ++j)
+    {
+      if (i == j)
+      {
+        continue;
+      }
+
+      if (errors[j] * absoluteSuppressionFactor < errors[i])
+      {
+        isSuppressed[i] = true;
+        break;
+      }
+    }
+
+    if (isSuppressed[i])
+    {
+      continue;
+    }
+
+    bool isNextBetter = errors[i] > errors[(i + 1) % errors.size()];
+    bool isPreviousBetter = errors[i] > errors[(static_cast<int>(errors.size() + i) - 1) % errors.size()];
+
+    if (isNextBetter || isPreviousBetter)
+    {
+      isSuppressed[i] = true;
+    }
+  }
+}
+
 void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const
 {
   cout << "get initial poses..." << endl;
@@ -319,35 +585,15 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
       poseQualities[i] = chamferDistance / transformedEdgelsVec.size();
     }
 
-    vector<bool> isDominated(silhouettes.size(), false);
+    vector<bool> isSuppressed;
     vector<PoseRT> poses(silhouettes.size());
+
+    suppressNonMinimum(poseQualities, params.confidentDomination, isSuppressed);
+
     for (size_t i = 0; i < silhouettes.size(); ++i)
     {
-      for (size_t j = 0; j < silhouettes.size(); ++j)
+      if (isSuppressed[i])
       {
-        if (i == j)
-        {
-          continue;
-        }
-
-        if (poseQualities[j] * params.confidentDomination < poseQualities[i])
-        {
-          isDominated[i] = true;
-          break;
-        }
-      }
-
-      if (isDominated[i])
-      {
-        continue;
-      }
-
-      bool isNextBetter = poseQualities[i] > poseQualities[(i + 1) % silhouettes.size()];
-      bool isPreviousBetter = poseQualities[i] > poseQualities[(static_cast<int>(silhouettes.size() + i) - 1) % silhouettes.size()];
-
-      if (isNextBetter || isPreviousBetter)
-      {
-        isDominated[i] = true;
         continue;
       }
 
@@ -381,7 +627,7 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 
     for (size_t i = 0; i < silhouettes.size(); ++i)
     {
-      if (isDominated[i])
+      if (isSuppressed[i])
         continue;
 
       candidatePoses[contourIndex].push_back(poses[i]);
@@ -535,7 +781,7 @@ void PoseEstimatorParams::write(cv::FileStorage &fs) const
 
 void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color) const
 {
-  image = displayEdgels(image, edgeModel.points, pose, kinectCamera, color);
+  image = drawEdgels(image, edgeModel.points, pose, kinectCamera, color);
 }
 
 #ifdef USE_3D_VISUALIZATION
