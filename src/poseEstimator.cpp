@@ -50,7 +50,7 @@ void PoseEstimator::generateGeometricHashes()
   }
 }
 
-void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane) const
+void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane, std::vector<cv::Mat> *initialSilhouettes) const
 {
   CV_Assert(kinectBgrImage.size() == glassMask.size());
   CV_Assert(kinectBgrImage.size() == getValitTestImageSize());
@@ -62,7 +62,7 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
   }
 
 //  getInitialPoses(glassMask, poses_cam, posesQualities);
-  getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities);
+  getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
 
   refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
@@ -336,7 +336,7 @@ void suppressNonMaximum(const cv::Mat &confidences, int windowSize, float absolu
   }
 }
 
-void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const
+void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
 {
   cout << "get initial poses by geometric hashing..." << endl;
   initialPoses.clear();
@@ -475,6 +475,13 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
       silhouettes[i].affine2poseRT(edgeModel, kinectCamera, finalSimilarityTransformation, params.useClosedFormPnP, pose);
       initialPoses.push_back(pose);
       initialPosesQualities.push_back(-bestCorrespondences[i].votes);
+
+      if (initialSilhouettes != 0)
+      {
+        Mat transformedEdgels;
+        transform(edgels, transformedEdgels, finalSimilarityTransformation);
+        initialSilhouettes->push_back(transformedEdgels);
+      }
     }
   }
   cout << "Initial pose count: " << initialPoses.size() << endl;

@@ -211,6 +211,8 @@ int main(int argc, char **argv)
   int segmentationFailuresCount = 0;
   int badSegmentationCount = 0;
 
+  vector<float> allChamferDistances;
+  vector<size_t> geometricHashingPoseCount;
   vector<int> indicesOfRecognizedObjects;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
@@ -289,25 +291,61 @@ int main(int argc, char **argv)
     TickMeter recognitionTime;
     recognitionTime.start();
 
-    Mat glassMask;
+    TransparentDetector::DebugInfo debugInfo;
     try
     {
-      glassMask = detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames);
+      detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames, &debugInfo);
     }
     catch(const cv::Exception &)
     {
     }
+    recognitionTime.stop();
 #ifdef VISUALIZE_POSE_REFINEMENT
+    Mat glassMask = debugInfo.glassMask;
     imshow("glassMask", glassMask);
     waitKey();
 #endif
+
+
+    if (edgeModels.size() == 1)
+    {
+      vector<Point2f> groundEdgels;
+      kinectCamera.projectPoints(edgeModels[0].points, model2test_ground, groundEdgels);
+
+      vector<float> chamferDistances;
+      for (size_t silhouetteIndex = 0; silhouetteIndex < debugInfo.initialSilhouettes.size(); ++silhouetteIndex)
+      {
+        vector<Point2f> silhouette = debugInfo.initialSilhouettes[silhouetteIndex];
+
+        double silhoutteDistance = 0.0;
+        for (int i = 0; i < silhouette.size(); ++i)
+        {
+          float minDist = std::numeric_limits<float>::max();
+          for (int j = 0; j < groundEdgels.size(); ++j)
+          {
+            float currentDist = norm(silhouette[i] - groundEdgels[j]);
+            if (currentDist < minDist)
+            {
+              minDist = currentDist;
+            }
+          }
+          silhoutteDistance += minDist;
+        }
+        silhoutteDistance /= silhouette.size();
+        chamferDistances.push_back(silhoutteDistance);
+      }
+      std::sort(chamferDistances.begin(), chamferDistances.end());
+      cout << "Best geometric hashing pose (px): " << chamferDistances[0];
+      cout << "Number of initial poses: " << chamferDistances.size() << endl;
+      allChamferDistances.push_back(chamferDistances[0]);
+      geometricHashingPoseCount.push_back(chamferDistances.size());
+    }
+
     if (poses_cam.size() == 0)
     {
       ++segmentationFailuresCount;
       continue;
     }
-
-    recognitionTime.stop();
 
     cout << poses_cam.size() << endl;
 
@@ -413,6 +451,16 @@ int main(int argc, char **argv)
     const double cmThreshold = 2.0;
     PoseError::evaluateErrors(bestPoses, cmThreshold);
   }
+
+  cout << "Evaluation of geometric hashing" << endl;
+  std::sort(allChamferDistances.begin(), allChamferDistances.end());
+  for (size_t i = 0; i < allChamferDistances.size(); ++i)
+  {
+    cout << i << "\t: " << allChamferDistances[i] << endl;
+  }
+  int posesSum = std::accumulate(geometricHashingPoseCount.begin(), geometricHashingPoseCount.end(), 0);
+  float meanInitialPoseCount = static_cast<float>(posesSum) / initialPoseCount.size();
+  cout << "Mean number of initial poses: " << meanInitialPoseCount << endl;
 
   std::system("date");
   return 0;

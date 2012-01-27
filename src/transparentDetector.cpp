@@ -69,7 +69,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 }
 */
 
-cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
+void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, TransparentDetector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -110,7 +110,7 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
-    return cv::Mat();
+    return;
   }
   else
   {
@@ -122,6 +122,10 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
   GlassSegmentator glassSegmentator(params.glassSegmentationParams);
   glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
 //  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
+  if (debugInfo != 0)
+  {
+    debugInfo->glassMask = glassMask;
+  }
   std::cout << "glass is segmented" << std::endl;
   if (numberOfComponents == 0)
   {
@@ -157,9 +161,15 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
     std::vector<PoseRT> currentPoses;
     std::vector<float> currentPosesQualities;
 
-    poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane);
+    vector<Mat> initialSilhouettes;
+    vector<Mat> *initialSilhouettesPtr = debugInfo == 0 ? 0 : &initialSilhouettes;
+    poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
     std::cout << "done." << std::endl;
     std::cout << "detected poses: " << currentPoses.size() << std::endl;
+    if (debugInfo != 0)
+    {
+      std::copy(initialSilhouettes.begin(), initialSilhouettes.end(), std::back_inserter(debugInfo->initialSilhouettes));
+    }
     if (!currentPoses.empty())
     {
       poses_cam.push_back(currentPoses[0]);
@@ -167,7 +177,6 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
       detectedObjectNames.push_back(objectNames[i]);
     }
   }
-  return glassMask;
 }
 
 int TransparentDetector::getObjectIndex(const std::string &name) const

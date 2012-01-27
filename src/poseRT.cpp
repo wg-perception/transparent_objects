@@ -168,6 +168,10 @@ PoseRT PoseRT::generateRandomPose(double rotationAngleInRadians, double translat
 void PoseRT::computeMeanPose(const std::vector<PoseRT> &poses, PoseRT &meanPose)
 {
   meanPose = PoseRT();
+  if (poses.empty())
+  {
+    return;
+  }
 
   Mat meanTvec = meanPose.tvec;
   Mat meanRotationMatrix = meanPose.getRotationMatrix();
