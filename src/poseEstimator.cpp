@@ -44,9 +44,10 @@ void PoseEstimator::setModel(const EdgeModel &_edgeModel)
 void PoseEstimator::generateGeometricHashes()
 {
   ghTable.clear();
+  canonicScales.resize(silhouettes.size());
   for (size_t i = 0; i < silhouettes.size(); ++i)
   {
-    silhouettes[i].generateGeometricHash(i, ghTable, params.ghGranularity);
+    silhouettes[i].generateGeometricHash(i, ghTable, canonicScales[i], params.ghGranularity);
   }
 }
 
@@ -261,23 +262,12 @@ void PoseEstimator::computeCentralEdges(const Mat &centralBgrImage, const Mat &g
 
 }
 
-struct BasisCorrespondence
+PoseEstimator::BasisMatch::BasisMatch()
 {
-  float votes;
-
-  int firstTrain, secondTrain;
-  int firstTest, secondTest;
-
-  BasisCorrespondence();
-};
-
-BasisCorrespondence::BasisCorrespondence()
-{
-  votes = 0.0f;
-  firstTrain = 0;
-  secondTrain = 0;
-  firstTest = 0;
-  secondTest = 0;
+  confidence = 0.0f;
+  trainBasis = Basis(0, 0);
+  testBasis = Basis(0, 0);
+  silhouetteIndex = 0;
 }
 
 void suppressNonMaximum(const cv::Mat &confidences, int windowSize, float absoluteSuppressionFactor, std::vector<cv::Point> &maxLocations)
@@ -324,18 +314,197 @@ void suppressNonMaximum(const cv::Mat &confidences, int windowSize, float absolu
     }
   }
 
-  for (int i = 0; i < isSuppressed.rows; ++i)
+  for (int row = 0; row < confidences.rows; ++row)
   {
-    for (int j = 0; j < isSuppressed.cols; ++j)
+    for (int col = 0; col < confidences.cols; ++col)
     {
-      if (isSuppressed.at<uchar>(i, j) == 0)
+      if (isSuppressed.at<uchar>(row + halfWindowSize, col + halfWindowSize) == 0)
       {
-        maxLocations.push_back(Point(j, i));
+        maxLocations.push_back(Point(col, row));
       }
     }
   }
 }
 
+void decomposeSimilarityTransformation(const cv::Mat &transformation, Point2f &translation, Point2f &rotationCosSin, float &scale)
+{
+  CV_Assert(transformation.type() == CV_32FC1);
+
+  Mat scaledRotationMatrix = transformation(Range(0, 2), Range(0, 2));
+  scale = sqrt(determinant(scaledRotationMatrix));
+  const float eps = 1e-4;
+  CV_Assert(scale > eps);
+  rotationCosSin.x = scaledRotationMatrix.at<float>(0, 0) / scale;
+  rotationCosSin.y = scaledRotationMatrix.at<float>(1, 0) / scale;
+
+  translation.x = transformation.at<float>(0, 2);
+  translation.y = transformation.at<float>(1, 2);
+}
+
+void compareSimilarityTransformations(const cv::Mat &transformation_1, const cv::Mat &transformation_2, float &translationDiff, float &rotationCosDiff, float &scaleChange)
+{
+  Point2f translation_1, cosSin_1;
+  float scale_1;
+  decomposeSimilarityTransformation(transformation_1, translation_1, cosSin_1, scale_1);
+
+  Point2f translation_2, cosSin_2;
+  float scale_2;
+  decomposeSimilarityTransformation(transformation_2, translation_2, cosSin_2, scale_2);
+
+  translationDiff = norm(translation_2 - translation_1);
+  scaleChange = scale_2 / scale_1;
+  rotationCosDiff = cosSin_1.dot(cosSin_2);
+}
+
+void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, const Basis &testBasis, std::vector<BasisMatch> &basisMatches) const
+{
+  Point2f firstPoint = contour.at(testBasis.first);
+  Point2f secondPoint= contour.at(testBasis.second);
+
+  vector<Mat> votes(silhouettes.size());
+  for (size_t i = 0; i < silhouettes.size(); ++i)
+  {
+    votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1, Scalar(0));
+  }
+
+  Mat similarityTransformation;
+  findSimilarityTransformation(firstPoint, secondPoint, similarityTransformation);
+  Mat contourFloatMat(contour);
+  Mat transformedContour;
+  transform(contourFloatMat, transformedContour, similarityTransformation);
+  vector<Point2f> transformedContourVec = transformedContour;
+  for (size_t i = 0; i < transformedContourVec.size(); ++i)
+  {
+    if (i == testBasis.first || i == testBasis.second)
+    {
+      continue;
+    }
+
+    float invertedGranularity = 1.0 / params.ghGranularity;
+    Point pt = transformedContourVec[i] * invertedGranularity;
+    GHKey key(pt.x, pt.y);
+
+    std::pair<GHTable::iterator, GHTable::iterator> range = ghTable.equal_range(key);
+//        std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable.equal_range(key);
+    for(GHTable::iterator it = range.first; it != range.second; ++it)
+    {
+      GHValue value = it->second;
+      votes[value[0]].at<int>(value[1], value[2]) += 1;
+    }
+  }
+
+  for (size_t i = 0; i < votes.size(); ++i)
+  {
+    Mat currentVotes;
+    votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].size());
+    float testScale = norm(firstPoint - secondPoint);
+    Mat currentScale = testScale * canonicScales[i];
+    currentVotes /= currentScale;
+
+    vector<Point> maxLocations;
+    suppressNonMaximum(currentVotes, params.votesWindowSize, params.votesConfidentSuppression, maxLocations);
+
+    for (size_t j = 0; j < maxLocations.size(); ++j)
+    {
+      Point maxLoc = maxLocations[j];
+
+      BasisMatch match;
+      match.confidence = currentVotes.at<float>(maxLoc.y, maxLoc.x);
+      match.testBasis = testBasis;
+      match.trainBasis = Basis(maxLoc.y, maxLoc.x);
+      match.silhouetteIndex = i;
+
+      basisMatches.push_back(match);
+    }
+  }
+}
+
+void PoseEstimator::suppressBasisMatches(const std::vector<BasisMatch> &matches, std::vector<BasisMatch> &filteredMatches) const
+{
+  vector<float> errors(matches.size());
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    const float eps = 1e-4;
+    CV_Assert(matches[i].confidence > eps);
+    errors[i] = 1.0 / matches[i].confidence;
+  }
+
+  vector<bool> isSuppressed;
+  bool useNeighbors = false;
+  suppressNonMinimum(errors, params.basisConfidentSuppression, isSuppressed, useNeighbors);
+
+  filteredMatches.clear();
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (!isSuppressed[i])
+    {
+      filteredMatches.push_back(matches[i]);
+    }
+  }
+}
+
+void PoseEstimator::suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformations_obj, std::vector<bool> &isSuppressed) const
+{
+  //TODO: move up
+  const float maxTranslationDiff = 10.0f;
+  const float minRotationCosDiff = 0.95f;
+  const float maxScaleChange = 1.2f;
+  const int maxSilhouetteNeighbor = 1;
+  const float finalConfidentDomination = 1.5f;
+
+  vector<vector<int> > neighbors(matches.size());
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    for (size_t j = i+1; j < matches.size(); ++j)
+    {
+      int silhouettesCount = static_cast<int>(silhouettes.size());
+      //TODO: compare with
+      //if (abs(matches[i].silhouetteIndex - matches[j].silhouetteIndex) > maxSilhouetteNeighbor)
+      if ((silhouettesCount + matches[i].silhouetteIndex - matches[j].silhouetteIndex) % silhouettesCount > maxSilhouetteNeighbor)
+      {
+        continue;
+      }
+
+      float translationDiff, rotationCosDiff, scaleChange;
+      compareSimilarityTransformations(similarityTransformations_obj[i], similarityTransformations_obj[j], translationDiff, rotationCosDiff, scaleChange);
+
+      if (translationDiff < maxTranslationDiff && rotationCosDiff > minRotationCosDiff && std::max(scaleChange, 1.0f / scaleChange) < maxScaleChange)
+      {
+        neighbors[i].push_back(j);
+        neighbors[j].push_back(i);
+      }
+    }
+  }
+
+  float maxVotes = 0.0f;
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (matches[i].confidence > maxVotes)
+    {
+      maxVotes = matches[i].confidence;
+    }
+  }
+
+  isSuppressed.resize(matches.size(), false);
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (matches[i].confidence * finalConfidentDomination < maxVotes)
+    {
+      isSuppressed[i] = true;
+      continue;
+    }
+
+    for (size_t j = 0; j < neighbors[i].size(); ++j)
+    {
+      if (matches[i].confidence > matches[neighbors[i][j]].confidence)
+      {
+        isSuppressed[neighbors[i][j]] = true;
+      }
+    }
+  }
+}
+
+//TODO: suppress poses in 3D
 void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
 {
   cout << "get initial poses by geometric hashing..." << endl;
@@ -352,12 +521,7 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
   for (size_t contourIndex = 0; contourIndex < allGlassContours.size(); ++contourIndex)
   {
     vector<Point> &currentContour = allGlassContours[contourIndex];
-    if (currentContour.size() < params.minGlassContourLength)
-    {
-      continue;
-    }
-
-    if (contourArea(currentContour) < params.minGlassContourArea)
+    if (currentContour.size() < params.minGlassContourLength || contourArea(currentContour) < params.minGlassContourArea)
     {
       continue;
     }
@@ -365,129 +529,119 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
     Mat currentContourMat = Mat(currentContour);
     Mat currentContourFloatMat;
     currentContourMat.convertTo(currentContourFloatMat, CV_32FC2);
+    vector<Point2f> currentContourFloat(currentContourMat);
 
-    vector<BasisCorrespondence> bestCorrespondences(silhouettes.size());
-
-//    const int iterationNumber = 200;
-    const int iterationNumber = 16;
-    for (int iterationIndex = 0; iterationIndex < iterationNumber; ++iterationIndex)
+    vector<BasisMatch> bestMatches;
+    for (int iterationIndex = 0; iterationIndex < params.ghIterationCount; ++iterationIndex)
     {
-      vector<Mat> votes(silhouettes.size());
-      for (size_t i = 0; i < silhouettes.size(); ++i)
-      {
-        votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1, Scalar(0));
-      }
-
       int firstIndex = rand() % currentContour.size();
       int secondIndex = rand() % currentContour.size();
       if (currentContour[firstIndex] == currentContour[secondIndex])
       {
         continue;
       }
-
-      Mat similarityTransformation;
-      findSimilarityTransformation(currentContour[firstIndex], currentContour[secondIndex], similarityTransformation);
-      Mat transformedContour;
-      transform(currentContourFloatMat, transformedContour, similarityTransformation);
-      vector<Point2f> transformedContourVec = transformedContour;
-      for (size_t i = 0; i < transformedContourVec.size(); ++i)
-      {
-        if (i == firstIndex || i == secondIndex)
-        {
-          continue;
-        }
-
-        float invertedGranularity = 1.0 / params.ghGranularity;
-        Point pt = transformedContourVec[i] * invertedGranularity;
-        GHKey key(pt.x, pt.y);
-
-        std::pair<GHTable::iterator, GHTable::iterator> range = ghTable.equal_range(key);
-//        std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable.equal_range(key);
-        for(GHTable::iterator it = range.first; it != range.second; ++it)
-        {
-          GHValue value = it->second;
-          votes[value[0]].at<int>(value[1], value[2]) += 1;
-        }
-      }
-
-      for (size_t i = 0; i < votes.size(); ++i)
-      {
-        Mat currentVotes;
-        votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].size());
-        int windowSize = 5;
-        float factor = 1.5f;
-        vector<Point> maxLocations;
-        suppressNonMaximum(currentVotes, windowSize, factor, maxLocations);
-        cout << "max locations: " << maxLocations.size() << endl;
-
-        double maxVotes;
-        Point maxLoc;
-        minMaxLoc(currentVotes, 0, &maxVotes, 0, &maxLoc);
-        if (maxVotes > bestCorrespondences[i].votes)
-        {
-          bestCorrespondences[i].votes = maxVotes;
-          bestCorrespondences[i].firstTest = firstIndex;
-          bestCorrespondences[i].secondTest= secondIndex;
-          bestCorrespondences[i].firstTrain = maxLoc.y;
-          bestCorrespondences[i].secondTrain = maxLoc.x;
-        }
-      }
+      Basis testBasis(firstIndex, secondIndex);
+      vector<BasisMatch> currentMatches;
+      findBasisMatches(currentContourFloat, testBasis, currentMatches);
+      std::copy(currentMatches.begin(), currentMatches.end(), std::back_inserter(bestMatches));
     }
 
-    vector<float> errors(bestCorrespondences.size());
-    for (size_t i = 0; i < bestCorrespondences.size(); ++i)
-    {
-      CV_Assert(bestCorrespondences[i].votes != 0);
-      errors[i] = 1.0 / bestCorrespondences[i].votes;
-    }
-    vector<bool> isSuppressed;
-    //TODO: use spatial locations of transformed silhouettes in suppression
-    //that is allow a silhouette to be in several places
-    //TODO: fix problem with suppresion on the FixedOnTable base
-    suppressNonMinimum(errors, params.confidentDomination, isSuppressed);
-    for (size_t i = 0; i < bestCorrespondences.size(); ++i)
-    {
-      if (isSuppressed[i])
-      {
-        continue;
-      }
+    vector<BasisMatch> filteredCorrespondences;
+    suppressBasisMatches(bestMatches, filteredCorrespondences);
 
+    vector<Mat> similarityTransformations_cam(filteredCorrespondences.size());
+    vector<Mat> similarityTransformations_obj(filteredCorrespondences.size());
+    for (size_t i = 0; i < filteredCorrespondences.size(); ++i)
+    {
       Mat testTransformation, trainTransformation;
-      findSimilarityTransformation(currentContour[bestCorrespondences[i].firstTest], currentContour[bestCorrespondences[i].secondTest], testTransformation);
+      findSimilarityTransformation(currentContour[filteredCorrespondences[i].testBasis.first], currentContour[filteredCorrespondences[i].testBasis.second], testTransformation);
       Mat edgels;
-      silhouettes[i].getEdgels(edgels);
+      silhouettes[filteredCorrespondences[i].silhouetteIndex].getEdgels(edgels);
       vector<Point2f> edgelsVec = edgels;
-      findSimilarityTransformation(edgelsVec[bestCorrespondences[i].firstTrain], edgelsVec[bestCorrespondences[i].secondTrain], trainTransformation);
+      findSimilarityTransformation(edgelsVec[filteredCorrespondences[i].trainBasis.first], edgelsVec[filteredCorrespondences[i].trainBasis.second], trainTransformation);
 
       Mat testHomography = affine2homography(testTransformation);
       Mat invertedTestTransformation(homography2affine(testHomography.inv()));
       Mat finalSimilarityTransformation;
       composeAffineTransformations(trainTransformation, invertedTestTransformation, finalSimilarityTransformation);
+      similarityTransformations_cam[i] = finalSimilarityTransformation;
+      silhouettes[filteredCorrespondences[i].silhouetteIndex].camera2object(similarityTransformations_cam[i], similarityTransformations_obj[i]);
+    }
 
-#ifdef VISUALIZE_GEOMETRIC_HASHING
-      Mat visualization = glassMask.clone();
-      silhouettes[i].visualizeSimilarityTransformation(finalSimilarityTransformation, visualization, Scalar(255, 0, 0));
-      imshow("transformation by geometric hashing", visualization);
-      waitKey();
-#endif
+    vector<bool> isSimilaritySuppressed;
+    suppressSimilarityTransformations(filteredCorrespondences, similarityTransformations_obj, isSimilaritySuppressed);
+
+    cout << "best correspondences size: " << bestMatches.size() << endl;
+    cout << "filtered correspondences size: " << filteredCorrespondences.size() << endl;
+    int remainedCorrespondences = 0;
+    for (size_t i = 0; i < filteredCorrespondences.size(); ++i)
+    {
+      if (isSimilaritySuppressed[i])
+      {
+        continue;
+      }
+      ++remainedCorrespondences;
 
       PoseRT pose;
-      silhouettes[i].affine2poseRT(edgeModel, kinectCamera, finalSimilarityTransformation, params.useClosedFormPnP, pose);
+      silhouettes[filteredCorrespondences[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
       initialPoses.push_back(pose);
-      initialPosesQualities.push_back(-bestCorrespondences[i].votes);
+      initialPosesQualities.push_back(-filteredCorrespondences[i].confidence);
 
       if (initialSilhouettes != 0)
       {
+        Mat edgels;
+        silhouettes[filteredCorrespondences[i].silhouetteIndex].getEdgels(edgels);
         Mat transformedEdgels;
-        transform(edgels, transformedEdgels, finalSimilarityTransformation);
+        transform(edgels, transformedEdgels, similarityTransformations_cam[i]);
         initialSilhouettes->push_back(transformedEdgels);
       }
+
+#ifdef VISUALIZE_GEOMETRIC_HASHING
+      if (filteredCorrespondences[i].silhouetteIndex != 0)
+      {
+//        continue;
+      }
+      Mat visualization = glassMask.clone();
+      silhouettes[filteredCorrespondences[i].silhouetteIndex].visualizeSimilarityTransformation(similarityTransformations_cam[i], visualization, Scalar(255, 0, 0));
+      imshow("transformation by geometric hashing", visualization);
+
+      cout << "votes: " << filteredCorrespondences[i].confidence << endl;
+      cout << "idx: " << filteredCorrespondences[i].silhouetteIndex << endl;
+      cout << "i: " << i << endl;
+
+
+      if (i != 0)
+      {
+        float translationDiff, rotationCosDiff, scaleChange;
+        compareSimilarityTransformations(similarityTransformations_obj[i], similarityTransformations_obj[i-1], translationDiff, rotationCosDiff, scaleChange);
+        cout << translationDiff << endl;
+        cout << rotationCosDiff<< endl;
+        cout << scaleChange<< endl;
+        for (size_t j = 0; j < neighbors[i].size(); ++j)
+        {
+          cout << neighbors[i][j] << " ";
+        }
+        cout << endl;
+
+/*
+        for (size_t j = 0; j < neighbors[i-1].size(); ++j)
+        {
+          cout << neighbors[i-1][j] << " ";
+        }
+        cout << endl;
+*/
+      }
+
+      cout << endl;
+      waitKey();
+#endif
     }
+    cout << "remained correspondences: " << remainedCorrespondences << endl;
   }
   cout << "Initial pose count: " << initialPoses.size() << endl;
 }
 
-void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed)
+void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed, bool useNeighbors)
 {
   isSuppressed.resize(errors.size(), false);
   for (size_t i = 0; i < errors.size(); ++i)
@@ -506,17 +660,20 @@ void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absolute
       }
     }
 
-    if (isSuppressed[i])
+    if (useNeighbors)
     {
-      continue;
-    }
+      if (isSuppressed[i])
+      {
+        continue;
+      }
 
-    bool isNextBetter = errors[i] > errors[(i + 1) % errors.size()];
-    bool isPreviousBetter = errors[i] > errors[(static_cast<int>(errors.size() + i) - 1) % errors.size()];
+      bool isNextBetter = errors[i] > errors[(i + 1) % errors.size()];
+      bool isPreviousBetter = errors[i] > errors[(static_cast<int>(errors.size() + i) - 1) % errors.size()];
 
-    if (isNextBetter || isPreviousBetter)
-    {
-      isSuppressed[i] = true;
+      if (isNextBetter || isPreviousBetter)
+      {
+        isSuppressed[i] = true;
+      }
     }
   }
 }

@@ -110,8 +110,21 @@ void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &
 */
 }
 
-void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, float granularity)
+void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity)
 {
+  vector<Point2f> edgelsVec = edgels;
+  canonicScale.create(edgels.rows, edgels.rows, CV_32FC1);
+  for (int i = 0; i < edgels.rows; ++i)
+  {
+    for (int j = i; j < edgels.rows; ++j)
+    {
+      float dist = norm(edgelsVec[i] - edgelsVec[j]);
+      float invDist = (i == j) ? 1.0 : 1.0 / dist;
+      canonicScale.at<float>(i, j) = invDist;
+      canonicScale.at<float>(j, i) = invDist;
+    }
+  }
+
   for (int firstIndex = 0; firstIndex < edgels.rows; ++firstIndex)
   {
     //TODO: use symmetry (i, j) and (j, i)
@@ -146,6 +159,10 @@ void Silhouette::init(const cv::Mat &_edgels, const PoseRT &_initialPose_cam)
 {
   edgels = _edgels;
   initialPose_cam = _initialPose_cam;
+
+  CV_Assert(edgels.channels() == 2);
+  Scalar center = mean(edgels);
+  silhouetteCenter = Point2f(center[0], center[1]);
 
   getNormalizationTransform(edgels, silhouette2normalized);
 }
@@ -431,4 +448,17 @@ void Silhouette::write(cv::FileStorage &fs) const
   fs << "silhouette2normalized" << silhouette2normalized;
 
   initialPose_cam.write(fs);
+}
+
+
+void Silhouette::camera2object(const cv::Mat &similarityTransformation_cam, cv::Mat &similarityTransformation_obj) const
+{
+  Mat similarity_cam = affine2homography(similarityTransformation_cam);
+  Mat cam2obj = Mat::eye(3, 3, similarityTransformation_cam.type());
+  CV_Assert(similarityTransformation_cam.type() == CV_32FC1);
+  cam2obj.at<float>(0, 2) = -silhouetteCenter.x;
+  cam2obj.at<float>(1, 2) = -silhouetteCenter.y;
+
+  Mat similarity_obj = cam2obj * similarity_cam * cam2obj.inv();
+  similarityTransformation_obj = homography2affine(similarity_obj);
 }

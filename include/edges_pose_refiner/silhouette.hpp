@@ -54,11 +54,13 @@ public:
   int size() const;
   void clear();
 
-  void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, float granularity);
+  void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity);
 
   void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const;
 
   void match(const cv::Mat &testEdgels, cv::Mat &silhouette2test, int icpIterationsCount, float min2dScaleChange) const;
+
+  void camera2object(const cv::Mat &similarityTransformation_cam, cv::Mat &similarityTransformation_obj) const;
 
   void read(const cv::FileNode &fn);
   void write(cv::FileStorage &fs) const;
@@ -72,6 +74,7 @@ private:
   static void showNormalizedPoints(const cv::Mat &points, const std::string &title = "normalized points");
 
   cv::Mat edgels;
+  cv::Point2f silhouetteCenter;
   cv::Mat silhouette2normalized;
 
   //TODO: use smart pointer

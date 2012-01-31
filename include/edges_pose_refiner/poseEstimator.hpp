@@ -39,6 +39,10 @@ struct PoseEstimatorParams
   bool useClosedFormPnP;
 
   float ghGranularity;
+  int ghIterationCount;
+  int votesWindowSize;
+  float votesConfidentSuppression;
+  float basisConfidentSuppression;
 
   PoseEstimatorParams()
   {
@@ -58,7 +62,13 @@ struct PoseEstimatorParams
     min2dScaleChange = 0.001f;
 
     useClosedFormPnP = true;
+
     ghGranularity = 0.04f;
+//    ghIterationCount = 200;
+    ghIterationCount = 16;
+    votesWindowSize = 5;
+    votesConfidentSuppression = 1.1f;
+    basisConfidentSuppression = 1.5f;
   }
 
   void read(const cv::FileNode &fn);
@@ -84,18 +94,38 @@ public:
   void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
 #endif
 private:
-  static void suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed);
+  typedef std::pair<int, int> Basis;
+  struct BasisMatch
+  {
+    float confidence;
+
+    Basis trainBasis;
+    Basis testBasis;
+
+    int silhouetteIndex;
+
+    BasisMatch();
+  };
+
+  static void suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed, bool useNeighbors = true);
+
+  void findBasisMatches(const std::vector<cv::Point2f> &contour, const Basis &testBasis, std::vector<BasisMatch> &basisMatches) const;
+
+  void suppressBasisMatches(const std::vector<BasisMatch> &matches, std::vector<BasisMatch> &filteredMatches) const;
+  void suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformaitons_obj, std::vector<bool> &isSuppressed) const;
 
   void generateGeometricHashes();
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
   void getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const;
+
   void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities) const;
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
   void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
 
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;
+  std::vector<cv::Mat> canonicScales;
   //TODO: remove mutable
   mutable GHTable ghTable;
 
