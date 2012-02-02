@@ -110,7 +110,7 @@ void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &
 */
 }
 
-void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity)
+void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity, int hashBasisStep, float minDistanceBetweenPoints)
 {
   vector<Point2f> edgelsVec = edgels;
   canonicScale.create(edgels.rows, edgels.rows, CV_32FC1);
@@ -119,21 +119,28 @@ void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, 
     for (int j = i; j < edgels.rows; ++j)
     {
       float dist = norm(edgelsVec[i] - edgelsVec[j]);
-      float invDist = (i == j) ? 1.0 : 1.0 / dist;
+      float invDist = 1.0f;
+      if (dist > minDistanceBetweenPoints)
+      {
+        invDist = 1.0f / dist;
+      }
+
       canonicScale.at<float>(i, j) = invDist;
       canonicScale.at<float>(j, i) = invDist;
     }
   }
 
-  for (int firstIndex = 0; firstIndex < edgels.rows; ++firstIndex)
+  for (int firstIndex = 0; firstIndex < edgels.rows; firstIndex += hashBasisStep)
   {
     //TODO: use symmetry (i, j) and (j, i)
-    for (int secondIndex = 0; secondIndex < edgels.rows; ++secondIndex)
+    for (int secondIndex = 0; secondIndex < edgels.rows; secondIndex += hashBasisStep)
     {
-      if (firstIndex == secondIndex)
+      float dist = norm(edgelsVec[firstIndex] - edgelsVec[secondIndex]);
+      if (dist < minDistanceBetweenPoints)
       {
         continue;
       }
+
       GHValue basisIndices(silhouetteIndex, firstIndex, secondIndex);
       Mat transformedEdgels;
       generateHashForBasis(firstIndex, secondIndex, transformedEdgels);
@@ -255,6 +262,14 @@ void Silhouette::visualizeSimilarityTransformation(const cv::Mat &similarityTran
   vector<Point2f> transformedEdgelsVec = transformedEdgels;
   drawPoints(transformedEdgelsVec, image, color);
 }
+
+void Silhouette::draw(cv::Mat &image, int thickness) const
+{
+//  CV_Assert(image.type() == CV_8UC1);
+  vector<Point2f> edgelsVec = edgels;
+  drawPoints(edgelsVec, image, Scalar::all(255), thickness);
+}
+
 
 void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform)
 {

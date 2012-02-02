@@ -54,7 +54,7 @@ public:
   int size() const;
   void clear();
 
-  void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity);
+  void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity, int hashBasisStep, float minDistanceBetweenPoints);
 
   void affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const;
 
@@ -66,6 +66,7 @@ public:
   void write(cv::FileStorage &fs) const;
 
   void visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color = cv::Scalar::all(255)) const;
+  void draw(cv::Mat &image, int thickness) const;
 private:
   void generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels);
   static void getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform);

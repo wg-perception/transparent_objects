@@ -47,7 +47,8 @@ void PoseEstimator::generateGeometricHashes()
   canonicScales.resize(silhouettes.size());
   for (size_t i = 0; i < silhouettes.size(); ++i)
   {
-    silhouettes[i].generateGeometricHash(i, ghTable, canonicScales[i], params.ghGranularity);
+    cout << "generating hashes for silhouette #" << i << endl;
+    silhouettes[i].generateGeometricHash(i, ghTable, canonicScales[i], params.ghGranularity, params.ghBasisStep, params.ghMinDistanceBetweenBasisPoints);
   }
 }
 
@@ -401,10 +402,8 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
     float testScale = norm(firstPoint - secondPoint);
     Mat currentScale = testScale * canonicScales[i];
     currentVotes /= currentScale;
-
     vector<Point> maxLocations;
     suppressNonMaximum(currentVotes, params.votesWindowSize, params.votesConfidentSuppression, maxLocations);
-
     for (size_t j = 0; j < maxLocations.size(); ++j)
     {
       Point maxLoc = maxLocations[j];
@@ -414,7 +413,6 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
       match.testBasis = testBasis;
       match.trainBasis = Basis(maxLoc.y, maxLoc.x);
       match.silhouetteIndex = i;
-
       basisMatches.push_back(match);
     }
   }

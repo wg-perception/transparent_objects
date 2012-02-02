@@ -39,6 +39,8 @@ struct PoseEstimatorParams
   bool useClosedFormPnP;
 
   float ghGranularity;
+  int ghBasisStep;
+  float ghMinDistanceBetweenBasisPoints;
   int ghIterationCount;
   int votesWindowSize;
   float votesConfidentSuppression;
@@ -67,9 +69,12 @@ struct PoseEstimatorParams
 
     useClosedFormPnP = true;
 
+    ghBasisStep = 2;
+    ghMinDistanceBetweenBasisPoints = 0.1f;
     ghGranularity = 0.04f;
 //    ghIterationCount = 200;
-    ghIterationCount = 16;
+//    ghIterationCount = 16;
+    ghIterationCount = 64;
     votesWindowSize = 5;
     votesConfidentSuppression = 1.1f;
     basisConfidentSuppression = 1.5f;

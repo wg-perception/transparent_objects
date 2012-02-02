@@ -26,6 +26,7 @@ using std::cout;
 using std::endl;
 using std::stringstream;
 
+//#define VISUALIZE_TEST_DATA
 //#define VISUALIZE_POSE_REFINEMENT
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
 //#define WRITE_RESULTS
@@ -189,11 +190,14 @@ int main(int argc, char **argv)
 //#endif
 
   TransparentDetectorParams params;
-  params.glassSegmentationParams.closingIterations = 8;
+//  params.glassSegmentationParams.closingIterations = 8;
 //  params.glassSegmentationParams.openingIterations = 15;
 
+  params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.openingIterations = 8;
   params.glassSegmentationParams.finalClosingIterations = 8;
+
+//  params.glassSegmentationParams.finalClosingIterations = 16;
 
   TransparentDetector detector(kinectCamera, params);
 //  TransparentDetector detector(kinectCamera);
@@ -254,6 +258,11 @@ int main(int argc, char **argv)
 
     pcl::PointCloud<pcl::PointXYZ> testPointCloud;
     dataImporter.importPointCloud(testImageIdx, testPointCloud);
+
+#ifdef VISUALIZE_TEST_DATA
+    imshow("rgb", kinectBgrImage);
+    imshow("depth", kinectDepth * 20);
+#endif
 
 #ifdef VISUALIZE_POSE_REFINEMENT
 #ifdef USE_3D_VISUALIZATION
@@ -464,13 +473,29 @@ int main(int argc, char **argv)
 
   cout << "Evaluation of geometric hashing" << endl;
   std::sort(allChamferDistances.begin(), allChamferDistances.end());
+  const float successfulChamferDistance = 10.0f;
+  int ghSuccessCount = 0;
+  double meanChamferDistance = 0.0;
   for (size_t i = 0; i < allChamferDistances.size(); ++i)
   {
     cout << i << "\t: " << allChamferDistances[i] << endl;
+    if (allChamferDistances[i] < successfulChamferDistance)
+    {
+      ++ghSuccessCount;
+      meanChamferDistance += allChamferDistances[i];
+    }
+  }
+  if (ghSuccessCount != 0)
+  {
+    meanChamferDistance /= ghSuccessCount;
   }
   int posesSum = std::accumulate(geometricHashingPoseCount.begin(), geometricHashingPoseCount.end(), 0);
   float meanInitialPoseCount = static_cast<float>(posesSum) / initialPoseCount.size();
   cout << "Mean number of initial poses: " << meanInitialPoseCount << endl;
+
+  float ghSuccessRate = static_cast<float>(ghSuccessCount) / allChamferDistances.size();
+  cout << "Success rate: " << ghSuccessRate << endl;
+  cout << "Mean chamfer distance (px): " << meanChamferDistance << endl;
 
   std::system("date");
   return 0;
