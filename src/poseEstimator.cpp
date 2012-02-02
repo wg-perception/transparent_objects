@@ -64,12 +64,13 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
 
 //  getInitialPoses(glassMask, poses_cam, posesQualities);
   getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
-
+/*
   refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
   {
     refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
   }
+*/
 }
 
 void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
@@ -504,6 +505,92 @@ void PoseEstimator::suppressSimilarityTransformations(const std::vector<BasisMat
   }
 }
 
+//TODO: write generic non-maxima suppression
+void PoseEstimator::suppressBasisMatchesIn3D(std::vector<BasisMatch> &matches) const
+{
+  //TODO: check symmetry of the distance
+  vector<vector<int> > neighbors(matches.size());
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    for (size_t j = i + 1; j < matches.size(); ++j)
+    {
+      double rotationDistance, translationDistance;
+      PoseRT::computeDistance(matches[i].pose, matches[j].pose, rotationDistance, translationDistance, edgeModel.Rt_obj2cam);
+      if (rotationDistance < params.maxRotation3D && translationDistance < params.maxTranslation3D)
+      {
+        neighbors[i].push_back(j);
+        neighbors[j].push_back(i);
+      }
+    }
+  }
+
+  float maxConfidence = 0.0f;
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (matches[i].confidence > maxConfidence)
+    {
+      maxConfidence = matches[i].confidence;
+    }
+  }
+
+  vector<bool> isSuppressed(matches.size(), false);
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (matches[i].confidence * params.confidentSuppresion3D < maxConfidence)
+    {
+      isSuppressed[i] = true;
+      continue;
+    }
+
+    for (size_t j = 0; j < neighbors[i].size(); ++j)
+    {
+      if (matches[i].confidence > matches[neighbors[i][j]].confidence)
+      {
+        isSuppressed[neighbors[i][j]] = true;
+      }
+    }
+  }
+
+  vector<BasisMatch> filteredMatches;
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    if (!isSuppressed[i])
+    {
+      filteredMatches.push_back(matches[i]);
+    }
+  }
+  std::swap(matches, filteredMatches);
+}
+
+
+void PoseEstimator::estimateSimilarityTransformations(const std::vector<cv::Point> &contour, std::vector<BasisMatch> &matches) const
+{
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    Mat testTransformation, trainTransformation;
+    findSimilarityTransformation(contour[matches[i].testBasis.first], contour[matches[i].testBasis.second], testTransformation);
+    Mat edgels;
+    silhouettes[matches[i].silhouetteIndex].getEdgels(edgels);
+    vector<Point2f> edgelsVec = edgels;
+    findSimilarityTransformation(edgelsVec[matches[i].trainBasis.first], edgelsVec[matches[i].trainBasis.second], trainTransformation);
+
+    Mat testHomography = affine2homography(testTransformation);
+    Mat invertedTestTransformation(homography2affine(testHomography.inv()));
+    Mat finalSimilarityTransformation;
+    composeAffineTransformations(trainTransformation, invertedTestTransformation, finalSimilarityTransformation);
+    matches[i].similarityTransformation_cam = finalSimilarityTransformation;
+    silhouettes[matches[i].silhouetteIndex].camera2object(matches[i].similarityTransformation_cam, matches[i].similarityTransformation_obj);
+  }
+}
+
+void PoseEstimator::estimatePoses(std::vector<BasisMatch> &matches) const
+{
+  for (size_t i = 0; i < matches.size(); ++i)
+  {
+    silhouettes[matches[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, matches[i].similarityTransformation_cam, params.useClosedFormPnP, matches[i].pose);
+  }
+}
+
 //TODO: suppress poses in 3D
 void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
 {
@@ -549,42 +636,35 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
     vector<BasisMatch> filteredCorrespondences;
     suppressBasisMatches(bestMatches, filteredCorrespondences);
 
-    vector<Mat> similarityTransformations_cam(filteredCorrespondences.size());
-    vector<Mat> similarityTransformations_obj(filteredCorrespondences.size());
-    for (size_t i = 0; i < filteredCorrespondences.size(); ++i)
-    {
-      Mat testTransformation, trainTransformation;
-      findSimilarityTransformation(currentContour[filteredCorrespondences[i].testBasis.first], currentContour[filteredCorrespondences[i].testBasis.second], testTransformation);
-      Mat edgels;
-      silhouettes[filteredCorrespondences[i].silhouetteIndex].getEdgels(edgels);
-      vector<Point2f> edgelsVec = edgels;
-      findSimilarityTransformation(edgelsVec[filteredCorrespondences[i].trainBasis.first], edgelsVec[filteredCorrespondences[i].trainBasis.second], trainTransformation);
+    estimateSimilarityTransformations(currentContour, filteredCorrespondences);
+    estimatePoses(filteredCorrespondences);
 
-      Mat testHomography = affine2homography(testTransformation);
-      Mat invertedTestTransformation(homography2affine(testHomography.inv()));
-      Mat finalSimilarityTransformation;
-      composeAffineTransformations(trainTransformation, invertedTestTransformation, finalSimilarityTransformation);
-      similarityTransformations_cam[i] = finalSimilarityTransformation;
-      silhouettes[filteredCorrespondences[i].silhouetteIndex].camera2object(similarityTransformations_cam[i], similarityTransformations_obj[i]);
-    }
+    cout << "before 3d: " << filteredCorrespondences.size() << endl;
+    suppressBasisMatchesIn3D(filteredCorrespondences);
+    cout << "after 3d: " << filteredCorrespondences.size() << endl;
 
-    vector<bool> isSimilaritySuppressed;
-    suppressSimilarityTransformations(filteredCorrespondences, similarityTransformations_obj, isSimilaritySuppressed);
+
+//    vector<bool> isSimilaritySuppressed;
+//    suppressSimilarityTransformations(filteredCorrespondences, similarityTransformations_obj, isSimilaritySuppressed);
+
 
     cout << "best correspondences size: " << bestMatches.size() << endl;
     cout << "filtered correspondences size: " << filteredCorrespondences.size() << endl;
     int remainedCorrespondences = 0;
     for (size_t i = 0; i < filteredCorrespondences.size(); ++i)
     {
-      if (isSimilaritySuppressed[i])
-      {
-        continue;
-      }
+//      if (isSimilaritySuppressed[i])
+//      {
+//        continue;
+//      }
       ++remainedCorrespondences;
 
-      PoseRT pose;
-      silhouettes[filteredCorrespondences[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
-      initialPoses.push_back(pose);
+//      PoseRT pose;
+//      silhouettes[filteredCorrespondences[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
+//      initialPoses.push_back(pose);
+//      initialPosesQualities.push_back(-filteredCorrespondences[i].confidence);
+
+      initialPoses.push_back(filteredCorrespondences[i].pose);
       initialPosesQualities.push_back(-filteredCorrespondences[i].confidence);
 
       if (initialSilhouettes != 0)
@@ -592,7 +672,7 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
         Mat edgels;
         silhouettes[filteredCorrespondences[i].silhouetteIndex].getEdgels(edgels);
         Mat transformedEdgels;
-        transform(edgels, transformedEdgels, similarityTransformations_cam[i]);
+        transform(edgels, transformedEdgels, filteredCorrespondences[i].similarityTransformation_cam);
         initialSilhouettes->push_back(transformedEdgels);
       }
 
@@ -602,14 +682,14 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
 //        continue;
       }
       Mat visualization = glassMask.clone();
-      silhouettes[filteredCorrespondences[i].silhouetteIndex].visualizeSimilarityTransformation(similarityTransformations_cam[i], visualization, Scalar(255, 0, 0));
+      silhouettes[filteredCorrespondences[i].silhouetteIndex].visualizeSimilarityTransformation(filteredCorrespondences[i].similarityTransformation_cam, visualization, Scalar(255, 0, 0));
       imshow("transformation by geometric hashing", visualization);
 
       cout << "votes: " << filteredCorrespondences[i].confidence << endl;
       cout << "idx: " << filteredCorrespondences[i].silhouetteIndex << endl;
       cout << "i: " << i << endl;
 
-
+/*
       if (i != 0)
       {
         float translationDiff, rotationCosDiff, scaleChange;
@@ -623,20 +703,22 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
         }
         cout << endl;
 
-/*
-        for (size_t j = 0; j < neighbors[i-1].size(); ++j)
-        {
-          cout << neighbors[i-1][j] << " ";
-        }
-        cout << endl;
-*/
+
+//        for (size_t j = 0; j < neighbors[i-1].size(); ++j)
+//        {
+//          cout << neighbors[i-1][j] << " ";
+//        }
+//        cout << endl;
+
       }
+*/
 
       cout << endl;
       waitKey();
 #endif
     }
     cout << "remained correspondences: " << remainedCorrespondences << endl;
+
   }
   cout << "Initial pose count: " << initialPoses.size() << endl;
 }

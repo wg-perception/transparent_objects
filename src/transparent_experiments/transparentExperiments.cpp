@@ -159,7 +159,7 @@ int main(int argc, char **argv)
   const string kinectCameraFilename = baseFolder + "/center.yml";
 //  const string visualizationPath = "visualized_results/";
   const string errorsVisualizationPath = "/home/ilysenkov/errors/";
-  //const vector<string> objectNames = {"bank", "bucket"};
+//  const vector<string> objectNames = {"bank", "bucket"};
 //  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
 
@@ -190,11 +190,13 @@ int main(int argc, char **argv)
 
   TransparentDetectorParams params;
   params.glassSegmentationParams.closingIterations = 8;
-  params.glassSegmentationParams.openingIterations = 15;
+//  params.glassSegmentationParams.openingIterations = 15;
+
+  params.glassSegmentationParams.openingIterations = 8;
   params.glassSegmentationParams.finalClosingIterations = 8;
 
-//  TransparentDetector detector(kinectCamera, params);
-  TransparentDetector detector(kinectCamera);
+  TransparentDetector detector(kinectCamera, params);
+//  TransparentDetector detector(kinectCamera);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
     detector.addModel(objectNames[i], edgeModels[i]);
@@ -303,6 +305,10 @@ int main(int argc, char **argv)
 #ifdef VISUALIZE_POSE_REFINEMENT
     Mat glassMask = debugInfo.glassMask;
     imshow("glassMask", glassMask);
+
+    Mat detectionResults = kinectBgrImage.clone();
+    detector.visualize(poses_cam, detectedObjectsNames, detectionResults);
+    imshow("detection", detectionResults);
     waitKey();
 #endif
 
@@ -335,7 +341,11 @@ int main(int argc, char **argv)
         chamferDistances.push_back(silhoutteDistance);
       }
       std::sort(chamferDistances.begin(), chamferDistances.end());
-      cout << "Best geometric hashing pose (px): " << chamferDistances[0];
+      if (chamferDistances.empty())
+      {
+        chamferDistances.push_back(std::numeric_limits<float>::max());
+      }
+      cout << "Best geometric hashing pose (px): " << chamferDistances[0] << endl;
       cout << "Number of initial poses: " << chamferDistances.size() << endl;
       allChamferDistances.push_back(chamferDistances[0]);
       geometricHashingPoseCount.push_back(chamferDistances.size());

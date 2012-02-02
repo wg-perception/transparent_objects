@@ -188,6 +188,7 @@ void Silhouette::clear()
   silhouette2normalized = Mat();
 }
 
+//TODO: undistort and scale the image
 void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const
 {
   PoseRT poseWithExtrinsics_cam;

@@ -44,6 +44,10 @@ struct PoseEstimatorParams
   float votesConfidentSuppression;
   float basisConfidentSuppression;
 
+  float maxRotation3D;
+  float maxTranslation3D;
+  float confidentSuppresion3D;
+
   PoseEstimatorParams()
   {
     silhouetteCount = 10;
@@ -69,6 +73,10 @@ struct PoseEstimatorParams
     votesWindowSize = 5;
     votesConfidentSuppression = 1.1f;
     basisConfidentSuppression = 1.5f;
+
+    maxRotation3D = 0.8f;
+    maxTranslation3D = 0.15f;
+    confidentSuppresion3D = 1.3f;
   }
 
   void read(const cv::FileNode &fn);
@@ -104,6 +112,9 @@ private:
 
     int silhouetteIndex;
 
+    cv::Mat similarityTransformation_cam, similarityTransformation_obj;
+    PoseRT pose;
+
     BasisMatch();
   };
 
@@ -111,8 +122,15 @@ private:
 
   void findBasisMatches(const std::vector<cv::Point2f> &contour, const Basis &testBasis, std::vector<BasisMatch> &basisMatches) const;
 
+  void estimateSimilarityTransformations(const std::vector<cv::Point> &contour, std::vector<BasisMatch> &matches) const;
+
+  void estimatePoses(std::vector<BasisMatch> &matches) const;
+
+
   void suppressBasisMatches(const std::vector<BasisMatch> &matches, std::vector<BasisMatch> &filteredMatches) const;
   void suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformaitons_obj, std::vector<bool> &isSuppressed) const;
+
+  void suppressBasisMatchesIn3D(std::vector<BasisMatch> &matches) const;
 
   void generateGeometricHashes();
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
