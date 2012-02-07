@@ -5,6 +5,8 @@
 #include "edges_pose_refiner/utils.hpp"
 
 using namespace cv;
+using std::cout;
+using std::endl;
 
 class Region
 {
@@ -125,6 +127,7 @@ void Region::clusterIntensities()
   }
 
   intensityClusterCenters = cv::Mat(clusterCenters).clone();
+  CV_Assert(intensityClusterCenters.cols == 1);
 }
 
 void computeColorSimilarity(const Region &region_1, const Region &region_2, float &distance)
@@ -138,13 +141,18 @@ void computeColorSimilarity(const Region &region_1, const Region &region_2, floa
 
 void computeOverlayConsistency(const Region &region_1, const Region &region_2, float &slope, float &intercept)
 {
+  //TODO: move up
+  const float minAlpha = 0.0f;
+  const float maxAlpha = 1.001f;
+
+
   Mat clusters_1 = region_1.getIntensityClusters();
   Mat clusters_2 = region_2.getIntensityClusters();
 
-  Mat b = clusters_1.t();
+  Mat b = clusters_1;
   const int dim = 2;
   Mat A = Mat(b.rows, dim, b.type());
-  Mat clusters_2_col = clusters_2.t();
+  Mat clusters_2_col = clusters_2;
   Mat col_0 = A.col(0);
   clusters_2_col.copyTo(col_0);
   A.col(1).setTo(1.0);
@@ -153,13 +161,13 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
   solve(A, b, model, DECOMP_SVD);
   CV_Assert(model.type() == CV_32FC1);
   CV_Assert(model.total() == dim);
-  if (model.at<float>(0) < 0 || model.at<float>(0) > 1)
+  if (model.at<float>(0) < minAlpha || model.at<float>(0) > maxAlpha)
   {
     //TODO: test this
     std::swap(col_0, b);
     solve(A, b, model, DECOMP_SVD);
   }
-  CV_Assert(0.0 <= model.at<float>(0) && model.at<float>(0) <= 1.0);
+  CV_Assert(model.at<float>(0) >= minAlpha && model.at<float>(0) <= maxAlpha);
 
   slope = model.at<float>(0);
   intercept = model.at<float>(1);
@@ -224,7 +232,8 @@ void segmentation2regions(const cv::Mat &image, const cv::Mat &segmentation, vec
   CV_Assert(segmentation.type() == CV_32SC1);
   vector<int> labels = segmentation.reshape(1, 1);
   std::sort(labels.begin(), labels.end());
-  std::unique(labels.begin(), labels.end());
+  vector<int>::iterator endIt = std::unique(labels.begin(), labels.end());
+  labels.resize(endIt - labels.begin());
 
   regions.clear();
   for (size_t i = 0; i < labels.size(); ++i)
@@ -259,8 +268,9 @@ void train(CvSVM &svm)
     Mat trainingImage = imread(trainingFiles[imageIndex]);
     CV_Assert(!trainingImage.empty());
 
-    Mat groundTruthMask = imread(trainingGroundTruhFiles[imageIndex]);
+    Mat groundTruthMask = imread(trainingGroundTruhFiles[imageIndex], CV_LOAD_IMAGE_GRAYSCALE);
     CV_Assert(!groundTruthMask.empty());
+    CV_Assert(trainingImage.size() == groundTruthMask.size());
 
     Mat segmentation;
     oversegmentImage(trainingImage, segmentation);
@@ -305,18 +315,21 @@ void train(CvSVM &svm)
     }
   }
   Mat trainingLabels = Mat(trainingLabelsVec).reshape(1, trainingLabelsVec.size());
+  CV_Assert(trainingLabels.rows == trainingData.rows);
 
   CvSVMParams svmParams;
   //TODO: move up
   svmParams.svm_type = CvSVM::C_SVC;
+  cout << "trainingData size: " << trainingData.rows << " x " << trainingData.cols << endl;
+
   svm.train(trainingData, trainingLabels, Mat(), Mat(), svmParams);
 }
 
 int main()
 {
-  Mat testImage = imread("tea_table2.jpg");
-  Mat oversegmentation;
-  oversegmentImage(testImage, oversegmentation);
+//  Mat testImage = imread("tea_table2.jpg");
+//  Mat oversegmentation;
+//  oversegmentImage(testImage, oversegmentation);
 //  showSegmentation(oversegmentation);
 
   CvSVM svm;
