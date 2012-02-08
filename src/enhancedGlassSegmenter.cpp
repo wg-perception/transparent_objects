@@ -1,6 +1,8 @@
 #include <opencv2/opencv.hpp>
 #include <fstream>
 #include <numeric>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/dijkstra_shortest_paths.hpp>
 
 #include "edges_pose_refiner/utils.hpp"
 
@@ -8,23 +10,57 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
+struct VertexProperties
+{
+  cv::Point pt;
+  float orientation;
+  bool isRegion;
+  int regionIndex;
+};
+
+struct EdgeProperties
+{
+  float length;
+  float maximumAngle;
+
+  EdgeProperties();
+};
+
+EdgeProperties::EdgeProperties()
+{
+  length = 0.0f;
+  maximumAngle = 0.0f;
+}
+
+typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS, VertexProperties, EdgeProperties> Graph;
+typedef boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
+typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
+
+
+//TODO: remove
+void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<double> &affinities);
+
 class Region
 {
   public:
     Region(const cv::Mat &image, const cv::Mat &mask);
 
+    cv::Point2f getCenter() const;
     const cv::Mat& getMask() const;
     const cv::Mat& getColorHistogram() const;
     const cv::Mat& getIntensityClusters() const;
   private:
     void computeColorHistogram();
     void clusterIntensities();
+    void computeCenter();
 
     cv::Mat image, mask;
     cv::Mat grayscaleImage;
 
     cv::Mat hist;
     cv::Mat intensityClusterCenters;
+
+    cv::Point2f center;
 };
 
 Region::Region(const cv::Mat &_image, const cv::Mat &_mask)
@@ -34,8 +70,13 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_mask)
 
   computeColorHistogram();
   clusterIntensities();
+  computeCenter();
 }
 
+cv::Point2f Region::getCenter() const
+{
+  return center;
+}
 
 const cv::Mat& Region::getColorHistogram() const
 {
@@ -50,6 +91,25 @@ const cv::Mat& Region::getIntensityClusters() const
 const cv::Mat& Region::getMask() const
 {
   return mask;
+}
+
+void Region::computeCenter()
+{
+  Point2d sum(0.0, 0.0);
+  int pointCount = 0;
+  for (int i = 0; i < mask.rows; ++i)
+  {
+    for (int j = 0; j < mask.cols; ++j)
+    {
+      if (mask.at<uchar>(i, j) != 0)
+      {
+        sum += Point2d(j, i);
+        ++pointCount;
+      }
+    }
+  }
+  sum *= 1.0 / pointCount;
+  center = sum;
 }
 
 void Region::computeColorHistogram()
@@ -140,6 +200,7 @@ void computeColorSimilarity(const Region &region_1, const Region &region_2, floa
   distance = norm(hist_1 - hist_2);
 }
 
+//TODO: what if I = I_B?
 void computeOverlayConsistency(const Region &region_1, const Region &region_2, float &slope, float &intercept)
 {
   //TODO: move up
@@ -399,10 +460,15 @@ struct InteractiveClassificationData
   CvSVM *svm;
   Mat segmentation;
   vector<Region> regions;
+
+  Graph graph;
 };
 
 void onMouse(int event, int x, int y, int, void *rawData)
 {
+  //TODO: move up
+  const float regionEdgeLength = 1e6;
+
   if (event != CV_EVENT_LBUTTONDOWN)
   {
     return;
@@ -418,12 +484,287 @@ void onMouse(int event, int x, int y, int, void *rawData)
     Mat sample;
     regions2sample(data->regions[regionIndex], data->regions[i], sample);
     labels[i] = cvRound(data->svm->predict(sample));
-    cout << labels[i] << endl;
   }
 
   Mat visualization;
   visualizeClassification(data->regions, labels, visualization);
   imshow("classification", visualization);
+
+
+  vector<double> affinities;
+  estimateAffinities(data->graph, data->regions.size(), data->segmentation.size(), regionIndex, affinities);
+  CV_Assert(data->regions.size() == affinities.size());
+
+  Mat regionAffinities(data->segmentation.size(), CV_64FC1, Scalar(0));
+  for (size_t i = 0; i < affinities.size(); ++i)
+  {
+    regionAffinities.setTo(affinities[i], data->regions[i].getMask());
+  }
+//  regionAffinities -= 2 * regionEdgeLength;
+// regionAffinities.setTo(0, regionAffinities > regionEdgeLength);
+
+  Mat affinityImage(regionAffinities.size(), CV_8UC1, Scalar(0));
+
+  regionAffinities.convertTo(affinityImage, CV_8UC1, 100.0);
+//  cout << regionAffinities << endl;
+//  affinityImage.setTo(255, regionAffinities == 0.0);
+ // regionAffinities.convertTo(affinityImage, CV_8UC1, 10.0);
+  imshow("affinities", affinityImage);
+}
+
+
+//TODO: is it possible to use the index to access a vertex directly?
+VertexDescriptor getRegionVertex(const Graph &graph, int regionIndex)
+{
+  boost::graph_traits<Graph>::vertex_iterator vi, vi_end;
+  for (tie(vi, vi_end) = vertices(graph); vi != vi_end; ++vi)
+  {
+    if (graph[*vi].isRegion && graph[*vi].regionIndex == regionIndex)
+    {
+      return *vi;
+    }
+  }
+  CV_Assert(false);
+}
+
+VertexDescriptor insertPoint(const cv::Mat &segmentation, const cv::Mat &orientations, cv::Point pt, Graph &graph)
+{
+  //TODO: move up
+  const int maxDistanceToRegion = 3;
+  const float regionEdgeLength = 1e6;
+
+
+  boost::graph_traits<Graph>::vertex_iterator vi, vi_end;
+  for (tie(vi, vi_end) = vertices(graph); vi != vi_end; ++vi)
+  {
+    if (pt == graph[*vi].pt)
+    {
+      return *vi;
+    }
+  }
+
+  VertexDescriptor v = boost::add_vertex(graph);
+  graph[v].pt = pt;
+  CV_Assert(orientations.type() == CV_32FC1);
+  graph[v].orientation = orientations.at<float>(pt.y, pt.x);
+
+
+  CV_Assert(segmentation.type() == CV_32SC1);
+  for (int dy = -maxDistanceToRegion; dy <= maxDistanceToRegion; ++dy)
+  {
+    for (int dx = -maxDistanceToRegion; dx <= maxDistanceToRegion; ++dx)
+    {
+      Point shiftedPt = pt + Point(dx, dy);
+      if (!isPointInside(segmentation, shiftedPt))
+      {
+        continue;
+      }
+
+      int regionIndex = segmentation.at<int>(shiftedPt.y, shiftedPt.x);
+      VertexDescriptor regionVertex = getRegionVertex(graph, regionIndex);
+      bool isNew;
+      EdgeDescriptor addedEdge;
+      tie(addedEdge, isNew) = boost::add_edge(v, regionVertex, graph);
+      if (isNew)
+      {
+        graph[addedEdge].length = regionEdgeLength;
+      }
+    }
+  }
+
+  return v;
+}
+
+void edges2graph(const cv::Mat &segmentation, const vector<Region> &regions, const cv::Mat &edges, Graph &graph)
+{
+  //TODO: move up
+  const int medianIndex = 3;
+
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    VertexDescriptor v = boost::add_vertex(graph);
+    graph[v].isRegion = true;
+    graph[v].regionIndex = i;
+    graph[v].pt = regions[i].getCenter();
+  }
+
+  Mat edgesMap = edges.clone();
+  Mat orientations;
+  computeEdgeOrientations(edgesMap, orientations, medianIndex);
+  CV_Assert(orientations.type() == CV_32FC1);
+  //TODO: check with NaNs and remove magic numbers
+
+  edgesMap = edges.clone();
+  edgesMap.setTo(0, ~((orientations >= -10.0) & (orientations <= 10.0)));
+
+  vector<vector<Point> > contours;
+  findContours(edgesMap, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+  for (size_t contourIndex = 0; contourIndex < contours.size(); ++contourIndex)
+  {
+    VertexDescriptor previousVertex = insertPoint(segmentation, orientations, contours[contourIndex][0], graph);
+
+    for (size_t edgelIndex = 1; edgelIndex < contours[contourIndex].size(); ++edgelIndex)
+    {
+      VertexDescriptor currentVertex = insertPoint(segmentation, orientations, contours[contourIndex][edgelIndex], graph);
+      EdgeDescriptor currentEdge;
+      bool isNewEdge;
+      tie(currentEdge, isNewEdge) = boost::add_edge(previousVertex, currentVertex, graph);
+      if (isNewEdge)
+      {
+        //TODO: use better estimation
+        graph[currentEdge].length = norm(graph[previousVertex].pt - graph[currentVertex].pt);
+        graph[currentEdge].maximumAngle = fabs(graph[previousVertex].orientation - graph[currentVertex].orientation);
+      }
+      previousVertex = currentVertex;
+    }
+  }
+}
+
+cv::Point getNextPoint(cv::Point previous, cv::Point current)
+{
+  Point next = current + (current - previous);
+  return next;
+}
+
+//TODO: use orientations of endpoints
+//TODO: process adjacent regions when the shortest path has the single edgel
+bool areRegionsOnTheSameSide(const cv::Mat &path, Point firstPathEdgel, Point lastPathEdgel, Point center_1, Point center_2)
+{
+  //TODO: move up
+  float minDistanceToEndpoints = 1.8f;
+  Mat dilatedPath;
+  dilate(path, dilatedPath, Mat());
+  vector<vector<Point> > contours;
+  findContours(dilatedPath, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  CV_Assert(contours.size() <= 1);
+  if (contours.size() == 0)
+  {
+    return true;
+  }
+
+  for (vector<Point>::iterator it = contours[0].begin(); it != contours[0].end();)
+  {
+    if (norm(*it - firstPathEdgel) < minDistanceToEndpoints || norm(*it - lastPathEdgel) < minDistanceToEndpoints)
+    {
+      it = contours[0].erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+
+  Mat boundaries(path.size(), CV_8UC1, Scalar(0));
+  drawContours(boundaries, contours, -1, Scalar(255));
+  contours.clear();
+  findContours(boundaries, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  CV_Assert(contours.size() <= 2);
+  if (contours.size() != 2)
+  {
+    return true;
+  }
+
+  //TODO: remove code duplication
+  Mat firstBoundary(path.size(), CV_8UC1, Scalar(0));
+  drawContours(firstBoundary, contours, 0, Scalar(255));
+  Mat firstDT;
+  distanceTransform(~firstBoundary, firstDT, CV_DIST_L2, CV_DIST_MASK_PRECISE);
+
+  Mat secondBoundary(path.size(), CV_8UC1, Scalar(0));
+  drawContours(secondBoundary, contours, 1, Scalar(255));
+  Mat secondDT;
+  distanceTransform(~secondBoundary, secondDT, CV_DIST_L2, CV_DIST_MASK_PRECISE);
+
+  bool isFirst_1 = firstDT.at<float>(center_1) < secondDT.at<float>(center_1);
+  bool isFirst_2 = firstDT.at<float>(center_2) < secondDT.at<float>(center_2);
+
+  return (!(isFirst_1 ^ isFirst_2));
+}
+
+//TODO: block junctions
+//TODO: extend to the cases when regions are not connected to each other
+void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<double> &affinities)
+{
+  //TODO: move up
+  const float regionEdgeLength = 1e6;
+
+  vector<double> distances(boost::num_vertices(graph));
+  vector<VertexDescriptor> predecessors(boost::num_vertices(graph));
+  boost::dijkstra_shortest_paths(graph, getRegionVertex(graph, regionIndex),
+        boost::weight_map(boost::get(&EdgeProperties::length, graph))
+        .distance_map(make_iterator_property_map(distances.begin(), get(boost::vertex_index, graph)))
+        .predecessor_map(&predecessors[0]));
+
+
+  //TODO: use dynamic programming
+  affinities.resize(regionCount);
+  int affinityIndex = -1;
+  boost::graph_traits<Graph>::vertex_iterator vi, vi_end;
+  for (tie(vi, vi_end) = vertices(graph); vi != vi_end; ++vi)
+  {
+    if (!graph[*vi].isRegion)
+    {
+      continue;
+    }
+    ++affinityIndex;
+
+    VertexDescriptor currentVertex = *vi;
+    VertexDescriptor predecessorVertex = predecessors[currentVertex];
+
+    if (distances[affinityIndex] > 3 * regionEdgeLength || currentVertex == predecessorVertex)
+    {
+      affinities[affinityIndex] = CV_PI;
+      continue;
+    }
+
+    Mat path(imageSize, CV_8UC1, Scalar(0));
+    float maxAngle = 0.0f;
+    Point firstEdgel = graph[predecessorVertex].pt;
+    Point lastEdgel;
+    Point predecessorLocation = graph[predecessorVertex].pt;
+    bool pathIsInvalid = false;
+    while (predecessorVertex != currentVertex)
+    {
+      if (currentVertex != *vi && graph[currentVertex].isRegion)
+      {
+        maxAngle = CV_PI;
+        pathIsInvalid = true;
+        break;
+      }
+
+      Point currentLocation = graph[currentVertex].pt;
+      CV_Assert(isPointInside(path, currentLocation));
+      CV_Assert(isPointInside(path, predecessorLocation));
+      if (!graph[currentVertex].isRegion && !graph[predecessorVertex].isRegion)
+      {
+        line(path, currentLocation, predecessorLocation, Scalar(255));
+      }
+
+      EdgeDescriptor edge;
+      bool doesExist;
+      tie(edge, doesExist) = boost::edge(currentVertex, predecessorVertex, graph);
+      CV_Assert(doesExist);
+      maxAngle = std::max(maxAngle, graph[edge].maximumAngle);
+
+      lastEdgel = graph[currentVertex].pt;
+      currentVertex = predecessorVertex;
+      predecessorVertex = predecessors[currentVertex];
+      predecessorLocation = graph[predecessorVertex].pt;
+    }
+    if (pathIsInvalid)
+    {
+      affinities[affinityIndex] = CV_PI;
+      continue;
+    }
+    if (areRegionsOnTheSameSide(path, firstEdgel, lastEdgel, graph[*vi].pt, graph[currentVertex].pt))
+    {
+      affinities[affinityIndex] = maxAngle;
+    }
+    else
+    {
+      affinities[affinityIndex] = CV_PI;
+    }
+  }
 }
 
 int main()
@@ -438,6 +779,9 @@ int main()
 
   Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
 
+
+
+
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
   CV_Assert(!testImage.empty());
 
@@ -446,6 +790,15 @@ int main()
   vector<Region> regions;
   segmentation2regions(testImage, oversegmentation, regions);
 
+
+  Mat grayscaleImage;
+  cvtColor(testImage, grayscaleImage, CV_BGR2GRAY);
+  Mat edges;
+  Canny(grayscaleImage, edges, 100, 50);
+  imshow("edges", edges.clone());
+  Graph graph;
+  edges2graph(oversegmentation, regions, edges, graph);
+
   namedWindow(testSegmentationTitle);
 
 
@@ -453,6 +806,7 @@ int main()
   data.svm = &svm;
   data.segmentation = oversegmentation;
   data.regions = regions;
+  data.graph = graph;
 
   setMouseCallback(testSegmentationTitle, onMouse, &data);
   showSegmentation(oversegmentation, testSegmentationTitle);
