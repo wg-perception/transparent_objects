@@ -8,10 +8,10 @@ ectomodule(transparent_objects_cells
     )
 
 
-find_ros_package(pcl)
+find_package(PCL)
 
 link_ecto(transparent_objects_cells
-     ${pcl_LIBRARIES}
+     ${PCL_LIBRARIES}
      ${Boost_LIBRARIES}
      object_recognition_db
      edges_pose_refiner

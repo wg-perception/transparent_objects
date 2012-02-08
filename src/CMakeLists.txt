@@ -1,4 +1,4 @@
-find_ros_package(pcl)
+find_package(PCL)
 
 #TDS: dont glob together sources.
 set(src 
@@ -37,7 +37,7 @@ add_library(edges_pose_refiner SHARED
 add_definitions(-Wno-deprecated)
 
 target_link_libraries(edges_pose_refiner
-  ${pcl_LIBRARIES}
+  ${PCL_LIBRARIES}
   ${OpenCV_LIBS}
   )
 

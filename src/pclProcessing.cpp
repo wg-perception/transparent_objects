@@ -30,7 +30,7 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-#include <pcl/common/transform.h>
+#include <pcl/common/transforms.h>
 
 #include <opencv2/opencv.hpp>
 
@@ -74,7 +74,7 @@ void estimateNormals(int kSearch, const pcl::PointCloud<pcl::PointXYZ> &cloud, p
 {
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normalsEstimator;
   normalsEstimator.setInputCloud(cloud.makeShared());
-  pcl::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::KdTreeFLANN<pcl::PointXYZ> ());
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ> ());
   normalsEstimator.setSearchMethod(tree);
   normalsEstimator.setKSearch(kSearch);
   normalsEstimator.compute(normals);
@@ -200,7 +200,7 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
 //    reconstructConvexHull(projectedInliers, *tableHull);
 
 
-    pcl::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::KdTreeFLANN<pcl::PointXYZ>);
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
     tree->setInputCloud(projectedInliers.makeShared());
 
     std::vector<pcl::PointIndices> clusterIndices;

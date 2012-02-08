@@ -9,18 +9,18 @@ endif()
 find_package(ecto REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(object_recognition REQUIRED)
+find_package(PCL REQUIRED)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
-                    ${object_recognition_INCLUDE_DIRS}
-                    )
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(SYSTEM ${object_recognition_INCLUDE_DIRS}
+                           ${PCL_INCLUDE_DIRS})
 
 add_subdirectory(src)
 add_subdirectory(python)
 
-ecto_python_env_gen(${CMAKE_BINARY_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/python)
 add_subdirectory(cells)
 
 option(BUILD_TEST "Build tests" ON)
@@ -29,3 +29,4 @@ if(BUILD_TEST)
   add_subdirectory(test)
 endif()  
 
+catkin_add_env_hooks(10transparent_objects SHELLS all )
