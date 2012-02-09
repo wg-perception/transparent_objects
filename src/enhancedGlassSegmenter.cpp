@@ -38,7 +38,7 @@ typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
 
 
 //TODO: remove
-void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<double> &affinities);
+void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<float> &affinities);
 
 class Region
 {
@@ -317,6 +317,7 @@ void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, vector<Re
 
 enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1};
 
+
 void regions2sample(const Region &region_1, const Region &region_2, cv::Mat &sample)
 {
   float colorDistance;
@@ -328,7 +329,7 @@ void regions2sample(const Region &region_1, const Region &region_2, cv::Mat &sam
   sample = (Mat_<float>(1, dim) << colorDistance, slope, intercept);
 }
 
-void train(CvSVM &svm)
+void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
 {
   //TODO: move up
   const string trainingFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImages.txt";
@@ -418,15 +419,32 @@ void train(CvSVM &svm)
   svm.train(trainingData, trainingLabels, Mat(), Mat(), svmParams);
 
   int wrongClassificationCount = 0;
+  float minSVMDistance = 0.0f;
+  float maxSVMDistance = 0.0f;
   for (size_t i = 0; i < trainingData.rows; ++i)
   {
     Mat sample = trainingData.row(i);
+    //TODO: use one predict
     int label = cvRound(svm.predict(sample));
+    float distance = svm.predict(sample, true);
+    minSVMDistance = std::min(minSVMDistance, distance);
+    maxSVMDistance = std::max(maxSVMDistance, distance);
+
     if (label != trainingLabelsVec[i])
     {
       ++wrongClassificationCount;
     }
   }
+
+  float spread = maxSVMDistance - minSVMDistance;
+  const float eps = 1e-2;
+  CV_Assert(spread > eps);
+  normalizationSlope = 1.0 / spread;
+  normalizationIntercept = -minSVMDistance * normalizationSlope;
+
+  //TODO: do you need this?
+  normalizationSlope = -normalizationSlope;
+  normalizationIntercept = -normalizationIntercept + 1;
 
   cout << "training error: " << static_cast<float>(wrongClassificationCount) / trainingData.rows << endl;
 }
@@ -491,11 +509,11 @@ void onMouse(int event, int x, int y, int, void *rawData)
   imshow("classification", visualization);
 
 
-  vector<double> affinities;
+  vector<float> affinities;
   estimateAffinities(data->graph, data->regions.size(), data->segmentation.size(), regionIndex, affinities);
   CV_Assert(data->regions.size() == affinities.size());
 
-  Mat regionAffinities(data->segmentation.size(), CV_64FC1, Scalar(0));
+  Mat regionAffinities(data->segmentation.size(), CV_32FC1, Scalar(0));
   for (size_t i = 0; i < affinities.size(); ++i)
   {
     regionAffinities.setTo(affinities[i], data->regions[i].getMask());
@@ -505,7 +523,7 @@ void onMouse(int event, int x, int y, int, void *rawData)
 
   Mat affinityImage(regionAffinities.size(), CV_8UC1, Scalar(0));
 
-  regionAffinities.convertTo(affinityImage, CV_8UC1, 100.0);
+  regionAffinities.convertTo(affinityImage, CV_8UC1, 255.0);
 //  cout << regionAffinities << endl;
 //  affinityImage.setTo(255, regionAffinities == 0.0);
  // regionAffinities.convertTo(affinityImage, CV_8UC1, 10.0);
@@ -683,7 +701,7 @@ bool areRegionsOnTheSameSide(const cv::Mat &path, Point firstPathEdgel, Point la
 
 //TODO: block junctions
 //TODO: extend to the cases when regions are not connected to each other
-void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<double> &affinities)
+void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<float> &affinities)
 {
   //TODO: move up
   const float regionEdgeLength = 1e6;
@@ -707,6 +725,12 @@ void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSi
       continue;
     }
     ++affinityIndex;
+
+    if (graph[*vi].regionIndex == regionIndex)
+    {
+      affinities[affinityIndex] = 0.0f;
+      continue;
+    }
 
     VertexDescriptor currentVertex = *vi;
     VertexDescriptor predecessorVertex = predecessors[currentVertex];
@@ -765,24 +789,133 @@ void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSi
       affinities[affinityIndex] = CV_PI;
     }
   }
+
+  for (size_t i = 0; i < affinities.size(); ++i)
+  {
+    affinities[i] = 1.0 - affinities[i] / CV_PI;
+  }
+}
+
+void computeAllAffinities(const std::vector<Region> &regions, const Graph &graph, cv::Mat &affinities)
+{
+  affinities.create(regions.size(), regions.size(), CV_32FC1);
+  affinities.setTo(-1);
+  //TODO: use the Floyd-Warshall algorithm
+  for (size_t regionIndex = 0; regionIndex < regions.size(); ++regionIndex)
+  {
+    vector<float> currentAffinities;
+    estimateAffinities(graph, regions.size(), regions[0].getMask().size(), regionIndex, currentAffinities);
+    CV_Assert(currentAffinities.size());
+    Mat affinitiesMat = Mat(currentAffinities);
+    Mat affinitiesFloat;
+    affinitiesMat.convertTo(affinitiesFloat, CV_32FC1);
+    Mat row = affinities.row(regionIndex);
+    affinitiesFloat.reshape(1, 1).copyTo(row);
+  }
+}
+
+void computeAllDiscrepancies(const std::vector<Region> &regions, const CvSVM *svm, float normalizationSlope, float normalizationIntercept, cv::Mat &discrepancies)
+{
+  discrepancies.create(regions.size(), regions.size(), CV_32FC1);
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    vector<float> labels(regions.size());
+    for (size_t j = 0; j < regions.size(); ++j)
+    {
+      if (j == i)
+      {
+        labels[j] = 0.0f;
+        continue;
+      }
+
+      Mat sample;
+      regions2sample(regions[i], regions[j], sample);
+
+      //TODO: use continious labels
+      labels[j] = cvRound(svm->predict(sample));
+
+      labels[j] = normalizationSlope * svm->predict(sample, true) + normalizationIntercept;
+    }
+    Mat row = discrepancies.row(i);
+    Mat(labels).reshape(1, 1).copyTo(row);
+  }
+}
+
+void computeBoundaryStrength(const cv::Mat &segmentation, const std::vector<Region> &regions, const Graph &graph, const CvSVM *svm, float normalizationSlope, float normalizationIntercept, float affinityWeight, cv::Mat &boundaryStrength)
+{
+  //TODO: move up
+  const int neighborDistance = 1;
+
+
+  CV_Assert(affinityWeight >= 0.0f && affinityWeight <= 1.0f);
+  //TODO: use lazy evaluations
+  Mat affinities;
+  computeAllAffinities(regions, graph, affinities);
+  Mat discrepancies;
+  computeAllDiscrepancies(regions, svm, normalizationSlope, normalizationIntercept, discrepancies);
+
+  CV_Assert(discrepancies.type() == CV_32FC1);
+  CV_Assert(affinities.type() == CV_32FC1);
+
+  Mat pixelDiscrepancies(segmentation.size(), CV_32FC1);
+  Mat pixelAffinities(segmentation.size(), CV_32FC1);
+  for (int i = 0; i < segmentation.rows; ++i)
+  {
+    for (int j = 0; j < segmentation.cols; ++j)
+    {
+      Point srcPt = Point(j, i);
+      int srcRegionIndex = segmentation.at<int>(srcPt);
+      float maxDiscrepancy = 0.0f;
+      float maxAffinity = 0.0f;
+      for (int dy = -neighborDistance; dy <= neighborDistance; ++dy)
+      {
+        for (int dx = -neighborDistance; dx <= neighborDistance; ++dx)
+        {
+          Point diffPt(dx, dy);
+          Point pt = srcPt + diffPt;
+          if (!isPointInside(segmentation, pt))
+          {
+            continue;
+          }
+
+          int regionIndex = segmentation.at<int>(pt);
+          //TODO: what about symmetry
+          maxDiscrepancy = std::max(maxDiscrepancy, discrepancies.at<float>(srcRegionIndex, regionIndex));
+          maxAffinity = std::max(maxAffinity, affinities.at<float>(srcRegionIndex, regionIndex));
+        }
+      }
+      pixelDiscrepancies.at<float>(srcPt) = maxDiscrepancy;
+      pixelAffinities.at<float>(srcPt) = maxAffinity;
+    }
+  }
+
+  boundaryStrength = (1.0 - affinityWeight) * pixelDiscrepancies - affinityWeight * pixelAffinities;
 }
 
 int main()
 {
   const string svmFilename = "svm.xml";
+
   CvSVM svm;
-//  train(svm);
+  float normalizationSlope, normalizationIntercept;
+//  train(svm, normalizationSlope, normalizationIntercept);
+//  cout << normalizationSlope << endl;
+//  cout << normalizationIntercept << endl;
 //  svm.save(svmFilename.c_str());
   svm.load(svmFilename.c_str());
+//  normalizationSlope = 0.163644f;
+//  normalizationIntercept = 0.53197f;
+  normalizationSlope = -0.163644f;
+  normalizationIntercept = -0.53197f + 1.0f;
 
   const string testSegmentationTitle = "test segmentation";
 
-  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
 
 
 
 
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
+  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
   CV_Assert(!testImage.empty());
 
   Mat oversegmentation;
@@ -800,6 +933,12 @@ int main()
   edges2graph(oversegmentation, regions, edges, graph);
 
   namedWindow(testSegmentationTitle);
+
+  Mat boundaryStrength;
+  computeBoundaryStrength(oversegmentation, regions, graph, &svm, normalizationSlope, normalizationIntercept, 0.01f, boundaryStrength);
+
+  imshow("boundary", boundaryStrength);
+  waitKey();
 
 
   InteractiveClassificationData data;
