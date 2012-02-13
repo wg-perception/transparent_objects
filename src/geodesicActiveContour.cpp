@@ -70,9 +70,7 @@ void cv2itk(const cv::Mat &mat, itk::Image<InternalPixelType, Dimension>::Pointe
 void initializeGeodesicActiveContour(const cv::Mat &edges, cv::Mat &initialLevelSet, cv::Mat &featureImage)
 {
   //TODO: move up
-//  const int initialContourMargin = 10;
-
-  const int initialContourMargin = 0;
+  const int initialContourMargin = 10;
 
   //TODO: use FastMarching
   Mat initialContour(edges.size(), CV_8UC1, Scalar(0));
@@ -90,8 +88,6 @@ void initializeGeodesicActiveContour(const cv::Mat &edges, cv::Mat &initialLevel
 
   Mat edgesFloat;
   edges.convertTo(edgesFloat, CV_32FC1);
-  //TODO: remove
-//  edgesFloat /= 600.0;
   featureImage = edgesFloat;
 
   imshow("featureImage", featureImage);
@@ -103,33 +99,16 @@ void geodesicActiveContour(const cv::Mat &edges, cv::Mat &segmentation)
 {
   //TODO: move up
 //  const float alpha = -1.0f;
-
  const float alpha = -0.2f;
 //  const float beta = 3.0f;
   const float beta = 0.01f;
-
-//  const float propagationScaling = -0.01f;
-
-//  const float propagationScaling = -0.005f;
-
-//  const float propagationScaling = -0.01f;
-
-//  const float propagationScaling = -0.1f;
 
   const float propagationScaling = -0.3f;
   const float curvatureScaling = 1.0f;
   const float advectionScaling = 1.0f;
 
-//  const float maximumRMSError = 0.02f;
-//  const int numberOfIterations = 3000;
-
-
   const float maximumRMSError = 0.001f;
-//  const int numberOfIterations = 3000;
-
-  const int numberOfIterations = 3200;
-
-//  const int numberOfIterations = 100000;
+  const int numberOfIterations = 3000;
 
 /*
   const float seedX = 320.0f;
