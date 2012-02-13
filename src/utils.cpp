@@ -743,15 +743,20 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
 
 void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &orientations, int medianIndex)
 {
-  IplImage edge_img = edges;
+  Mat edgeClone = edges.clone();
+  edgeClone.row(0).setTo(0);
+  edgeClone.row(edges.rows - 1).setTo(0);
+  edgeClone.col(0).setTo(0);
+  edgeClone.col(edges.cols - 1).setTo(0);
+
+  IplImage edge_img = edgeClone;
   IplImage *orientation_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32F, 1);
 //  cvSetZero(orientation_img);
   //cvSet(orientation_img, cvScalarAll(std::numeric_limits<float>::quiet_Nan()));
   //TODO: remove the magic number
   cvSet(orientation_img, cvScalarAll(-100.0));
-  IplImage* edge_clone = cvCloneImage(&edge_img);
-  computeEdgeOrientations(edge_clone, orientation_img, medianIndex);
-  cvReleaseImage(&edge_clone);
+  computeEdgeOrientations(edge_img, orientation_img, medianIndex);
+  //TODO: do you need to release edge_img?
   orientations = Mat(orientation_img).clone();
   cvReleaseImage(&orientation_img);
 }

@@ -38,6 +38,24 @@ typedef boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
 typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
 
 
+
+void saveToCache(const std::string &name, const cv::Mat &mat)
+{
+  FileStorage fs(name + ".xml", FileStorage::WRITE);
+  fs << name << mat;
+  fs.release();
+}
+
+void getFromCache(const std::string &name, cv::Mat &mat)
+{
+  FileStorage fs(name + ".xml", FileStorage::READ);
+  if (fs.isOpened())
+  {
+    fs[name] >> mat;
+    fs.release();
+  }
+}
+
 //TODO: remove
 void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<float> &affinities);
 
@@ -63,6 +81,8 @@ class Region
 
     cv::Point2f center;
 };
+
+void computeBoundaryPresences(const std::vector<Region> &regions, const cv::Mat &edges, cv::Mat &boundaryPresences);
 
 Region::Region(const cv::Mat &_image, const cv::Mat &_mask)
 {
@@ -477,7 +497,7 @@ void visualizeClassification(const vector<Region> &regions, const vector<float> 
 struct InteractiveClassificationData
 {
   CvSVM *svm;
-  Mat segmentation;
+  Mat edges, segmentation;
   vector<Region> regions;
 
   Graph graph;
@@ -519,6 +539,12 @@ void onMouse(int event, int x, int y, int, void *rawData)
   {
     regionAffinities.setTo(affinities[i], data->regions[i].getMask());
   }
+  static Mat boundaryPresences;
+  if (boundaryPresences.empty())
+  {
+    computeBoundaryPresences(data->regions, data->edges, boundaryPresences);
+  }
+  regionAffinities.setTo(0, boundaryPresences);
 //  regionAffinities -= 2 * regionEdgeLength;
 // regionAffinities.setTo(0, regionAffinities > regionEdgeLength);
 
@@ -815,6 +841,48 @@ void computeAllAffinities(const std::vector<Region> &regions, const Graph &graph
   }
 }
 
+void computeBoundaryPresences(const std::vector<Region> &regions, const cv::Mat &edges, cv::Mat &boundaryPresences)
+{
+  //TODO: move up
+  const int maxDistanceToEdgel = 3; //iterations of dilation
+  const float minIntersectionRatio = 0.05f;
+
+  boundaryPresences.create(regions.size(), regions.size(), CV_8UC1);
+  boundaryPresences.setTo(Scalar(0));
+  vector<Mat> dilatedMasks(regions.size());
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    dilate(regions[i].getMask(), dilatedMasks[i], Mat(), Point(-1, -1), maxDistanceToEdgel);
+  }
+
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    for (size_t j = 0; j < regions.size(); ++j)
+    {
+      if (i == j)
+      {
+        continue;
+      }
+
+      Mat intersectionMask = dilatedMasks[i] & dilatedMasks[j];
+      int intersectionArea = countNonZero(intersectionMask);
+      if (intersectionArea == 0)
+      {
+        continue;
+      }
+
+      Mat intersectionEdges = intersectionMask & edges;
+      int edgelCount = countNonZero(intersectionEdges);
+      float intersectionRatio = static_cast<float>(edgelCount) / intersectionArea;
+
+      if (intersectionRatio > minIntersectionRatio)
+      {
+        boundaryPresences.at<uchar>(i, j) = 255;
+      }
+    }
+  }
+}
+
 void computeAllDiscrepancies(const std::vector<Region> &regions, const CvSVM *svm, float normalizationSlope, float normalizationIntercept, cv::Mat &discrepancies)
 {
   discrepancies.create(regions.size(), regions.size(), CV_32FC1);
@@ -842,7 +910,7 @@ void computeAllDiscrepancies(const std::vector<Region> &regions, const CvSVM *sv
   }
 }
 
-void computeBoundaryStrength(const cv::Mat &segmentation, const std::vector<Region> &regions, const Graph &graph, const CvSVM *svm, float normalizationSlope, float normalizationIntercept, float affinityWeight, cv::Mat &boundaryStrength)
+void computeBoundaryStrength(const cv::Mat &edges, const cv::Mat &segmentation, const std::vector<Region> &regions, const Graph &graph, const CvSVM *svm, float normalizationSlope, float normalizationIntercept, float affinityWeight, cv::Mat &boundaryStrength)
 {
   //TODO: move up
   const int neighborDistance = 1;
@@ -851,14 +919,35 @@ void computeBoundaryStrength(const cv::Mat &segmentation, const std::vector<Regi
   CV_Assert(affinityWeight >= 0.0f && affinityWeight <= 1.0f);
   //TODO: use lazy evaluations
   Mat affinities;
-  computeAllAffinities(regions, graph, affinities);
-  Mat discrepancies;
-  computeAllDiscrepancies(regions, svm, normalizationSlope, normalizationIntercept, discrepancies);
+  getFromCache("affinities", affinities);
+  if (affinities.empty())
+  {
+    computeAllAffinities(regions, graph, affinities);
+    saveToCache("affinities", affinities);
+  }
 
+  Mat boundaryPresences;
+  getFromCache("boundaryPresences", boundaryPresences);
+  if (boundaryPresences.empty())
+  {
+    computeBoundaryPresences(regions, edges, boundaryPresences);
+    saveToCache("boundaryPresences", boundaryPresences);
+  }
+  affinities.setTo(0, boundaryPresences);
+#if 1
+  Mat discrepancies;
+  getFromCache("discrepancies", discrepancies);
+  if (discrepancies.empty())
+  {
+    computeAllDiscrepancies(regions, svm, normalizationSlope, normalizationIntercept, discrepancies);
+    saveToCache("discrepancies", discrepancies);
+  }
   CV_Assert(discrepancies.type() == CV_32FC1);
+#endif
+
   CV_Assert(affinities.type() == CV_32FC1);
 
-  Mat pixelDiscrepancies(segmentation.size(), CV_32FC1);
+  Mat pixelDiscrepancies(segmentation.size(), CV_32FC1, Scalar(0));
   Mat pixelAffinities(segmentation.size(), CV_32FC1);
   for (int i = 0; i < segmentation.rows; ++i)
   {
@@ -880,21 +969,44 @@ void computeBoundaryStrength(const cv::Mat &segmentation, const std::vector<Regi
           }
 
           int regionIndex = segmentation.at<int>(pt);
-          //TODO: what about symmetry
-          maxDiscrepancy = std::max(maxDiscrepancy, discrepancies.at<float>(srcRegionIndex, regionIndex));
-          maxAffinity = std::max(maxAffinity, affinities.at<float>(srcRegionIndex, regionIndex));
+          if (regionIndex != srcRegionIndex)
+          {
+            //TODO: what about symmetry
+#if 1
+            maxDiscrepancy = std::max(maxDiscrepancy, discrepancies.at<float>(srcRegionIndex, regionIndex));
+#endif
+            maxAffinity = std::max(maxAffinity, affinities.at<float>(srcRegionIndex, regionIndex));
+          }
         }
       }
+#if 1
       pixelDiscrepancies.at<float>(srcPt) = maxDiscrepancy;
+#endif
       pixelAffinities.at<float>(srcPt) = maxAffinity;
     }
   }
 
-  boundaryStrength = (1.0 - affinityWeight) * pixelDiscrepancies - affinityWeight * pixelAffinities;
+  boundaryStrength = pixelDiscrepancies - affinityWeight * pixelAffinities;
+}
+
+void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
+{
+  contourEdges.create(imageSize, CV_8UC1);
+  contourEdges.setTo(0);
+
+  Point tl(210, 120);
+  Point br(420, 400);
+  Rect contourRect(tl, br);
+  rectangle(contourEdges, contourRect, Scalar(255), 2);
 }
 
 int main()
 {
+  std::system("date");
+  const float affinityWeight = 1.0f;
+  const double cannyThreshold1 = 100.0;
+  const double cannyThreshold2 = 50.0;
+
   const string svmFilename = "svm.xml";
 
   CvSVM svm;
@@ -912,11 +1024,11 @@ int main()
   const string testSegmentationTitle = "test segmentation";
 
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
-
-
-
-
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/tea_table2.jpg");
   Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/wineB1f.jpg");
   CV_Assert(!testImage.empty());
 
   Mat oversegmentation;
@@ -928,7 +1040,7 @@ int main()
   Mat grayscaleImage;
   cvtColor(testImage, grayscaleImage, CV_BGR2GRAY);
   Mat edges;
-  Canny(grayscaleImage, edges, 100, 50);
+  Canny(grayscaleImage, edges, cannyThreshold1, cannyThreshold2);
   imshow("edges", edges.clone());
   Graph graph;
   edges2graph(oversegmentation, regions, edges, graph);
@@ -936,33 +1048,34 @@ int main()
   namedWindow(testSegmentationTitle);
 
   Mat boundaryStrength;
-  computeBoundaryStrength(oversegmentation, regions, graph, &svm, normalizationSlope, normalizationIntercept, 0.01f, boundaryStrength);
-/*
-  FileStorage fs("boundary.xml", FileStorage::WRITE);
-  fs << "boundary" << boundaryStrength;
-  fs.release();
-
-  FileStorage fs("boundary.xml", FileStorage::READ);
-  fs["boundary"] >> boundaryStrength;
-  fs.release();
-*/
+  computeBoundaryStrength(edges, oversegmentation, regions, graph, &svm, normalizationSlope, normalizationIntercept, affinityWeight, boundaryStrength);
+  //TODO: do you need this?
+  boundaryStrength.setTo(0, boundaryStrength < 0);
 
   imshow("boundary", boundaryStrength);
   waitKey();
 
   Mat finalSegmentation;
+
+//  Mat contour;
+//  createContour(testImage.size(), contour);
+//  geodesicActiveContour(contour, finalSegmentation);
   geodesicActiveContour(boundaryStrength, finalSegmentation);
   imshow("finalSegmentation", finalSegmentation);
+  Mat gac = drawSegmentation(testImage, finalSegmentation, 2);
+  imwrite("final.png", gac);
   waitKey();
 
   InteractiveClassificationData data;
   data.svm = &svm;
+  data.edges = edges;
   data.segmentation = oversegmentation;
   data.regions = regions;
   data.graph = graph;
 
   setMouseCallback(testSegmentationTitle, onMouse, &data);
   showSegmentation(oversegmentation, testSegmentationTitle);
+  std::system("date");
 
   return 0;
 }
