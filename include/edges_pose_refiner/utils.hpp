@@ -106,4 +106,6 @@ void drawPoints(const std::vector<cv::Point_<T> > &points, cv::Mat &image, cv::S
   }
 }
 
+void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &oreintations, int medianIndex);
+
 #endif /* UTILS_HPP_ */

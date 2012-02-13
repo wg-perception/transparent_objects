@@ -10,6 +10,8 @@
 #include <opencv2/opencv.hpp>
 #include "edges_pose_refiner/poseRT.hpp"
 
+#include "chamfer_matching/chamfer_matching.h"
+
 #ifdef USE_3D_VISUALIZATION
 #include <boost/thread/thread.hpp>
 #endif
@@ -737,4 +739,19 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
     modif_points[i].z = R.at<double> (2, 0) * points[i].x + R.at<double> (2, 1) * points[i].y + R.at<double> (2, 2)
         * points[i].z + tvec.at<double> (2, 0);
   }
+}
+
+void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &orientations, int medianIndex)
+{
+  IplImage edge_img = edges;
+  IplImage *orientation_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32F, 1);
+//  cvSetZero(orientation_img);
+  //cvSet(orientation_img, cvScalarAll(std::numeric_limits<float>::quiet_Nan()));
+  //TODO: remove the magic number
+  cvSet(orientation_img, cvScalarAll(-100.0));
+  IplImage* edge_clone = cvCloneImage(&edge_img);
+  computeEdgeOrientations(edge_clone, orientation_img, medianIndex);
+  cvReleaseImage(&edge_clone);
+  orientations = Mat(orientation_img).clone();
+  cvReleaseImage(&orientation_img);
 }
