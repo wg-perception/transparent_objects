@@ -16,6 +16,8 @@ set(src
     tangentVectorsEstimator.cpp
     transparentDetector.cpp
     utils.cpp
+    chamfer_matching/chamfer_matching.cpp
+    geodesicActiveContour.cpp
 )
 
 #EAR: is there a reason to list headers in this target?
@@ -39,6 +41,7 @@ add_definitions(-Wno-deprecated)
 target_link_libraries(edges_pose_refiner
   ${pcl_LIBRARIES}
   ${OpenCV_LIBS}
+  ${ITK_LIBRARIES}
   )
 
 install(TARGETS edges_pose_refiner

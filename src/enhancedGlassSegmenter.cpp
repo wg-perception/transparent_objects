@@ -5,6 +5,7 @@
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 
 #include "edges_pose_refiner/utils.hpp"
+#include "edges_pose_refiner/geodesicActiveContour.hpp"
 
 using namespace cv;
 using std::cout;
@@ -936,10 +937,23 @@ int main()
 
   Mat boundaryStrength;
   computeBoundaryStrength(oversegmentation, regions, graph, &svm, normalizationSlope, normalizationIntercept, 0.01f, boundaryStrength);
+/*
+  FileStorage fs("boundary.xml", FileStorage::WRITE);
+  fs << "boundary" << boundaryStrength;
+  fs.release();
+
+  FileStorage fs("boundary.xml", FileStorage::READ);
+  fs["boundary"] >> boundaryStrength;
+  fs.release();
+*/
 
   imshow("boundary", boundaryStrength);
   waitKey();
 
+  Mat finalSegmentation;
+  geodesicActiveContour(boundaryStrength, finalSegmentation);
+  imshow("finalSegmentation", finalSegmentation);
+  waitKey();
 
   InteractiveClassificationData data;
   data.svm = &svm;
