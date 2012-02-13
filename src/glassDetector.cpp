@@ -13,7 +13,6 @@ using std::endl;
 //#define VISUALIZE_TABLE
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
-void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");
 
 void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentationParams &params)
 {

@@ -78,4 +78,6 @@ private:
   GlassSegmentationParams params;
 };
 
+void showSegmentation(const cv::Mat &image, const cv::Mat &mask, const std::string &title = "glass segmentation");
+
 #endif

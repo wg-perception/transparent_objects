@@ -314,6 +314,7 @@ int main(int argc, char **argv)
 #ifdef VISUALIZE_POSE_REFINEMENT
     Mat glassMask = debugInfo.glassMask;
     imshow("glassMask", glassMask);
+    showSegmentation(kinectBgrImage, glassMask, "segmentation");
 
     Mat detectionResults = kinectBgrImage.clone();
     detector.visualize(poses_cam, detectedObjectsNames, detectionResults);
@@ -467,13 +468,15 @@ int main(int argc, char **argv)
     meanInitialPoseCount /= initialPoseCount.size();
     cout << "mean initial pose count: " << meanInitialPoseCount << endl;
 
-    const double cmThreshold = 2.0;
+//    const double cmThreshold = 2.0;
+
+    const double cmThreshold = 5.0;
     PoseError::evaluateErrors(bestPoses, cmThreshold);
   }
 
   cout << "Evaluation of geometric hashing" << endl;
   std::sort(allChamferDistances.begin(), allChamferDistances.end());
-  const float successfulChamferDistance = 10.0f;
+  const float successfulChamferDistance = 5.0f;
   int ghSuccessCount = 0;
   double meanChamferDistance = 0.0;
   for (size_t i = 0; i < allChamferDistances.size(); ++i)

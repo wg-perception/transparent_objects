@@ -65,13 +65,13 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
 
 //  getInitialPoses(glassMask, poses_cam, posesQualities);
   getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
-/*
+
   refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
   {
     refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
   }
-*/
+
 }
 
 void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
@@ -98,7 +98,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, Vec4f::all(0.0f), &finalJacobian);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "before alignment to a table plane");
+    showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "before alignment to a table plane");
 
 //    if (pt_pub != 0)
 //    {
@@ -112,7 +112,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
     findTransformationToTable(initialPose_cam, tablePlane, rotationAngles[initPoseIdx], finalJacobian);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "after alignment to a table plane");
+    showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "after alignment to a table plane");
 //    if (pt_pub != 0)
 //    {
 //      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
@@ -125,8 +125,8 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined by LM with a table plane");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels refined by LM with a table plane");
+    showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined by LM with a table plane");
+    showEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels refined by LM with a table plane");
     waitKey();
 #endif
   }
@@ -402,8 +402,10 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
     float testScale = norm(firstPoint - secondPoint);
     Mat currentScale = testScale * canonicScales[i];
     currentVotes /= currentScale;
+
     vector<Point> maxLocations;
     suppressNonMaximum(currentVotes, params.votesWindowSize, params.votesConfidentSuppression, maxLocations);
+
     for (size_t j = 0; j < maxLocations.size(); ++j)
     {
       Point maxLoc = maxLocations[j];
@@ -413,6 +415,7 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
       match.testBasis = testBasis;
       match.trainBasis = Basis(maxLoc.y, maxLoc.x);
       match.silhouetteIndex = i;
+
       basisMatches.push_back(match);
     }
   }
@@ -590,6 +593,7 @@ void PoseEstimator::estimatePoses(std::vector<BasisMatch> &matches) const
 }
 
 //TODO: suppress poses in 3D
+//TODO: refine estimate similarities by using all corresponding points
 void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
 {
   cout << "get initial poses by geometric hashing..." << endl;
@@ -928,14 +932,14 @@ void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv:
     PoseRT &initialPose_cam = initPoses_cam[initPoseIdx];
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels");
+    showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose");
+    showEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels");
     waitKey();
 #endif
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true);
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
-    displayEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined");
-    displayEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edges refined");
+    showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined");
+    showEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edges refined");
     waitKey();
 #endif
   }
