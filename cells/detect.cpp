@@ -2,7 +2,6 @@
 #include <boost/foreach.hpp>
 
 #include <object_recognition/db/ModelReader.h>
-#include <object_recognition/common/pose_result.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
 #include <edges_pose_refiner/glassDetector.hpp>
@@ -13,6 +12,8 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
+#include <object_recognition/common/pose_result.h>
 
 //#define TRANSPARENT_DEBUG
 
