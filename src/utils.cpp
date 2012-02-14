@@ -497,6 +497,7 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
 
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness)
 {
+  CV_Assert(!image.empty() && !mask.empty());
   Mat drawImage = image.clone();
   CV_Assert(drawImage.channels() == 3);
 
@@ -755,7 +756,7 @@ void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &orientations, int me
   //cvSet(orientation_img, cvScalarAll(std::numeric_limits<float>::quiet_Nan()));
   //TODO: remove the magic number
   cvSet(orientation_img, cvScalarAll(-100.0));
-  computeEdgeOrientations(edge_img, orientation_img, medianIndex);
+  computeEdgeOrientations(&edge_img, orientation_img, medianIndex);
   //TODO: do you need to release edge_img?
   orientations = Mat(orientation_img).clone();
   cvReleaseImage(&orientation_img);

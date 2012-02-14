@@ -3,6 +3,6 @@
 
 #include <opencv2/core/core.hpp>
 
-void geodesicActiveContour(const cv::Mat &edges, cv::Mat &segmentation);
+void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation);
 
 #endif

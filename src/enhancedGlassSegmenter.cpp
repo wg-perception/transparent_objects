@@ -1060,7 +1060,7 @@ int main()
 //  Mat contour;
 //  createContour(testImage.size(), contour);
 //  geodesicActiveContour(contour, finalSegmentation);
-  geodesicActiveContour(boundaryStrength, finalSegmentation);
+  geodesicActiveContour(testImage, boundaryStrength, finalSegmentation);
   imshow("finalSegmentation", finalSegmentation);
   Mat gac = drawSegmentation(testImage, finalSegmentation, 2);
   imwrite("final.png", gac);
