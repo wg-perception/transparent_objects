@@ -38,7 +38,8 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
     def type_name(cls):
         return "transparent_objects"
 
-    def processor(self, *args, **kwargs):
+    @classmethod
+    def processor(cls, *args, **kwargs):
         db_params = kwargs['db_params']
         object_id = kwargs.get('object_id', None)
         submethod = kwargs['submethod']
@@ -65,5 +66,6 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
             db_models = []
         return TransparentObjectsProcessor(json_submethod=dict_to_cpp_json_str(submethod), json_K=dict_to_cpp_json_str(json_K), json_D=dict_to_cpp_json_str(json_D), imageWidth=imageWidth, imageHeight=imageHeight, db_models=db_models)
 
-    def post_processor(self, *args, **kwarg):
+    @classmethod
+    def post_processor(cls, *args, **kwarg):
         return transparent_objects_cells.ModelFiller()
