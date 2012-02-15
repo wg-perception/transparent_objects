@@ -23,10 +23,11 @@ add_subdirectory(python)
 
 add_subdirectory(cells)
 
+catkin_add_env_hooks(10transparent_objects SHELLS all )
+
+# deal with the tests
 option(BUILD_TEST "Build tests" ON)
 if(BUILD_TEST)
   enable_testing()
   add_subdirectory(test)
 endif()  
-
-catkin_add_env_hooks(10transparent_objects SHELLS all )
