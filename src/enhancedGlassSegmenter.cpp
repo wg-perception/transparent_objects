@@ -150,6 +150,7 @@ void Region::computeColorHistogram()
   const float* ranges[] = {hranges, sranges};
   int channels[] = {0, 1};
   calcHist(&hsv, 1, channels, mask, hist, 2, histSize, ranges, true, false);
+  hist /= countNonZero(mask);
 }
 
 void Region::clusterIntensities()
@@ -253,6 +254,7 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
     cout << A << endl;
     cout << b << endl;
     cout << model << endl;
+    //TODO: fix the problem with uniform regions
     CV_Error(CV_StsError, "Cannot estimate overlay consistency");
   }
 
@@ -350,12 +352,15 @@ void regions2sample(const Region &region_1, const Region &region_2, cv::Mat &sam
   sample = (Mat_<float>(1, dim) << colorDistance, slope, intercept);
 }
 
+enum RegionLabel {GLASS, BACKGROUND, NOT_VALID};
+
 void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
 {
   //TODO: move up
   const string trainingFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImages.txt";
   const string groundTruthFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImagesGroundTruth.txt";
   const float maxSampleDistance = 0.1f;
+  float confidentLabelArea = 0.9f;
 
   vector<string> trainingGroundTruhFiles;
   readLinesInFile(groundTruthFilesList, trainingGroundTruhFiles);
@@ -382,13 +387,27 @@ void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
 
     vector<Region> regions;
     segmentation2regions(trainingImage, segmentation, regions);
-    vector<bool> isGlass(regions.size());
+    vector<RegionLabel> regionLabels(regions.size());
     for (size_t i = 0; i < regions.size(); ++i)
     {
       int regionArea = countNonZero(regions[i].getMask() != 0);
       int glassArea = countNonZero(regions[i].getMask() & groundTruthMask);
-      const int glassFactor = 2;
-      isGlass[i] = (glassFactor * glassArea > regionArea);
+      float glassAreaRatio = static_cast<float>(glassArea) / regionArea;
+      if (glassAreaRatio > confidentLabelArea)
+      {
+        regionLabels[i] = GLASS;
+      }
+      else
+      {
+        if (glassAreaRatio < 1.0 - confidentLabelArea)
+        {
+          regionLabels[i] = BACKGROUND;
+        }
+        else
+        {
+          regionLabels[i] = NOT_VALID;
+        }
+      }
     }
 
     for (size_t i = 0; i < regions.size(); ++i)
@@ -399,13 +418,17 @@ void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
         {
           continue;
         }
+        if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID)
+        {
+          continue;
+        }
 
         Mat sample;
         regions2sample(regions[i], regions[j], sample);
 
         trainingData.push_back(sample);
         int currentLabel;
-        if (isGlass[i] ^ isGlass[j])
+        if (regionLabels[i] ^ regionLabels[j])
         {
           currentLabel = GLASS_COVERED;
         }
@@ -428,26 +451,36 @@ void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
   }
   Mat trainingLabels = Mat(trainingLabelsVec).reshape(1, trainingLabelsVec.size());
   CV_Assert(trainingLabels.rows == trainingData.rows);
+  CV_Assert(trainingLabels.cols == 1);
+  CV_Assert(trainingLabels.type() == CV_32SC1);
+  CV_Assert(trainingData.type() == CV_32FC1);
 
   CvSVMParams svmParams;
   //TODO: move up
-  //svmParams.svm_type = CvSVM::C_SVC;
-
+//  svmParams.svm_type = CvSVM::C_SVC;
   svmParams.svm_type = CvSVM::NU_SVC;
-  svmParams.nu = 0.5;
+  svmParams.nu = 0.1;
   cout << "trainingData size: " << trainingData.rows << " x " << trainingData.cols << endl;
 
-  svm.train(trainingData, trainingLabels, Mat(), Mat(), svmParams);
+
+  cout << "training...  " << std::flush;
+  bool isTrained = svm.train(trainingData, trainingLabels, Mat(), Mat(), svmParams);
+//  bool isTrained = svm.train_auto(trainingData, trainingLabels, Mat(), Mat(), svmParams);
+  cout << "done: " << isTrained << endl;
 
   int wrongClassificationCount = 0;
   float minSVMDistance = 0.0f;
   float maxSVMDistance = 0.0f;
+  CV_Assert(trainingData.rows > 0);
+  Mat zeroSample = trainingData.row(0);
+  int zeroPredictedLabel = svm.predict(zeroSample);
+  float zeroDistance = svm.predict(zeroSample, true);
+  int negativeLabel = zeroDistance < 0 ? zeroPredictedLabel : 1 - zeroPredictedLabel;
   for (size_t i = 0; i < trainingData.rows; ++i)
   {
     Mat sample = trainingData.row(i);
-    //TODO: use one predict
-    int label = cvRound(svm.predict(sample));
     float distance = svm.predict(sample, true);
+    int label = distance < 0 ? negativeLabel : 1 - negativeLabel;
     minSVMDistance = std::min(minSVMDistance, distance);
     maxSVMDistance = std::max(maxSVMDistance, distance);
 
@@ -463,9 +496,11 @@ void train(CvSVM &svm, float &normalizationSlope, float &normalizationIntercept)
   normalizationSlope = 1.0 / spread;
   normalizationIntercept = -minSVMDistance * normalizationSlope;
 
-  //TODO: do you need this?
-  normalizationSlope = -normalizationSlope;
-  normalizationIntercept = -normalizationIntercept + 1;
+  if (negativeLabel == GLASS_COVERED)
+  {
+    normalizationSlope = -normalizationSlope;
+    normalizationIntercept = -normalizationIntercept + 1;
+  }
 
   cout << "training error: " << static_cast<float>(wrongClassificationCount) / trainingData.rows << endl;
 }
@@ -820,6 +855,8 @@ void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSi
   for (size_t i = 0; i < affinities.size(); ++i)
   {
     affinities[i] = 1.0 - affinities[i] / CV_PI;
+    const float eps = 1e-4;
+    CV_Assert(affinities[i] > -eps && affinities[i] < CV_PI + eps);
   }
 }
 
@@ -899,9 +936,6 @@ void computeAllDiscrepancies(const std::vector<Region> &regions, const CvSVM *sv
 
       Mat sample;
       regions2sample(regions[i], regions[j], sample);
-
-      //TODO: use continious labels
-      labels[j] = cvRound(svm->predict(sample));
 
       labels[j] = normalizationSlope * svm->predict(sample, true) + normalizationIntercept;
     }
