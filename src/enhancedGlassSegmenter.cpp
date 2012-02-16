@@ -379,8 +379,11 @@ void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std
 {
   //TODO: move up
   const int textonCount = 36;
-  const int iterationCount = 10;
-  const int attempts = 3;
+//  const int iterationCount = 10;
+//  const int attempts = 3;
+
+  const int iterationCount = 20;
+  const int attempts = 1;
 
   Mat responses;
   convolveImage(image, filterBank, responses);
@@ -515,6 +518,47 @@ void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, c
   cout << "training error: " << static_cast<float>(wrongClassificationCount) / trainingData.rows << endl;
 }
 
+void saveMLData(const std::string filename, const cv::Mat &trainingData, const cv::Mat &labels)
+{
+
+  CV_Assert(trainingData.rows == labels.rows);
+  CV_Assert(trainingData.type() == CV_32FC1);
+  CV_Assert(labels.type() == CV_32SC1);
+
+  std::ofstream fout(filename.c_str());
+
+/*
+  fout << "first, second, third, label" << endl;
+  for (int i = 0; i < trainingData.rows; ++i)
+  {
+    for (int j = 0; j < trainingData.cols; ++j)
+    {
+      fout << trainingData.at<float>(i, j) << ", ";
+    }
+    if (labels.at<int>(i) == THE_SAME)
+    {
+      fout << "theSame" << endl;
+    }
+    else
+    {
+      fout << "different" << endl;
+    }
+  }
+*/
+
+  for (int i = 0; i < trainingData.rows; ++i)
+  {
+    fout << labels.at<int>(i) << " ";
+    for (int j = 0; j < trainingData.cols; ++j)
+    {
+      fout << j << ":" << trainingData.at<float>(i, j) << " ";
+    }
+    fout << endl;
+  }
+
+  fout.close();
+}
+
 void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingSlope, cv::Mat &scalingIntercept, float &normalizationSlope, float &normalizationIntercept)
 {
   //TODO: move up
@@ -645,10 +689,13 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
 
   svmParams.nu = 0.1;
 //  svmParams.nu = 0.01;
-//  svmParams.gamma = 0.00015;
   svmParams.kernel_type = CvSVM::RBF;
 
 //  cout << dcaTrainingData << endl;
+  saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
+  saveMLData("dcaData.csv", dcaTrainingData, trainingLabels);
+
+//  cout << ecaTrainingData << endl;
   cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
   cout << "dcaTrainingData size: " << dcaTrainingData.rows << " x " << dcaTrainingData.cols << endl;
   cout << "Glass covered: " << countNonZero(trainingLabels == GLASS_COVERED) << endl;
