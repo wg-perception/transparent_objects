@@ -17,7 +17,10 @@ set(src
     transparentDetector.cpp
     utils.cpp
     chamfer_matching/chamfer_matching.cpp
-    geodesicActiveContour.cpp
+    glass_segmentation/geodesicActiveContour.cpp
+    glass_segmentation/enhancedGlassSegmenter.cpp
+    glass_segmentation/region.cpp
+    glass_segmentation/segmentedImage.cpp
 )
 
 #EAR: is there a reason to list headers in this target?
@@ -54,3 +57,6 @@ install(TARGETS edges_pose_refiner
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
 #target_link_libraries(transparentExperiments edges_pose_refiner)
+
+add_executable(enhancedGlassSegmenter glass_segmentation/demo.cpp)
+target_link_libraries(enhancedGlassSegmenter edges_pose_refiner)

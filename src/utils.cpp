@@ -761,3 +761,24 @@ void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &orientations, int me
   orientations = Mat(orientation_img).clone();
   cvReleaseImage(&orientation_img);
 }
+
+void saveToCache(const std::string &name, const cv::Mat &mat)
+{
+  FileStorage fs(name + ".xml", FileStorage::WRITE);
+  fs << name << mat;
+  fs.release();
+}
+
+cv::Mat getFromCache(const std::string &name)
+{
+  Mat result;
+/*
+  FileStorage fs(name + ".xml", FileStorage::READ);
+  if (fs.isOpened())
+  {
+    fs[name] >> result;
+    fs.release();
+  }
+*/
+  return result;
+}
