@@ -77,7 +77,7 @@ class Region
     void clusterIntensities();
     void computeCenter();
 
-    cv::Mat image, textonLabels, mask;
+    cv::Mat image, textonLabels, mask, erodedMask;
     cv::Mat grayscaleImage;
 
     cv::Mat hist;
@@ -91,9 +91,14 @@ void computeBoundaryPresences(const std::vector<Region> &regions, const cv::Mat 
 
 Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Mat &_mask)
 {
+  //TODO: move up
+  const int erosionCount = 2;
+
   image = _image;
   textonLabels = _textonLabels;
   mask = _mask;
+  erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
+//  erodedMask = mask.clone();
 
   computeColorHistogram();
   computeTextonHistogram();
@@ -152,7 +157,7 @@ void Region::computeColorHistogram()
   const int sbins = 20;
 
   CV_Assert(image.type() == CV_8UC3);
-  CV_Assert(mask.type() == CV_8UC1);
+  CV_Assert(erodedMask.type() == CV_8UC1);
   Mat hsv;
   cvtColor(image, hsv, CV_BGR2HSV);
 
@@ -161,8 +166,8 @@ void Region::computeColorHistogram()
   float sranges[] = {0, 256};
   const float* ranges[] = {hranges, sranges};
   int channels[] = {0, 1};
-  calcHist(&hsv, 1, channels, mask, hist, 2, histSize, ranges, true, false);
-  hist /= countNonZero(mask);
+  calcHist(&hsv, 1, channels, erodedMask, hist, 2, histSize, ranges, true, false);
+  hist /= countNonZero(erodedMask);
 }
 
 void Region::computeTextonHistogram()
@@ -180,8 +185,8 @@ void Region::computeTextonHistogram()
   int dims = 1;
   bool isUniform = true;
   bool accumulate = false;
-  calcHist(&textonLabels_8U, narrays, channels, mask, textonHistogram, dims, histSize, ranges, isUniform, accumulate);
-  textonHistogram /= countNonZero(mask);
+  calcHist(&textonLabels_8U, narrays, channels, erodedMask, textonHistogram, dims, histSize, ranges, isUniform, accumulate);
+  textonHistogram /= countNonZero(erodedMask);
 }
 
 void Region::clusterIntensities()
@@ -201,15 +206,15 @@ void Region::clusterIntensities()
     }
   }
   CV_Assert(grayscaleImage.type() == CV_8UC1);
-  CV_Assert(mask.type() == CV_8UC1);
-  CV_Assert(grayscaleImage.size() == mask.size());
+  CV_Assert(erodedMask.type() == CV_8UC1);
+  CV_Assert(grayscaleImage.size() == erodedMask.size());
 
   vector<int> intensities;
-  for (int i = 0; i < mask.rows; ++i)
+  for (int i = 0; i < erodedMask.rows; ++i)
   {
-    for (int j = 0; j < mask.cols; ++j)
+    for (int j = 0; j < erodedMask.cols; ++j)
     {
-      if (mask.at<uchar>(i, j) == 255)
+      if (erodedMask.at<uchar>(i, j) == 255)
       {
         intensities.push_back(grayscaleImage.at<uchar>(i, j));
       }
@@ -306,6 +311,9 @@ void oversegmentImage(const cv::Mat &image, cv::Mat &segmentation)
 {
   //TODO: move up
   const float sigma = 0.2f;
+
+//  const float sigma = 0.4f;
+//  const float k = 300.0f;
   const float k = 500.0f;
   const int min_size = 200;
 
@@ -375,6 +383,64 @@ void convolveImage(const cv::Mat &image, const std::vector<cv::Mat> &filterBank,
   CV_Assert(responses.channels() == filterBank.size());
 }
 
+void mergeThinRegions(cv::Mat &segmentation, vector<int> &labels)
+{
+  //TODO: move up
+  const int erosionIterations = 6;
+  vector<bool> isThin(labels.size(), false);
+  vector<Mat> masks(labels.size());
+  for (size_t i = 0; i < labels.size(); ++i)
+  {
+    masks[i] = (segmentation == labels[i]);
+    Mat erodedMask;
+    erode(masks[i], erodedMask, Mat(), Point(-1, -1), erosionIterations);
+
+    if (countNonZero(erodedMask) == 0)
+    {
+      isThin[i] = true;
+    }
+  }
+
+  Mat finalMask(segmentation.size(), CV_8UC1, Scalar(0));
+  for (size_t i = 0; i < labels.size(); ++i)
+  {
+    if (isThin[i])
+    {
+      finalMask.setTo(255, masks[i]);
+    }
+  }
+
+  vector<int> newLabels;
+  for (size_t i = 0; i < labels.size(); ++i)
+  {
+    if (!isThin[i])
+    {
+      newLabels.push_back(labels[i]);
+      continue;
+    }
+    Mat dilatedMask;
+    dilate(masks[i], dilatedMask, Mat());
+
+    int largestAdjacentRegionIndex;
+    int largestArea = 0;
+    for (size_t j = 0; j < labels.size(); ++j)
+    {
+      if (i == j || countNonZero(dilatedMask & masks[j]) == 0)
+      {
+        continue;
+      }
+      int currentArea = countNonZero(masks[j]);
+      if (currentArea > largestArea)
+      {
+        largestArea = currentArea;
+        largestAdjacentRegionIndex = j;
+      }
+    }
+    segmentation.setTo(labels[largestAdjacentRegionIndex], masks[i]);
+  }
+  std::swap(labels, newLabels);
+}
+
 void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
 {
   //TODO: move up
@@ -406,6 +472,7 @@ void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std
 
   int firstFreeLabel = 1 + *std::max_element(labels.begin(), labels.end());
 
+  mergeThinRegions(segmentation, labels);
   regions.clear();
   for (size_t i = 0; i < labels.size(); ++i)
   {
@@ -420,7 +487,7 @@ void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std
 enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1};
 
 
-void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample)
+void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample)
 {
   float colorDistance;
   computeColorSimilarity(region_1, region_2, colorDistance);
@@ -432,6 +499,7 @@ void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ec
   const int dim = 3;
   ecaSample = (Mat_<float>(1, dim) << intercept, colorDistance, slope);
   dcaSample = (Mat_<float>(1, dim) << textureDistance, colorDistance, slope);
+  fullSample = (Mat_<float>(1, 4) << intercept, colorDistance, slope, textureDistance);
 }
 
 enum RegionLabel {GLASS, BACKGROUND, NOT_VALID};
@@ -471,6 +539,9 @@ void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, c
   float zeroDistance = svm->predict(zeroSample, true);
   int negativeLabel = zeroDistance < 0 ? zeroPredictedLabel : 1 - zeroPredictedLabel;
   cout << "Negative label: " << negativeLabel << endl;
+
+  const int labelCount = 2;
+  Mat confusionMatrix(labelCount, labelCount, CV_32SC1, Scalar(0));
   for (size_t i = 0; i < trainingData.rows; ++i)
   {
     Mat sample = trainingData.row(i);
@@ -483,7 +554,18 @@ void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, c
     {
       ++wrongClassificationCount;
     }
+    ++confusionMatrix.at<int>(trainingLabelsVec[i], label);
   }
+  cout << "confusion matrix: " << endl;
+  cout << confusionMatrix << endl;
+  Mat normalizedConfusionMatrix;
+  confusionMatrix.convertTo(normalizedConfusionMatrix, CV_32FC1);
+  normalizedConfusionMatrix.at<float>(0, 0) /= confusionMatrix.at<int>(0, 0) + confusionMatrix.at<int>(0, 1);
+  normalizedConfusionMatrix.at<float>(0, 1) /= confusionMatrix.at<int>(0, 0) + confusionMatrix.at<int>(0, 1);
+  normalizedConfusionMatrix.at<float>(1, 0) /= confusionMatrix.at<int>(1, 0) + confusionMatrix.at<int>(1, 1);
+  normalizedConfusionMatrix.at<float>(1, 1) /= confusionMatrix.at<int>(1, 0) + confusionMatrix.at<int>(1, 1);
+  cout << "normalized confusion matrix: " << endl;
+  cout << normalizedConfusionMatrix << endl;
 
   float spread = maxSVMDistance - minSVMDistance;
   const float eps = 1e-2;
@@ -520,43 +602,46 @@ void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, c
 
 void saveMLData(const std::string filename, const cv::Mat &trainingData, const cv::Mat &labels)
 {
-
   CV_Assert(trainingData.rows == labels.rows);
   CV_Assert(trainingData.type() == CV_32FC1);
   CV_Assert(labels.type() == CV_32SC1);
 
-  std::ofstream fout(filename.c_str());
-
-/*
-  fout << "first, second, third, label" << endl;
-  for (int i = 0; i < trainingData.rows; ++i)
   {
-    for (int j = 0; j < trainingData.cols; ++j)
+    string wekaFilename = "weka_" + filename;
+    std::ofstream fout(wekaFilename.c_str());
+    fout << "first, second, third, label" << endl;
+    for (int i = 0; i < trainingData.rows; ++i)
     {
-      fout << trainingData.at<float>(i, j) << ", ";
+      for (int j = 0; j < trainingData.cols; ++j)
+      {
+        fout << trainingData.at<float>(i, j) << ", ";
+      }
+      if (labels.at<int>(i) == THE_SAME)
+      {
+        fout << "theSame" << endl;
+      }
+      else
+      {
+        fout << "different" << endl;
+      }
     }
-    if (labels.at<int>(i) == THE_SAME)
-    {
-      fout << "theSame" << endl;
-    }
-    else
-    {
-      fout << "different" << endl;
-    }
-  }
-*/
-
-  for (int i = 0; i < trainingData.rows; ++i)
-  {
-    fout << labels.at<int>(i) << " ";
-    for (int j = 0; j < trainingData.cols; ++j)
-    {
-      fout << j << ":" << trainingData.at<float>(i, j) << " ";
-    }
-    fout << endl;
+    fout.close();
   }
 
-  fout.close();
+  {
+    string svmFilename = "svm_" + filename;
+    std::ofstream fout(svmFilename.c_str());
+    for (int i = 0; i < trainingData.rows; ++i)
+    {
+      fout << labels.at<int>(i) << " ";
+      for (int j = 0; j < trainingData.cols; ++j)
+      {
+        fout << j << ":" << trainingData.at<float>(i, j) << " ";
+      }
+      fout << endl;
+    }
+    fout.close();
+  }
 }
 
 void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingSlope, cv::Mat &scalingIntercept, float &normalizationSlope, float &normalizationIntercept)
@@ -577,7 +662,7 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
   const size_t imageCount = trainingGroundTruhFiles.size();
   CV_Assert(trainingFiles.size() == imageCount);
 
-  Mat ecaTrainingData, dcaTrainingData;
+  Mat fullTrainingData;
   vector<int> trainingLabelsVec;
   for (size_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
   {
@@ -593,6 +678,7 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
 
     vector<Region> regions;
     segmentation2regions(trainingImage, segmentation, filterBank, regions);
+    showSegmentation(segmentation, "train segmentation");
     vector<RegionLabel> regionLabels(regions.size());
     for (size_t i = 0; i < regions.size(); ++i)
     {
@@ -635,11 +721,10 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
 
 
 
-        Mat ecaSample, dcaSample;
-        regions2samples(regions[i], regions[j], ecaSample, dcaSample);
+        Mat ecaSample, dcaSample, fullSample;
+        regions2samples(regions[i], regions[j], ecaSample, dcaSample, fullSample);
+        fullTrainingData.push_back(fullSample);
 
-        ecaTrainingData.push_back(ecaSample);
-        dcaTrainingData.push_back(dcaSample);
         int currentLabel;
         if (regionLabels[i] ^ regionLabels[j])
         {
@@ -651,30 +736,38 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
         }
         trainingLabelsVec.push_back(currentLabel);
 
-        Mat ecaSymmetricSample, dcaSymmetricSample;
-        regions2samples(regions[j], regions[i], ecaSymmetricSample, dcaSymmetricSample);
-        if (norm(ecaSample - ecaSymmetricSample) > maxSampleDistance || norm(dcaSample - dcaSymmetricSample) > maxSampleDistance)
+        Mat ecaSymmetricSample, dcaSymmetricSample, fullSymmetricSample;
+        regions2samples(regions[j], regions[i], ecaSymmetricSample, dcaSymmetricSample, fullSymmetricSample);
+        if (norm(fullSample - fullSymmetricSample) > maxSampleDistance)
         {
           //TODO: is it a correct way to process such cases?
-          ecaTrainingData.push_back(ecaSymmetricSample);
-          dcaTrainingData.push_back(dcaSymmetricSample);
+          fullTrainingData.push_back(fullSymmetricSample);
           trainingLabelsVec.push_back(currentLabel);
         }
       }
     }
   }
+  Mat ecaTrainingData = fullTrainingData.colRange(Range(0, 3));
+  Mat dcaTrainingData = fullTrainingData.colRange(Range(1, 4));
   CV_Assert(ecaTrainingData.size() == dcaTrainingData.size());
   CV_Assert(ecaTrainingData.type() == CV_32FC1);
   CV_Assert(dcaTrainingData.type() == CV_32FC1);
 
-  Mat ecaScalingSlope = (Mat_<float>(1, 3) << 1.0, 1.0, 1.0);
-  Mat ecaScalingIntercept = Mat::zeros(1, 3, CV_32FC1);
-  Mat dcaScalingSlope = ecaScalingSlope.clone();
-  Mat dcaScalingIntercept = ecaScalingIntercept.clone();
+  Mat ecaScalingSlope(1, ecaTrainingData.cols, CV_32FC1);
+  ecaScalingSlope = 1.0;
+  Mat ecaScalingIntercept = Mat::zeros(1, ecaTrainingData.cols, CV_32FC1);
+//  Mat dcaScalingSlope(1, dcaTrainingData.cols, CV_32FC1);
+//  Mat dcaScalingIntercept = Mat::zeros(1, dcaTrainingData.cols, CV_32FC1);
 //  normalizeTrainingData(ecaTrainingData, ecaScalingSlope, ecaScalingIntercept);
 //  normalizeTrainingData(dcaTrainingData, dcaScalingSlope, dcaScalingIntercept);
-  scalingSlope = ecaScalingSlope;
-  scalingIntercept = ecaScalingIntercept;
+//  scalingSlope = ecaScalingSlope;
+//  scalingIntercept = ecaScalingIntercept;
+
+  Mat fullScalingSlope(1, fullTrainingData.cols, CV_32FC1);
+  fullScalingSlope = 1.0;
+  Mat fullScalingIntercept = Mat::zeros(1, fullTrainingData.cols, CV_32FC1);
+  scalingSlope = fullScalingSlope;
+  scalingIntercept = fullScalingIntercept;
 
   Mat trainingLabels = Mat(trainingLabelsVec).reshape(1, trainingLabelsVec.size());
   CV_Assert(trainingLabels.rows == ecaTrainingData.rows);
@@ -683,21 +776,25 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
 
   CvSVMParams svmParams;
   //TODO: move up
-//  svmParams.svm_type = CvSVM::C_SVC;
-//  svmParams.C = 2.5;
-  svmParams.svm_type = CvSVM::NU_SVC;
+  svmParams.svm_type = CvSVM::C_SVC;
+  svmParams.C = 2;
+//  svmParams.svm_type = CvSVM::NU_SVC;
 
   svmParams.nu = 0.1;
 //  svmParams.nu = 0.01;
+  svmParams.gamma = 8;
   svmParams.kernel_type = CvSVM::RBF;
 
 //  cout << dcaTrainingData << endl;
   saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
   saveMLData("dcaData.csv", dcaTrainingData, trainingLabels);
 
+  saveMLData("fullData.csv", fullTrainingData, trainingLabels);
+
 //  cout << ecaTrainingData << endl;
   cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
   cout << "dcaTrainingData size: " << dcaTrainingData.rows << " x " << dcaTrainingData.cols << endl;
+  cout << "fullTrainingData size: " << fullTrainingData.rows << " x " << fullTrainingData.cols << endl;
   cout << "Glass covered: " << countNonZero(trainingLabels == GLASS_COVERED) << endl;
   cout << "The same: " << countNonZero(trainingLabels == THE_SAME) << endl;
 
@@ -705,7 +802,8 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
 
 //  bool isTrained = svm.train(dcaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
 //  bool isTrained = svm.train(ecaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
-  bool isTrained = svm.train_auto(ecaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
+  bool isTrained = svm.train(fullTrainingData, trainingLabels, Mat(), Mat(), svmParams);
+//  bool isTrained = svm.train_auto(ecaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
 //  bool isTrained = svm.train_auto(dcaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
   cout << "done: " << isTrained << endl;
   CvSVMParams optimalParams = svm.get_params();
@@ -713,7 +811,9 @@ void train(const std::vector<cv::Mat> &filterBank, CvSVM &svm, cv::Mat &scalingS
   cout << "nu: " << optimalParams.nu << endl;
   cout << "gamma: " << optimalParams.gamma << endl;
 
-  getNormalizationParameters(&svm, ecaTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
+
+  getNormalizationParameters(&svm, fullTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
+//  getNormalizationParameters(&svm, ecaTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
 //  getNormalizationParameters(&svm, dcaTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
 }
 
@@ -767,15 +867,17 @@ void onMouse(int event, int x, int y, int, void *rawData)
   vector<float> labels(data->regions.size());
   for (size_t i = 0; i < data->regions.size(); ++i)
   {
-    Mat ecaSample, dcaSample;
-    regions2samples(data->regions[regionIndex], data->regions[i], ecaSample, dcaSample);
+    Mat ecaSample, dcaSample, fullSample;
+    regions2samples(data->regions[regionIndex], data->regions[i], ecaSample, dcaSample, fullSample);
     labels[i] = cvRound(data->svm->predict(ecaSample));
+//    labels[i] = cvRound(data->svm->predict(dcaSample));
   }
 
   Mat visualization;
   visualizeClassification(data->regions, labels, visualization);
   imshow("classification", visualization);
 
+  /*
 
   vector<float> affinities;
   estimateAffinities(data->graph, data->regions.size(), data->segmentation.size(), regionIndex, affinities);
@@ -802,6 +904,7 @@ void onMouse(int event, int x, int y, int, void *rawData)
 //  affinityImage.setTo(255, regionAffinities == 0.0);
  // regionAffinities.convertTo(affinityImage, CV_8UC1, 10.0);
   imshow("affinities", affinityImage);
+  */
 }
 
 
@@ -1146,13 +1249,15 @@ void computeAllDiscrepancies(const std::vector<Region> &regions, const CvSVM *sv
         continue;
       }
 
-      Mat ecaSample, dcaSample;
-      regions2samples(regions[i], regions[j], ecaSample, dcaSample);
-      ecaSample = ecaSample.mul(scalingSlope) + scalingIntercept;
-      dcaSample = dcaSample.mul(scalingSlope) + scalingIntercept;
-
+      Mat ecaSample, dcaSample, fullSample;
+      regions2samples(regions[i], regions[j], ecaSample, dcaSample, fullSample);
+//      ecaSample = ecaSample.mul(scalingSlope) + scalingIntercept;
+//      dcaSample = dcaSample.mul(scalingSlope) + scalingIntercept;
 //      labels[j] = normalizationSlope * svm->predict(dcaSample, true) + normalizationIntercept;
-      labels[j] = normalizationSlope * svm->predict(ecaSample, true) + normalizationIntercept;
+//      labels[j] = normalizationSlope * svm->predict(ecaSample, true) + normalizationIntercept;
+
+      fullSample = fullSample.mul(scalingSlope) + scalingIntercept;
+      labels[j] = normalizationSlope * svm->predict(fullSample, true) + normalizationIntercept;
     }
     Mat row = discrepancies.row(i);
     Mat(labels).reshape(1, 1).copyTo(row);
@@ -1292,8 +1397,8 @@ int main()
 
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/tea_table2.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/table_misc3.jpg");
-  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
+  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/table_misc3.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/wineB1f.jpg");
@@ -1303,6 +1408,8 @@ int main()
   oversegmentImage(testImage, oversegmentation);
   vector<Region> regions;
   segmentation2regions(testImage, oversegmentation, filterBank, regions);
+
+  showSegmentation(oversegmentation, "test segmentation");
 
 
   Mat grayscaleImage;
@@ -1316,6 +1423,9 @@ int main()
   namedWindow(testSegmentationTitle);
 
   Mat boundaryStrength;
+//  dilate(edges, edges, Mat());
+//  edges.convertTo(boundaryStrength, CV_32FC1, 1.0 / 255.0);
+
   computeBoundaryStrength(edges, oversegmentation, regions, graph, &svm, scalingSlope, scalingIntercept, normalizationSlope, normalizationIntercept, affinityWeight, boundaryStrength);
   //TODO: do you need this?
   boundaryStrength.setTo(0, boundaryStrength < 0);
@@ -1323,7 +1433,6 @@ int main()
   Mat strengthVisualization = boundaryStrength.clone();
   strengthVisualization -= normalizationIntercept;
   strengthVisualization.setTo(0, strengthVisualization < 0);
-
 
   imshow("boundary", strengthVisualization);
 //  imshow("boundary", boundaryStrength);
