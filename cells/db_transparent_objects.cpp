@@ -35,22 +35,22 @@
 
 #include <boost/filesystem.hpp>
 
-#include <object_recognition/db/opencv.h>
+#include <object_recognition_core/db/opencv.h>
 
 #include "db_transparent_objects.hpp"
 
 namespace
 {
-  object_recognition::db::MimeType MIME_TYPE = "text/x-yaml";
+  object_recognition_core::db::MimeType MIME_TYPE = "text/x-yaml";
 }
-namespace object_recognition
+namespace object_recognition_core
 {
   namespace db
   {
     // Specializations for cv::FileNode
     template<>
     void
-    object_recognition::db::Document::get_attachment<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::get_attachment<PoseEstimator>(const AttachmentName &attachment_name,
                                                                     PoseEstimator &value) const
     {
       // Get the binary file
@@ -69,14 +69,14 @@ namespace object_recognition
 
     template<>
     void
-    object_recognition::db::Document::get_attachment_and_cache<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::get_attachment_and_cache<PoseEstimator>(const AttachmentName &attachment_name,
                                                                               PoseEstimator &value)
     {
     }
 
     template<>
     void
-    object_recognition::db::Document::set_attachment<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::set_attachment<PoseEstimator>(const AttachmentName &attachment_name,
                                                                     const PoseEstimator &value)
     {
       // First write the class to a file

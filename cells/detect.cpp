@@ -1,7 +1,11 @@
 #include <ecto/ecto.hpp>
 #include <boost/foreach.hpp>
 
-#include <object_recognition/db/ModelReader.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+#include <object_recognition_core/common/pose_result.h>
+#include <object_recognition_core/db/ModelReader.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
 #include <edges_pose_refiner/glassDetector.hpp>
@@ -10,28 +14,23 @@
 #include <edges_pose_refiner/transparentDetector.hpp>
 #include "db_transparent_objects.hpp"
 
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-#include <object_recognition/common/pose_result.h>
-
 //#define TRANSPARENT_DEBUG
 
 using ecto::tendrils;
 using ecto::spore;
-using object_recognition::db::ObjectId;
-using object_recognition::common::PoseResult;
-using object_recognition::db::ObjectDbParameters;
+using object_recognition_core::db::ObjectId;
+using object_recognition_core::common::PoseResult;
+using object_recognition_core::db::ObjectDbParameters;
 
 namespace transparent_objects
 {
-  struct TransparentObjectsDetector: public object_recognition::db::bases::ModelReaderImpl
+  struct TransparentObjectsDetector: public object_recognition_core::db::bases::ModelReaderImpl
   {
     void
-    ParameterCallback(const object_recognition::db::Documents & db_documents)
+    ParameterCallback(const object_recognition_core::db::Documents & db_documents)
     {
       std::cout << "detector: ParameterCallback" << std::endl;
-      BOOST_FOREACH(const object_recognition::db::Document & document, db_documents)
+      BOOST_FOREACH(const object_recognition_core::db::Document & document, db_documents)
           {
             PoseEstimator currentPoseEstimator;
             // Load the detector for that class
@@ -175,5 +174,5 @@ namespace transparent_objects
   };
 }
 
-ECTO_CELL(transparent_objects_cells, object_recognition::db::bases::ModelReaderBase<transparent_objects::TransparentObjectsDetector>, "Detector",
-          "Detection of transparent objects.");
+ECTO_CELL(transparent_objects_cells, object_recognition_core::db::bases::ModelReaderBase<transparent_objects::TransparentObjectsDetector>, "Detector",
+  "Detection of transparent objects.");

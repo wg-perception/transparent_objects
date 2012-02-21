@@ -6,14 +6,18 @@ ectomodule(transparent_objects_cells
     modelFiller.cpp
     )
 
-find_package(PCL)
+find_package(PCL REQUIRED)
+find_package(object_recognition_core REQUIRED)
+
+include_directories(SYSTEM
+    ${object_recognition_core_INCLUDE_DIRS}
+)
 
 link_ecto(transparent_objects_cells
-     ${PCL_LIBRARIES}
-     ${Boost_LIBRARIES}
-     object_recognition_common
-     object_recognition_db
-     edges_pose_refiner
-    )
+    ${PCL_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${object_recognition_core_LIBRARIES}
+    edges_pose_refiner
+)
 
 install_ecto_module(transparent_objects_cells)

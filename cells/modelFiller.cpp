@@ -1,14 +1,14 @@
 #include <ecto/ecto.hpp>
 #include <opencv2/core/core.hpp>
 
-#include <object_recognition/common/types.h>
-#include <object_recognition/db/db.h>
+#include <object_recognition_core/common/types.h>
+#include <object_recognition_core/db/db.h>
 
 #include "db_transparent_objects.hpp"
 #include <edges_pose_refiner/poseEstimator.hpp>
 
-using object_recognition::db::ObjectId;
-using object_recognition::db::Document;
+using object_recognition_core::db::ObjectId;
+using object_recognition_core::db::Document;
 
 namespace transparent_objects
 {

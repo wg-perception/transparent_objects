@@ -3,11 +3,10 @@
 Module defining the transparent objects detector to find objects in a scene
 """
 
-from ecto_object_recognition.object_recognition_db import DbModels, ObjectDbParameters
-from object_recognition_core.utils import json_helper
+from ecto_object_recognition_core.object_recognition_core_db import DbModels, ObjectDbParameters
 from object_recognition_core.pipelines.detection import DetectionPipeline
+from object_recognition_core.utils import json_helper
 import transparent_objects_cells
-
 
 ########################################################################################################################
 

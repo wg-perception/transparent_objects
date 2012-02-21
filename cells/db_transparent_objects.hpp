@@ -36,28 +36,28 @@
 #ifndef DB_TRANSPARENT_OBJECTS_HPP_
 #define DB_TRANSPARENT_OBJECTS_HPP_
 
-#include <object_recognition/db/db.h>
+#include <object_recognition_core/db/db.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
 
-namespace object_recognition
+namespace object_recognition_core
 {
   namespace db
   {
     // Specializations for cv::FileNode
     template<>
     void
-    object_recognition::db::Document::get_attachment<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::get_attachment<PoseEstimator>(const AttachmentName &attachment_name,
                                                                     PoseEstimator &value) const;
 
     template<>
     void
-    object_recognition::db::Document::get_attachment_and_cache<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::get_attachment_and_cache<PoseEstimator>(const AttachmentName &attachment_name,
                                                                               PoseEstimator &value);
 
     template<>
     void
-    object_recognition::db::Document::set_attachment<PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::Document::set_attachment<PoseEstimator>(const AttachmentName &attachment_name,
                                                                     const PoseEstimator &value);
   }
 }

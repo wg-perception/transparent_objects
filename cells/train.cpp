@@ -1,8 +1,8 @@
 #include <ecto/ecto.hpp>
 
 #include <boost/foreach.hpp>
-#include <object_recognition/common/json.hpp>
-#include <object_recognition/db/db.h>
+#include <object_recognition_core/common/json.hpp>
+#include <object_recognition_core/db/db.h>
 #include <fstream>
 
 #include "edges_pose_refiner/pinholeCamera.hpp"
@@ -40,17 +40,17 @@ namespace transparent_objects
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
       std::cout  << __PRETTY_FUNCTION__ << *json_submethod_  <<std::endl;
-      or_json::mValue submethod = object_recognition::to_json(*json_submethod_);
+      or_json::mValue submethod = object_recognition_core::to_json(*json_submethod_);
 //      if (submethod.get_str() == "default")
       {
         {
           std::vector<float> K_value;
-          for (size_t i = 0; i < object_recognition::to_json(*json_K_).get_array().size(); ++i)
+          for (size_t i = 0; i < object_recognition_core::to_json(*json_K_).get_array().size(); ++i)
           {
-            K_value.push_back(object_recognition::to_json(*json_K_).get_array()[i].get_real());
+            K_value.push_back(object_recognition_core::to_json(*json_K_).get_array()[i].get_real());
           }
 
-//          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_K_).get_array())
+//          BOOST_FOREACH(const or_json::mValue & value, object_recognition_core::to_json(*json_K_).get_array())
 //                K_value.push_back(value.get_real());
 
           K_ = cv::Mat(K_value).clone();
@@ -58,11 +58,11 @@ namespace transparent_objects
         }
         {
           std::vector<float> D_value;
-//          BOOST_FOREACH(const or_json::mValue & value, object_recognition::to_json(*json_D_).get_array())
+//          BOOST_FOREACH(const or_json::mValue & value, object_recognition_core::to_json(*json_D_).get_array())
 //            D_value.push_back(value.get_real());
-          for (size_t i = 0; i < object_recognition::to_json(*json_D_).get_array().size(); ++i)
+          for (size_t i = 0; i < object_recognition_core::to_json(*json_D_).get_array().size(); ++i)
           {
-            D_value.push_back(object_recognition::to_json(*json_D_).get_array()[i].get_real());
+            D_value.push_back(object_recognition_core::to_json(*json_D_).get_array()[i].get_real());
           }
 
           if (D_value.empty())
@@ -109,7 +109,7 @@ namespace transparent_objects
 
     cv::Mat K_, D_;
     spore<std::string> json_K_, json_D_;
-    spore<object_recognition::db::Document> document_;
+    spore<object_recognition_core::db::Document> document_;
     spore<cv::Ptr<PoseEstimator> > poseEstimator_;
     spore<std::string> json_submethod_;
     spore<int> imageWidth_, imageHeight_;
