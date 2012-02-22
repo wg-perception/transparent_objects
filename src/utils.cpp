@@ -495,7 +495,7 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
   CV_Assert(!blackBlobsObject.empty() && !whiteBlobsObject.empty());
 }
 
-cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness)
+cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar &color, int thickness)
 {
   CV_Assert(!image.empty() && !mask.empty());
   Mat drawImage = image.clone();
@@ -504,7 +504,7 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thicknes
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;
   findContours(glassMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-  drawContours(drawImage, contours, -1, Scalar(0, 255, 0), thickness);
+  drawContours(drawImage, contours, -1, color, thickness);
   return drawImage;
 }
 
@@ -772,13 +772,14 @@ void saveToCache(const std::string &name, const cv::Mat &mat)
 cv::Mat getFromCache(const std::string &name)
 {
   Mat result;
-/*
+  /*
   FileStorage fs(name + ".xml", FileStorage::READ);
   if (fs.isOpened())
   {
     fs[name] >> result;
     fs.release();
   }
-*/
+  */
+
   return result;
 }

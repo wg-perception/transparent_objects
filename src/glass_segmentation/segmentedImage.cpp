@@ -3,6 +3,8 @@
 #include "edges_pose_refiner/segmentedImage.hpp"
 
 using namespace cv;
+using std::cout;
+using std::endl;
 
 std::vector<cv::Mat> SegmentedImage::filterBank;
 
@@ -37,6 +39,7 @@ const cv::Mat& SegmentedImage::getOriginalImage() const
 
 void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentation)
 {
+/*
   //TODO: move up
 //  const float sigma = 0.2f;
 
@@ -56,7 +59,9 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentatio
 
   std::system(command.str().c_str());
   sleep(2);
+*/
 
+  const string outputTxtFilename = "seg.txt";
   segmentation.create(image.size(), CV_32SC1);
   std::ifstream segmentationTxt(outputTxtFilename.c_str());
   CV_Assert(segmentationTxt.is_open());
@@ -64,7 +69,9 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentatio
   {
     for (int j = 0; j < image.cols; ++j)
     {
-      segmentationTxt >> segmentation.at<int>(i, j);
+      double currentIndex;
+      segmentationTxt >> currentIndex;
+      segmentation.at<int>(i, j) = cvRound(currentIndex);
     }
   }
   segmentationTxt.close();
@@ -73,7 +80,9 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentatio
 void SegmentedImage::mergeThinRegions(cv::Mat &segmentation, vector<int> &labels)
 {
   //TODO: move up
-  const int erosionIterations = 6;
+//  const int erosionIterations = 6;
+  const int erosionIterations = 1;
+
   vector<bool> isThin(labels.size(), false);
   vector<Mat> masks(labels.size());
   for (size_t i = 0; i < labels.size(); ++i)
@@ -174,14 +183,17 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
   CV_Assert(textonLabels.type() == CV_32SC1);
 
   CV_Assert(segmentation.type() == CV_32SC1);
-  vector<int> labels = segmentation.reshape(1, 1);
+  vector<int> labels = segmentation.reshape(1, 1).clone();
   std::sort(labels.begin(), labels.end());
   vector<int>::iterator endIt = std::unique(labels.begin(), labels.end());
   labels.resize(endIt - labels.begin());
 
   int firstFreeLabel = 1 + *std::max_element(labels.begin(), labels.end());
+  cout << "FirstFreeLabel: " << firstFreeLabel << endl;
+  cout << "size: " << labels.size() << endl;
 
   mergeThinRegions(segmentation, labels);
+  cout << "regions are merged" << endl;
   regions.clear();
   for (size_t i = 0; i < labels.size(); ++i)
   {

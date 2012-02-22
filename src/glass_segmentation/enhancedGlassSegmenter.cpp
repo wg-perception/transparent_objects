@@ -121,44 +121,23 @@ void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat
   cout << "min: " << minData << endl;
 }
 
-void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, const std::vector<int> &trainingLabelsVec, float &normalizationSlope, float &normalizationIntercept)
+void GlassClassifier::computeNormalizationParameters(const MLData &trainingData)
 {
-  int wrongClassificationCount = 0;
-  float minSVMDistance = 0.0f;
-  float maxSVMDistance = 0.0f;
-  CV_Assert(trainingData.rows > 0);
-  Mat zeroSample = trainingData.row(0);
-  int zeroPredictedLabel = cvRound(svm->predict(zeroSample));
-  float zeroDistance = svm->predict(zeroSample, true);
+  CV_Assert(trainingData.getSamplesCount() > 0);
+
+  Mat zeroSample = trainingData.samples.row(0);
+  int zeroPredictedLabel = cvRound(svm.predict(zeroSample));
+  float zeroDistance = svm.predict(zeroSample, true);
   int negativeLabel = zeroDistance < 0 ? zeroPredictedLabel : 1 - zeroPredictedLabel;
   cout << "Negative label: " << negativeLabel << endl;
 
-  const int labelCount = 2;
-  Mat confusionMatrix(labelCount, labelCount, CV_32SC1, Scalar(0));
-  for (size_t i = 0; i < trainingData.rows; ++i)
-  {
-    Mat sample = trainingData.row(i);
-    float distance = svm->predict(sample, true);
-    int label = distance < 0 ? negativeLabel : 1 - negativeLabel;
-    minSVMDistance = std::min(minSVMDistance, distance);
-    maxSVMDistance = std::max(maxSVMDistance, distance);
-
-    if (label != trainingLabelsVec[i])
-    {
-      ++wrongClassificationCount;
-    }
-    ++confusionMatrix.at<int>(trainingLabelsVec[i], label);
-  }
-  cout << "confusion matrix: " << endl;
-  cout << confusionMatrix << endl;
-  Mat normalizedConfusionMatrix;
-  confusionMatrix.convertTo(normalizedConfusionMatrix, CV_32FC1);
-  normalizedConfusionMatrix.at<float>(0, 0) /= confusionMatrix.at<int>(0, 0) + confusionMatrix.at<int>(0, 1);
-  normalizedConfusionMatrix.at<float>(0, 1) /= confusionMatrix.at<int>(0, 0) + confusionMatrix.at<int>(0, 1);
-  normalizedConfusionMatrix.at<float>(1, 0) /= confusionMatrix.at<int>(1, 0) + confusionMatrix.at<int>(1, 1);
-  normalizedConfusionMatrix.at<float>(1, 1) /= confusionMatrix.at<int>(1, 0) + confusionMatrix.at<int>(1, 1);
-  cout << "normalized confusion matrix: " << endl;
-  cout << normalizedConfusionMatrix << endl;
+  normalizationSlope = 1.0;
+  normalizationIntercept = 0.0;
+  Mat trainingConfidences;
+  predict(trainingData, trainingConfidences);
+  double minSVMDistance = 0.0f;
+  double maxSVMDistance = 0.0f;
+  minMaxLoc(trainingConfidences, &minSVMDistance, &maxSVMDistance);
 
   float spread = maxSVMDistance - minSVMDistance;
   const float eps = 1e-2;
@@ -167,32 +146,32 @@ void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, c
   normalizationIntercept = -minSVMDistance * normalizationSlope;
 
   if (negativeLabel == GLASS_COVERED)
-//  if (negativeLabel == THE_SAME)
   {
     normalizationSlope = -normalizationSlope;
     normalizationIntercept = -normalizationIntercept + 1;
   }
-  float hyperplaneValue = normalizationIntercept;
 
-  cout << "training error: " << static_cast<float>(wrongClassificationCount) / trainingData.rows << endl;
-
-
-  wrongClassificationCount = 0;
-  for (size_t i = 0; i < trainingData.rows; ++i)
+  Mat predictedLabels = trainingConfidences >= 0;
+  predictedLabels.setTo(GLASS_COVERED, predictedLabels == 255);
+  if (negativeLabel == GLASS_COVERED)
   {
-    Mat sample = trainingData.row(i);
-    float distance = normalizationSlope * svm->predict(sample, true) + normalizationIntercept;
-    int label = distance < hyperplaneValue ? THE_SAME : GLASS_COVERED;
-
-    if (label != trainingLabelsVec[i])
-    {
-      ++wrongClassificationCount;
-    }
+    predictedLabels = 1 - predictedLabels;
   }
+  float trainingError;
+  Mat confusionMatrix;
+  trainingData.evaluate(predictedLabels, trainingError, confusionMatrix);
+  cout << "training error: " << trainingError << endl;
+  cout << "confusion matrix: " << endl << confusionMatrix << endl;
 
-  cout << "training error: " << static_cast<float>(wrongClassificationCount) / trainingData.rows << endl;
+  //TODO: remove
+  {
+    Mat trainingConfidences;
+    predict(trainingData, trainingConfidences);
+    Mat trainingPredictions = (trainingConfidences >= normalizationIntercept);
+    trainingPredictions.setTo(GLASS_COVERED, trainingPredictions == 255);
+    CV_Assert(countNonZero(trainingPredictions != predictedLabels) == 0);
+  }
 }
-
 
 bool MLData::isValid() const
 {
@@ -217,34 +196,52 @@ void MLData::push_back(const MLData &mlData)
   responses.push_back(mlData.responses);
 }
 
+int MLData::computeClassesCount() const
+{
+  double minLabel, maxLabel;
+  minMaxLoc(responses, &minLabel, &maxLabel);
+  return (cvRound(maxLabel) - cvRound(minLabel) + 1);
+}
+
+void MLData::evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &confusionMatrix) const
+{
+  int classesCount = computeClassesCount();
+  confusionMatrix.create(classesCount, classesCount, CV_32SC1);
+  for (int i = 0; i < classesCount; ++i)
+  {
+    for (int j = 0; j < classesCount; ++j)
+    {
+      confusionMatrix.at<int>(i, j) = countNonZero((responses == i) & (predictedLabels == j));
+    }
+  }
+
+  float accuracy = sum(confusionMatrix.diag())[0] / getSamplesCount();
+  error = 1.0 - accuracy;
+}
+
 void MLData::save(const std::string name) const
 {
   CV_Assert(isValid());
 
-/*
   {
     string wekaFilename = name + "_weka.csv";
     std::ofstream fout(wekaFilename.c_str());
-    CV_Assert(false);
-    fout << "first, second, third, label" << endl;
-    for (int i = 0; i < trainingData.rows; ++i)
+    for (int i = 0; i < getDimensionality(); ++i)
     {
-      for (int j = 0; j < trainingData.cols; ++j)
+      fout << "<- " << i << " ->, ";
+    }
+    fout << "label" << endl;
+    for (int i = 0; i < samples.rows; ++i)
+    {
+      for (int j = 0; j < samples.cols; ++j)
       {
-        fout << trainingData.at<float>(i, j) << ", ";
+        fout << samples.at<float>(i, j) << ", ";
       }
-      if (labels.at<int>(i) == THE_SAME)
-      {
-        fout << "theSame" << endl;
-      }
-      else
-      {
-        fout << "different" << endl;
-      }
+
+      fout << "[" << responses.at<int>(i) << "]" << endl;
     }
     fout.close();
   }
-*/
 
   {
     string svmFilename = name + "_svm.csv";
@@ -318,6 +315,7 @@ void GlassClassifier::train()
   Mat fullScalingSlope(1, trainingData.getDimensionality(), CV_32FC1);
   fullScalingSlope = 1.0;
   Mat fullScalingIntercept = Mat::zeros(1, trainingData.getDimensionality(), CV_32FC1);
+//  normalizeTrainingData(trainingData.samples, fullScalingSlope, fullScalingIntercept);
   scalingSlope = fullScalingSlope;
   scalingIntercept = fullScalingIntercept;
 
@@ -328,13 +326,14 @@ void GlassClassifier::train()
   CvSVMParams svmParams;
   //TODO: move up
   svmParams.svm_type = CvSVM::C_SVC;
-  svmParams.C = 2;
+  svmParams.C = 128.0;
 //  svmParams.svm_type = CvSVM::NU_SVC;
 
-  svmParams.nu = 0.1;
+//  svmParams.nu = 0.1;
 //  svmParams.nu = 0.01;
-  svmParams.gamma = 8;
+  svmParams.gamma = 8.0;
   svmParams.kernel_type = CvSVM::RBF;
+  svmParams.term_crit = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 100000, 0.1);
 
 //  cout << dcaTrainingData << endl;
 //  saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
@@ -353,6 +352,7 @@ void GlassClassifier::train()
 //  bool isTrained = svm.train(dcaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
 //  bool isTrained = svm.train(ecaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
   bool isTrained = svm.train(trainingData.samples, trainingData.responses, Mat(), Mat(), svmParams);
+//  bool isTrained = svm.train_auto(trainingData.samples, trainingData.responses, Mat(), Mat(), svmParams);
 //  bool isTrained = svm.train_auto(ecaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
 //  bool isTrained = svm.train_auto(dcaTrainingData, trainingLabels, Mat(), Mat(), svmParams);
   cout << "done: " << isTrained << endl;
@@ -362,9 +362,13 @@ void GlassClassifier::train()
   cout << "gamma: " << optimalParams.gamma << endl;
 
 
-  getNormalizationParameters(&svm, trainingData.samples, trainingData.responses, normalizationSlope, normalizationIntercept);
+  computeNormalizationParameters(trainingData);
+
 //  getNormalizationParameters(&svm, ecaTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
 //  getNormalizationParameters(&svm, dcaTrainingData, trainingLabelsVec, normalizationSlope, normalizationIntercept);
+
+  cout << "normalization slope: " << normalizationSlope << endl;
+  cout << "normalization intercept: " << normalizationIntercept << endl;
 }
 
 //TODO: is it possible to use the index to access a vertex directly?
@@ -694,40 +698,40 @@ void GlassClassifier::computeBoundaryPresences(const std::vector<Region> &region
   }
 }
 
+void GlassClassifier::predict(const MLData &data, cv::Mat &confidences) const
+{
+  confidences.create(data.getSamplesCount(), 1, CV_32FC1);
+  for (int i = 0; i < data.getSamplesCount(); ++i)
+  {
+    Mat sample = data.samples.row(i);
+    confidences.at<float>(i) = normalizationSlope * svm.predict(sample, true) + normalizationIntercept;
+  }
+}
+
 void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies) const
 {
-  Mat samples;
-  segmentedImage2samples(testImage, samples);
-  vector<Region> regions = testImage.getRegions();
+  Mat pairwiseSamples;
+  segmentedImage2pairwiseSamples(testImage, pairwiseSamples, scalingSlope, scalingIntercept);
+  Mat pairwiseResponses;
+  segmentedImage2pairwiseResponses(testImage, groundTruthMask, pairwiseResponses);
 
-  discrepancies.create(regions.size(), regions.size(), CV_32FC1);
-  for (size_t i = 0; i < regions.size(); ++i)
-  {
-    vector<float> labels(regions.size());
-    for (size_t j = 0; j < regions.size(); ++j)
-    {
-      if (j == i)
-      {
-        labels[j] = 0.0f;
-        continue;
-      }
-      Mat fullSample = Mat(samples.at<Vec4f>(i, j)).reshape(1, 1);
-      CV_Assert(fullSample.rows == 1);
-      CV_Assert(fullSample.cols == 4);
-      CV_Assert(fullSample.channels() == 1);
+  MLData testData;
+  testData.samples = pairwiseSamples.reshape(1, pairwiseSamples.total());
+  testData.responses = pairwiseResponses.reshape(1, pairwiseResponses.total());
+  testData.save("testData");
 
-//      ecaSample = ecaSample.mul(scalingSlope) + scalingIntercept;
-//      dcaSample = dcaSample.mul(scalingSlope) + scalingIntercept;
-//      labels[j] = normalizationSlope * svm->predict(dcaSample, true) + normalizationIntercept;
-//      labels[j] = normalizationSlope * svm->predict(ecaSample, true) + normalizationIntercept;
+  Mat testConfidences;
+  predict(testData, testConfidences);
+  discrepancies = testConfidences.reshape(1, pairwiseResponses.rows);
+  Mat diag = discrepancies.diag();
+  diag.setTo(0.0);
 
-//      Mat fullSample = mlData.samples.row(sampleIndex).mul(scalingSlope) + scalingIntercept;
-      fullSample = fullSample.mul(scalingSlope) + scalingIntercept;
-      labels[j] = normalizationSlope * svm.predict(fullSample, true) + normalizationIntercept;
-    }
-    Mat row = discrepancies.row(i);
-    Mat(labels).reshape(1, 1).copyTo(row);
-  }
+/*
+  MLData currentMLData;
+  segmentedImage2MLData(testImage, groundTruthMask, false, currentMLData);
+  currentMLData.save("trainTestData");
+*/
+
 }
 
 void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const
@@ -808,7 +812,7 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   boundaryStrength = pixelDiscrepancies - affinityWeight * pixelAffinities;
 }
 
-void GlassClassifier::segmentedImage2samples(const SegmentedImage &segmentedImage, cv::Mat &samples)
+void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope, const cv::Mat &scalingIntercept)
 {
   vector<Region> regions = segmentedImage.getRegions();
   samples.create(regions.size(), regions.size(), CV_32FC4);
@@ -819,13 +823,18 @@ void GlassClassifier::segmentedImage2samples(const SegmentedImage &segmentedImag
       Mat ecaSample, dcaSample, fullSample;
       regions2samples(regions[i], regions[j], ecaSample, dcaSample, fullSample);
       CV_Assert(fullSample.cols == 4);
+      if (!scalingSlope.empty() && !scalingIntercept.empty())
+      {
+        fullSample = fullSample.mul(scalingSlope) + scalingIntercept;
+      }
       samples.at<Vec4f>(i, j) = fullSample;
     }
   }
 }
 
-void GlassClassifier::segmentedImage2responses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses)
+void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses)
 {
+  CV_Assert(!groundTruthMask.empty());
   //TODO: move up
   const float confidentLabelArea = 0.9f;
 //  float confidentLabelArea = 0.6f;
@@ -862,7 +871,7 @@ void GlassClassifier::segmentedImage2responses(const SegmentedImage &segmentedIm
     for (size_t j = 0; j < regions.size(); ++j)
     {
       int currentLabel;
-      if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j)
+      if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j)// || countNonZero(dilatedMask & regions[j].getMask()) == 0)
       {
         currentLabel = INVALID;
       }
@@ -877,10 +886,6 @@ void GlassClassifier::segmentedImage2responses(const SegmentedImage &segmentedIm
           currentLabel = THE_SAME;
         }
       }
-//        if (countNonZero(dilatedMask & regions[j].getMask()) == 0)
-//        {
-//          continue;
-//        }
 
       responses.at<int>(i, j) = currentLabel;
     }
@@ -895,9 +900,9 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
   Mat fullTrainingData;
   vector<int> trainingLabelsVec;
   Mat samples;
-  segmentedImage2samples(segmentedImage, samples);
+  segmentedImage2pairwiseSamples(segmentedImage, samples);
   Mat responses;
-  segmentedImage2responses(segmentedImage, groundTruthMask, responses);
+  segmentedImage2pairwiseResponses(segmentedImage, groundTruthMask, responses);
 
   vector<Region> regions = segmentedImage.getRegions();
   for (size_t i = 0; i < regions.size(); ++i)
@@ -958,6 +963,8 @@ void GlassClassifier::test(const SegmentedImage &testImage, const cv::Mat &groun
   strengthVisualization -= normalizationIntercept;
   strengthVisualization.setTo(0, strengthVisualization < 0);
   imshow("boundary", strengthVisualization);
+
+  imshow("boundary binary", strengthVisualization > 0);
 //  imshow("boundary", boundaryStrength);
   waitKey();
 }

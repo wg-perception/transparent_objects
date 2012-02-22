@@ -53,6 +53,11 @@ struct MLData
   int getDimensionality() const;
   int getSamplesCount() const;
   void save(const std::string name) const;
+
+  void evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &confusionMatrix) const;
+
+private:
+  int computeClassesCount() const;
 };
 
 class GlassClassifier
@@ -62,8 +67,11 @@ class GlassClassifier
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
   private:
     static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool withAllSymmetricSamples, MLData &mlData);
-    static void segmentedImage2samples(const SegmentedImage &segmentedImage, cv::Mat &samples);
-    static void segmentedImage2responses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses);
+    static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());
+    static void segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses);
+    void predict(const MLData &data, cv::Mat &confidences) const;
+
+    void computeNormalizationParameters(const MLData &trainingData);
 
     //TODO: block junctions
     //TODO: extend to the cases when regions are not connected to each other

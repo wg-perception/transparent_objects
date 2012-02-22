@@ -110,9 +110,15 @@ int main(int argc, char *argv[])
 
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/tea_table2.jpg");
-  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/table_misc3.jpg");
+//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/table_misc3.jpg");
 
-  Mat testGlassMask = imread("/media/2Tb/transparentBases/rgbGlassData/Test/Mask/table_misc3.pgm");
+
+//  Mat testGlassMask = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/mask_image_00050_croped.png", CV_LOAD_IMAGE_GRAYSCALE);
+//  Mat testImage = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/image_00050_croped.png");
+
+  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_17.png", CV_LOAD_IMAGE_GRAYSCALE);
+  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_17.png");
+
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");

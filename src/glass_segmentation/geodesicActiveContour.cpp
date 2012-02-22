@@ -114,7 +114,7 @@ void GACIterationUpdate::Execute(const itk::Object *object, const itk::EventObje
   }
 
   const GeodesicActiveContourFilterType *geodesicActiveContour = dynamic_cast<const GeodesicActiveContourFilterType*>(object);
-  if (geodesicActiveContour->GetElapsedIterations() % iterationStep == 0)
+  if (geodesicActiveContour->GetElapsedIterations() == 1 || geodesicActiveContour->GetElapsedIterations() % iterationStep == 0)
   {
     std::cout << geodesicActiveContour->GetElapsedIterations()<< "   " << std::flush;
     typedef itk::BinaryThresholdImageFilter<InternalImageType, OutputImageType> ThresholdingFilterType;
@@ -127,8 +127,15 @@ void GACIterationUpdate::Execute(const itk::Object *object, const itk::EventObje
     thresholder->Update();
 
     cv::Mat currentSegmentation = BridgeType::ITKImageToCVMat<OutputImageType>(thresholder->GetOutput());
-    Mat currentCurve = drawSegmentation(bgrImage, currentSegmentation);
+    Mat currentCurve = drawSegmentation(bgrImage, currentSegmentation, Scalar(255, 0, 0), 2);
     imshow("current curve", currentCurve);
+/*
+    std::stringstream filename;
+    static int i = 10;
+    filename << i << ".png";
+    imwrite(filename.str(), currentCurve);
+    i += 10;
+*/
     waitKey(5);
   }
 }

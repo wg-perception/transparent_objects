@@ -12,8 +12,9 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
   image = _image;
   textonLabels = _textonLabels;
   mask = _mask;
-  erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
-//  erodedMask = mask.clone();
+//  erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
+  erodedMask = mask.clone();
+  CV_Assert(countNonZero(erodedMask) != 0);
 
   computeColorHistogram();
   computeTextonHistogram();

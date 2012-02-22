@@ -68,7 +68,7 @@ void hcat(const cv::Mat &A, const cv::Mat &B, cv::Mat &result);
 
 void readFiducial(const std::string &filename, cv::Mat &blackBlobsObject, cv::Mat &whiteBlobsObject, cv::Mat &allBlobsObject);
 
-cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness = 1);
+cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const cv::Scalar &color = cv::Scalar(0, 255, 0), int thickness = 1);
 
 cv::Mat drawEdgels(const cv::Mat &image, const std::vector<cv::Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color = cv::Scalar(0, 0, 255));
 std::vector<cv::Mat> drawEdgels(const std::vector<cv::Mat> &images, const std::vector<cv::Point3f> &edgels3d,
