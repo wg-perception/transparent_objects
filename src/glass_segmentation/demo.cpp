@@ -32,6 +32,7 @@ void visualizeClassification(const vector<Region> &regions, const vector<float> 
   }
 }
 
+#if 0
 void onMouse(int event, int x, int y, int, void *rawData)
 {
   //TODO: move up
@@ -88,6 +89,7 @@ void onMouse(int event, int x, int y, int, void *rawData)
   imshow("affinities", affinityImage);
   */
 }
+#endif
 
 void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
 {
@@ -117,19 +119,16 @@ int main(int argc, char *argv[])
 //  Mat testImage = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/image_00050_croped.png");
 
   Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_17.png", CV_LOAD_IMAGE_GRAYSCALE);
-  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_17.png");
+//  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_17.png");
 
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/wineB1f.jpg");
-  CV_Assert(!testImage.empty());
 
-  SegmentedImage segmentedImage(testImage);
+  SegmentedImage segmentedImage;
+  segmentedImage.read("segmentedImage.xml");
   segmentedImage.showSegmentation("test segmentation");
-  vector<Region> regions = segmentedImage.getRegions();
-
-
 
   Mat boundaryStrength;
   classifier.test(segmentedImage, testGlassMask, boundaryStrength);
@@ -139,9 +138,9 @@ int main(int argc, char *argv[])
 //  Mat contour;
 //  createContour(testImage.size(), contour);
 //  geodesicActiveContour(contour, finalSegmentation);
-  geodesicActiveContour(testImage, boundaryStrength, finalSegmentation);
+  geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation);
   imshow("finalSegmentation", finalSegmentation);
-  Mat gac = drawSegmentation(testImage, finalSegmentation, 2);
+  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
   imwrite("final.png", gac);
   waitKey();
 

@@ -8,6 +8,10 @@ using std::endl;
 
 std::vector<cv::Mat> SegmentedImage::filterBank;
 
+SegmentedImage::SegmentedImage()
+{
+}
+
 SegmentedImage::SegmentedImage(const cv::Mat &_image)
 {
   image = _image;
@@ -156,15 +160,15 @@ void SegmentedImage::showSegmentation(const std::string &title) const
   }
 
   imshow(title, visualization);
-  waitKey();
+  waitKey(500);
 }
 
 void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
 {
   //TODO: move up
   const int textonCount = 36;
-  const int iterationCount = 10;
-  const int attempts = 3;
+  const int iterationCount = 30;
+  const int attempts = 20;
 
 //  const int iterationCount = 20;
 //  const int attempts = 1;
@@ -178,6 +182,7 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
   Mat responsesMLDataFloat;
   responsesMLData.convertTo(responsesMLDataFloat, CV_32FC1);
   kmeans(responsesMLDataFloat, textonCount, textonLabels, termCriteria, attempts, KMEANS_PP_CENTERS);
+//  kmeans(responsesMLDataFloat, textonCount, textonLabels, termCriteria, attempts, KMEANS_RANDOM_CENTERS);
   textonLabels = textonLabels.reshape(1, image.rows);
   CV_Assert(textonLabels.size() == image.size());
   CV_Assert(textonLabels.type() == CV_32SC1);
@@ -238,3 +243,39 @@ void loadFilterBank(const std::string &filename, std::vector<cv::Mat> &filterBan
   }
 }
 
+void SegmentedImage::write(const std::string &filename) const
+{
+  FileStorage fs(filename, FileStorage::WRITE);
+  CV_Assert(fs.isOpened());
+  fs << "rgbImage" << image;
+  fs << "segmentation" << segmentation;
+  fs << "regions" << "[";
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    fs << "{";
+    regions[i].write(fs);
+    fs << "}";
+  }
+  fs << "]";
+  fs.release();
+}
+
+void SegmentedImage::read(const std::string &filename)
+{
+  FileStorage fs(filename, FileStorage::READ);
+  CV_Assert(fs.isOpened());
+  fs["rgbImage"] >> image;
+  fs["segmentation"] >> segmentation;
+  regions.clear();
+  FileNode regionsFN = fs["regions"];
+  FileNodeIterator it = regionsFN.begin(), it_end = regionsFN.end();
+  int regionIndex = 0;
+  for ( ; it != it_end; ++it)
+  {
+    Region currentRegion;
+    currentRegion.read(image, segmentation == regionIndex, *it);
+    regions.push_back(currentRegion);
+    ++regionIndex;
+  }
+  fs.release();
+}

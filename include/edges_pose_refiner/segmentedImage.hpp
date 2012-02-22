@@ -7,11 +7,14 @@
 class SegmentedImage
 {
   public:
+    SegmentedImage();
     SegmentedImage(const cv::Mat &image);
     const std::vector<Region>& getRegions() const;
     const cv::Mat& getSegmentation() const;
     const cv::Mat& getOriginalImage() const;
     void showSegmentation(const std::string &title) const;
+    void write(const std::string &filename) const;
+    void read(const std::string &filename);
   private:
     static void oversegmentImage(const cv::Mat &image, cv::Mat &segmentation);
     static void mergeThinRegions(cv::Mat &segmentation, std::vector<int> &labels);

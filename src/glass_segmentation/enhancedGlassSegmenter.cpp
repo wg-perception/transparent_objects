@@ -82,7 +82,7 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
 }
 
 
-void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample)
+void GlassClassifier::regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample)
 {
   float colorDistance;
   computeColorSimilarity(region_1, region_2, colorDistance);
@@ -94,7 +94,8 @@ void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ec
   const int dim = 3;
   ecaSample = (Mat_<float>(1, dim) << intercept, colorDistance, slope);
   dcaSample = (Mat_<float>(1, dim) << textureDistance, colorDistance, slope);
-  fullSample = (Mat_<float>(1, 4) << intercept, colorDistance, slope, textureDistance);
+  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance);
+//  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance);
 }
 
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept)
@@ -160,6 +161,7 @@ void GlassClassifier::computeNormalizationParameters(const MLData &trainingData)
   float trainingError;
   Mat confusionMatrix;
   trainingData.evaluate(predictedLabels, trainingError, confusionMatrix);
+  cout << "samples: " << trainingData.getSamplesCount() << endl;
   cout << "training error: " << trainingError << endl;
   cout << "confusion matrix: " << endl << confusionMatrix << endl;
 
@@ -219,7 +221,7 @@ void MLData::evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &con
   error = 1.0 - accuracy;
 }
 
-void MLData::save(const std::string name) const
+void MLData::write(const std::string name) const
 {
   CV_Assert(isValid());
 
@@ -280,18 +282,16 @@ void GlassClassifier::train()
   MLData trainingData;
   for (size_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
   {
-    Mat trainingImage = imread(trainingFiles[imageIndex]);
-    CV_Assert(!trainingImage.empty());
-
     Mat groundTruthMask = imread(trainingGroundTruhFiles[imageIndex], CV_LOAD_IMAGE_GRAYSCALE);
     CV_Assert(!groundTruthMask.empty());
-    CV_Assert(trainingImage.size() == groundTruthMask.size());
 
-    SegmentedImage segmentedImage(trainingImage);
+    SegmentedImage segmentedImage;
+    segmentedImage.read(trainingFiles[imageIndex]);
     segmentedImage.showSegmentation("train segmentation");
 
     MLData currentMLData;
     segmentedImage2MLData(segmentedImage, groundTruthMask, false, currentMLData);
+
     CV_Assert(currentMLData.isValid());
     trainingData.push_back(currentMLData);
   }
@@ -338,7 +338,7 @@ void GlassClassifier::train()
 //  cout << dcaTrainingData << endl;
 //  saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
 //  saveMLData("dcaData.csv", dcaTrainingData, trainingLabels);
-  trainingData.save("fullTrainingData");
+  trainingData.write("fullTrainingData");
 
 //  cout << ecaTrainingData << endl;
 //  cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
@@ -718,7 +718,7 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   MLData testData;
   testData.samples = pairwiseSamples.reshape(1, pairwiseSamples.total());
   testData.responses = pairwiseResponses.reshape(1, pairwiseResponses.total());
-  testData.save("testData");
+  testData.write("testData");
 
   Mat testConfidences;
   predict(testData, testConfidences);
@@ -726,12 +726,32 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   Mat diag = discrepancies.diag();
   diag.setTo(0.0);
 
-/*
-  MLData currentMLData;
-  segmentedImage2MLData(testImage, groundTruthMask, false, currentMLData);
-  currentMLData.save("trainTestData");
-*/
+  Mat predictedLabels = testConfidences > normalizationIntercept;
+  predictedLabels.setTo(GLASS_COVERED, predictedLabels == 255);
+  float error;
+  Mat confusionMatrix;
+  testData.evaluate(predictedLabels, error, confusionMatrix);
+  cout << "samples: " << testData.getSamplesCount() << endl;
+  cout << "test error: " << error << endl;
+  cout << "confusion matrix: " << confusionMatrix << endl;
 
+
+  {
+    MLData testDataInTrainFormat;
+    segmentedImage2MLData(testImage, groundTruthMask, false, testDataInTrainFormat);
+
+    testDataInTrainFormat.write("testDataInTrainFormat");
+    Mat confidences;
+    predict(testDataInTrainFormat, confidences);
+    Mat predictedLabels = confidences > normalizationIntercept;
+    predictedLabels.setTo(GLASS_COVERED, predictedLabels == 255);
+    float error;
+    Mat confusionMatrix;
+    testDataInTrainFormat.evaluate(predictedLabels, error, confusionMatrix);
+    cout << "samples: " << testDataInTrainFormat.getSamplesCount() << endl;
+    cout << "test error: " << error << endl;
+    cout << "confusion matrix: " << confusionMatrix << endl;
+  }
 }
 
 void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const
@@ -815,19 +835,19 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope, const cv::Mat &scalingIntercept)
 {
   vector<Region> regions = segmentedImage.getRegions();
-  samples.create(regions.size(), regions.size(), CV_32FC4);
+  samples.create(regions.size(), regions.size(), Sample::type);
+  Mat mlSamples;
   for (int i = 0; i < regions.size(); ++i)
   {
     for (int j = 0; j < regions.size(); ++j)
     {
       Mat ecaSample, dcaSample, fullSample;
       regions2samples(regions[i], regions[j], ecaSample, dcaSample, fullSample);
-      CV_Assert(fullSample.cols == 4);
       if (!scalingSlope.empty() && !scalingIntercept.empty())
       {
         fullSample = fullSample.mul(scalingSlope) + scalingIntercept;
       }
-      samples.at<Vec4f>(i, j) = fullSample;
+      samples.at<Sample>(i, j) = fullSample;
     }
   }
 }
@@ -836,11 +856,13 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
 {
   CV_Assert(!groundTruthMask.empty());
   //TODO: move up
-  const float confidentLabelArea = 0.9f;
+  const float confidentLabelArea = 0.7f;
 //  float confidentLabelArea = 0.6f;
 
   vector<Region> regions = segmentedImage.getRegions();
   vector<RegionLabel> regionLabels(regions.size());
+  int invalidRegionsCount = 0;
+  Mat invalidRegionsImage(groundTruthMask.size(), CV_8UC1, Scalar(0));
   for (size_t i = 0; i < regions.size(); ++i)
   {
     int regionArea = countNonZero(regions[i].getMask() != 0);
@@ -859,9 +881,14 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
       else
       {
         regionLabels[i] = NOT_VALID;
+        ++invalidRegionsCount;
+        invalidRegionsImage.setTo(255, regions[i].getMask());
       }
     }
   }
+  cout << "invalid regions: " << invalidRegionsCount << endl;
+  imshow("invalid regions", invalidRegionsImage);
+  waitKey(100);
 
   responses.create(regions.size(), regions.size(), CV_32SC1);
   for (size_t i = 0; i < regions.size(); ++i)
@@ -918,11 +945,11 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
       }
       CV_Assert(responses.at<int>(j, i) != INVALID);
 
-      Mat currentSample = Mat(samples.at<Vec4f>(i, j)).reshape(1, 1);
+      Mat currentSample = Mat(samples.at<Sample>(i, j)).reshape(1, 1);
       CV_Assert(currentSample.rows == 1);
-      CV_Assert(currentSample.cols == 4);
+      CV_Assert(currentSample.cols == Sample::channels);
       CV_Assert(currentSample.channels() == 1);
-      Mat symmetricSample = Mat(samples.at<Vec4f>(j, i)).reshape(1, 1);
+      Mat symmetricSample = Mat(samples.at<Sample>(j, i)).reshape(1, 1);
       fullTrainingData.push_back(currentSample);
       trainingLabelsVec.push_back(currentResponse);
 

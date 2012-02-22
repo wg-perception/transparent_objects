@@ -52,7 +52,7 @@ struct MLData
   void push_back(const MLData &mlData);
   int getDimensionality() const;
   int getSamplesCount() const;
-  void save(const std::string name) const;
+  void write(const std::string name) const;
 
   void evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &confusionMatrix) const;
 
@@ -66,6 +66,8 @@ class GlassClassifier
     void train();
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
   private:
+    typedef cv::Vec4f Sample;
+
     static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool withAllSymmetricSamples, MLData &mlData);
     static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());
     static void segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses);
@@ -82,13 +84,14 @@ class GlassClassifier
     void computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const;
 
 
+    static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
+
     CvSVM svm;
     cv::Mat scalingSlope, scalingIntercept;
     float normalizationSlope, normalizationIntercept;
 };
 
 enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1, INVALID = 2};
-void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept);
 void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, const std::vector<int> &trainingLabelsVec, float &normalizationSlope, float &normalizationIntercept);
 

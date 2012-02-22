@@ -174,7 +174,8 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
 //  const float alpha = -1.0f;
  const float alpha = -0.2f;
 //  const float beta = 3.0f;
-  const float beta = 0.01f;
+//  const float beta = 0.01f;
+  const float beta = 0.38f;
 
   const float propagationScaling = -0.3f;
   const float curvatureScaling = 1.0f;

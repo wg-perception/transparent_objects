@@ -4,6 +4,10 @@
 
 using namespace cv;
 
+Region::Region()
+{
+}
+
 Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Mat &_mask)
 {
   //TODO: move up
@@ -29,7 +33,7 @@ cv::Point2f Region::getCenter() const
 
 const cv::Mat& Region::getColorHistogram() const
 {
-  return hist;
+  return colorHistogram;
 }
 
 const cv::Mat& Region::getTextonHistogram() const
@@ -82,8 +86,8 @@ void Region::computeColorHistogram()
   float sranges[] = {0, 256};
   const float* ranges[] = {hranges, sranges};
   int channels[] = {0, 1};
-  calcHist(&hsv, 1, channels, erodedMask, hist, 2, histSize, ranges, true, false);
-  hist /= countNonZero(erodedMask);
+  calcHist(&hsv, 1, channels, erodedMask, colorHistogram, 2, histSize, ranges, true, false);
+  colorHistogram /= countNonZero(erodedMask);
 }
 
 void Region::computeTextonHistogram()
@@ -163,4 +167,25 @@ void Region::clusterIntensities()
 
   intensityClusterCenters = cv::Mat(clusterCenters).clone();
   CV_Assert(intensityClusterCenters.cols == 1);
+}
+
+void Region::write(cv::FileStorage &fs) const
+{
+  fs << "colorHistogram" << colorHistogram;
+  fs << "textonHistogram" << textonHistogram;
+  fs << "intensityClusters" << intensityClusterCenters;
+  fs << "center" << Mat(center);
+}
+
+void Region::read(const Mat &_image, const Mat &_mask, const FileNode &fn)
+{
+  image = _image;
+  mask = _mask;
+
+  fn["colorHistogram"] >> colorHistogram;
+  fn["textonHistogram"] >> textonHistogram;
+  fn["intensityClusters"] >> intensityClusterCenters;
+  Mat centerMat;
+  fn["center"] >> centerMat;
+  center = Point2f(centerMat);
 }
