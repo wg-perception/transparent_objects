@@ -20,7 +20,7 @@ using ecto::tendrils;
 using ecto::spore;
 using object_recognition_core::db::ObjectId;
 using object_recognition_core::common::PoseResult;
-using object_recognition_core::db::ObjectDbParameters;
+using object_recognition_core::db::ObjectDb;
 
 namespace transparent_objects
 {
@@ -48,7 +48,7 @@ namespace transparent_objects
       std::cout << "detector: declare_params" << std::endl;
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
       params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
-      params.declare(&TransparentObjectsDetector::db_params_, "db_params", "The DB parameters").required(true);
+      params.declare(&TransparentObjectsDetector::object_db_, "object_db", "The DB parameters").required(true);
 //      params.declare(&LinemodDetector::threshold_, "threshold", "Matching threshold, as a percentage", 90.0f);
     }
 
@@ -139,7 +139,7 @@ namespace transparent_objects
         PoseResult pose_result;
         pose_result.set_R(poses[bestDetectionIndex].getRotationMatrix());
         pose_result.set_T(poses[bestDetectionIndex].getTvec());
-        pose_result.set_object_id(*db_params_, detectedObjects[bestDetectionIndex]);
+        pose_result.set_object_id(object_db_->parameters(), detectedObjects[bestDetectionIndex]);
         pose_results_->push_back(pose_result);
       }
 
@@ -168,7 +168,7 @@ namespace transparent_objects
     /** The object recognition results */
     ecto::spore<std::vector<PoseResult> > pose_results_;
     /** The DB parameters */
-    ecto::spore<ObjectDbParameters> db_params_;
+    ecto::spore<ObjectDb> object_db_;
 
     cv::Ptr<TransparentDetector> detector_;
   };

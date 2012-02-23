@@ -3,8 +3,8 @@
 Module defining the transparent objects trainer
 """
 
-from ecto_object_recognition_core.object_recognition_core_db import DbModels, Document, DbDocuments
 from object_recognition_core.db.dbtools import db_params_to_db
+from object_recognition_core.db.interface import DbModels, Document, DbDocuments
 from object_recognition_core.db.models import Model, find_model_for_object
 from object_recognition_core.pipelines.training import TrainingPipeline
 from object_recognition_core.utils import dict_to_cpp_json_str
@@ -40,7 +40,7 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
 
     @classmethod
     def processor(cls, *args, **kwargs):
-        db_params = kwargs['db_params']
+        object_db = kwargs['object_db']
         object_id = kwargs.get('object_id', None)
         submethod = kwargs['submethod']
     
@@ -52,9 +52,9 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
             imageWidth = kwargs['pipeline_params']['imageWidth']
             imageHeight = kwargs['pipeline_params']['imageHeight']
 
-            document_ids =  find_model_for_object(db_params_to_db(db_params), object_id, model_type='mesh')
+            document_ids =  find_model_for_object(db_params_to_db(object_db.parameters()), object_id, model_type='mesh')
             print document_ids
-            db_models = DbDocuments(db_params, document_ids)
+            db_models = DbDocuments(object_db, document_ids)
             print 'Found %d meshes:'%len(db_models)
         else:
             #TODO these should be loaded from the database?
