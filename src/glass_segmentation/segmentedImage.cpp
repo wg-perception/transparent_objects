@@ -12,7 +12,7 @@ SegmentedImage::SegmentedImage()
 {
 }
 
-SegmentedImage::SegmentedImage(const cv::Mat &_image)
+SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segmentationFilename)
 {
   image = _image;
   //TODO: move up
@@ -22,7 +22,7 @@ SegmentedImage::SegmentedImage(const cv::Mat &_image)
   {
     loadFilterBank(filterBankFilename, filterBank);
   }
-  oversegmentImage(image, segmentation);
+  oversegmentImage(image, segmentationFilename, segmentation);
   cout << "image is oversegmented" << endl;
   segmentation2regions(image, segmentation, filterBank, regions);
   regionAdjacencyMat.create(regions.size(), regions.size(), CV_8UC1);
@@ -53,7 +53,7 @@ const cv::Mat& SegmentedImage::getOriginalImage() const
   return image;
 }
 
-void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentation)
+void SegmentedImage::oversegmentImage(const cv::Mat &image, const std::string &segmentationFilename, cv::Mat &segmentation)
 {
 /*
   //TODO: move up
@@ -77,9 +77,8 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, cv::Mat &segmentatio
   sleep(2);
 */
 
-  const string outputTxtFilename = "seg.txt";
   segmentation.create(image.size(), CV_32SC1);
-  std::ifstream segmentationTxt(outputTxtFilename.c_str());
+  std::ifstream segmentationTxt(segmentationFilename.c_str());
   CV_Assert(segmentationTxt.is_open());
   for (int i = 0; i < image.rows; ++i)
   {
@@ -231,6 +230,7 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
 
 bool SegmentedImage::areRegionsAdjacent(int i, int j) const
 {
+  CV_Assert(!regionAdjacencyMat.empty());
   return regionAdjacencyMat.at<uchar>(i, j);
 }
 

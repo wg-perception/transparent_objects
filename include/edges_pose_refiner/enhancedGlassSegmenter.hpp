@@ -69,7 +69,7 @@ class GlassClassifier
   private:
     typedef cv::Vec4f Sample;
 
-    static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool withAllSymmetricSamples, MLData &mlData);
+    static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, MLData &mlData);
     static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());
     static void segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, cv::Mat &responses);
     void predict(const MLData &data, cv::Mat &confidences) const;

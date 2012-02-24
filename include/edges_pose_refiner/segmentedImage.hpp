@@ -8,7 +8,7 @@ class SegmentedImage
 {
   public:
     SegmentedImage();
-    SegmentedImage(const cv::Mat &image);
+    SegmentedImage(const cv::Mat &image, const std::string &segmentationFilename = "seg.txt");
     const std::vector<Region>& getRegions() const;
     const cv::Mat& getSegmentation() const;
     const cv::Mat& getOriginalImage() const;
@@ -18,7 +18,7 @@ class SegmentedImage
     void read(const std::string &filename);
   private:
     static void computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels);
-    static void oversegmentImage(const cv::Mat &image, cv::Mat &segmentation);
+    static void oversegmentImage(const cv::Mat &image, const std::string &segmentationFilename, cv::Mat &segmentation);
     static void mergeThinRegions(cv::Mat &segmentation, std::vector<int> &labels);
     static void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions);
 

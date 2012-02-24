@@ -171,7 +171,10 @@ void GlassClassifier::computeNormalizationParameters(const MLData &trainingData)
     predict(trainingData, trainingConfidences);
     Mat trainingPredictions = (trainingConfidences >= normalizationIntercept);
     trainingPredictions.setTo(GLASS_COVERED, trainingPredictions == 255);
-    CV_Assert(countNonZero(trainingPredictions != predictedLabels) == 0);
+    int missclassifiedSamples = countNonZero(trainingPredictions != predictedLabels);
+    //TODO: move up
+    const int maxMissclassifiedSamplesCount = 3;
+    CV_Assert(missclassifiedSamples < maxMissclassifiedSamplesCount);
   }
 }
 
@@ -284,6 +287,11 @@ void GlassClassifier::train()
   MLData trainingData;
   for (size_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
   {
+    if (trainingFiles[imageIndex][0] == '#' || trainingGroundTruhFiles[imageIndex][0] == '#')
+    {
+      continue;
+    }
+
     Mat groundTruthMask = imread(trainingGroundTruhFiles[imageIndex], CV_LOAD_IMAGE_GRAYSCALE);
     CV_Assert(!groundTruthMask.empty());
 
@@ -292,7 +300,9 @@ void GlassClassifier::train()
     segmentedImage.showSegmentation("train segmentation");
 
     MLData currentMLData;
-    segmentedImage2MLData(segmentedImage, groundTruthMask, false, currentMLData);
+    //TODO: move up parameter
+    bool useOnlyAdjacentRegions = countNonZero(groundTruthMask == 255) == 0;
+    segmentedImage2MLData(segmentedImage, groundTruthMask, useOnlyAdjacentRegions, currentMLData);
 
     CV_Assert(currentMLData.isValid());
     trainingData.push_back(currentMLData);
@@ -317,7 +327,7 @@ void GlassClassifier::train()
   Mat fullScalingSlope(1, trainingData.getDimensionality(), CV_32FC1);
   fullScalingSlope = 1.0;
   Mat fullScalingIntercept = Mat::zeros(1, trainingData.getDimensionality(), CV_32FC1);
-//  normalizeTrainingData(trainingData.samples, fullScalingSlope, fullScalingIntercept);
+  normalizeTrainingData(trainingData.samples, fullScalingSlope, fullScalingIntercept);
   scalingSlope = fullScalingSlope;
   scalingIntercept = fullScalingIntercept;
 
@@ -328,12 +338,15 @@ void GlassClassifier::train()
   CvSVMParams svmParams;
   //TODO: move up
   svmParams.svm_type = CvSVM::C_SVC;
-  svmParams.C = 128.0;
+//  svmParams.C = 128.0;
+
+  svmParams.C = 32.0;
 //  svmParams.svm_type = CvSVM::NU_SVC;
 
 //  svmParams.nu = 0.1;
 //  svmParams.nu = 0.01;
-  svmParams.gamma = 8.0;
+//  svmParams.gamma = 8.0;
+  svmParams.gamma = 0.5;
   svmParams.kernel_type = CvSVM::RBF;
   svmParams.term_crit = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 100000, 0.1);
 
@@ -346,8 +359,9 @@ void GlassClassifier::train()
 //  cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
 //  cout << "dcaTrainingData size: " << dcaTrainingData.rows << " x " << dcaTrainingData.cols << endl;
 //  cout << "fullTrainingData size: " << fullTrainingData.rows << " x " << fullTrainingData.cols << endl;
-  cout << "Glass covered: " << countNonZero(trainingData.responses == GLASS_COVERED) << endl;
   cout << "The same: " << countNonZero(trainingData.responses == THE_SAME) << endl;
+  cout << "Glass covered: " << countNonZero(trainingData.responses == GLASS_COVERED) << endl;
+  cout << "Invalid: " << countNonZero(trainingData.responses == INVALID) << endl;
 
   cout << "training...  " << std::flush;
 
@@ -747,7 +761,7 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   cout << "test error: " << error << endl;
   cout << "confusion matrix: " << confusionMatrix << endl;
 
-
+/*
   {
     MLData testDataInTrainFormat;
     segmentedImage2MLData(testImage, groundTruthMask, false, testDataInTrainFormat);
@@ -764,6 +778,7 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
     cout << "test error: " << error << endl;
     cout << "confusion matrix: " << confusionMatrix << endl;
   }
+*/
 }
 
 void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const
@@ -893,6 +908,16 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   Mat invalidRegionsImage(groundTruthMask.size(), CV_8UC1, Scalar(0));
   for (size_t i = 0; i < regions.size(); ++i)
   {
+    //TODO: move up
+    const uchar invalidArea = 127;
+    if (countNonZero(regions[i].getMask() & (groundTruthMask == invalidArea)) != 0)
+    {
+      regionLabels[i] = NOT_VALID;
+      ++invalidRegionsCount;
+      invalidRegionsImage.setTo(255, regions[i].getMask());
+      continue;
+    }
+
     int regionArea = countNonZero(regions[i].getMask() != 0);
     int glassArea = countNonZero(regions[i].getMask() & groundTruthMask);
     float glassAreaRatio = static_cast<float>(glassArea) / regionArea;
@@ -947,7 +972,7 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   }
 }
 
-void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool withAllSymmetricSamples, MLData &mlData)
+void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, MLData &mlData)
 {
   //TODO: move up
   const float maxSampleDistance = 0.1f;
@@ -957,7 +982,7 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
   Mat samples;
   segmentedImage2pairwiseSamples(segmentedImage, samples);
   Mat responses;
-  segmentedImage2pairwiseResponses(segmentedImage, groundTruthMask, false, responses);
+  segmentedImage2pairwiseResponses(segmentedImage, groundTruthMask, useOnlyAdjacentRegions, responses);
 
   vector<Region> regions = segmentedImage.getRegions();
   for (size_t i = 0; i < regions.size(); ++i)
@@ -969,6 +994,8 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
       {
         continue;
       }
+      CV_Assert(! (useOnlyAdjacentRegions && responses.at<int>(i, j) == GLASS_COVERED));
+
       CV_Assert(responses.at<int>(j, i) != INVALID);
 
       Mat currentSample = Mat(samples.at<Sample>(i, j)).reshape(1, 1);
