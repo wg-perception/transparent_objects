@@ -12,15 +12,18 @@ class SegmentedImage
     const std::vector<Region>& getRegions() const;
     const cv::Mat& getSegmentation() const;
     const cv::Mat& getOriginalImage() const;
+    bool areRegionsAdjacent(int i, int j) const;
     void showSegmentation(const std::string &title) const;
     void write(const std::string &filename) const;
     void read(const std::string &filename);
   private:
+    static void computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels);
     static void oversegmentImage(const cv::Mat &image, cv::Mat &segmentation);
     static void mergeThinRegions(cv::Mat &segmentation, std::vector<int> &labels);
     static void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions);
 
     cv::Mat image, segmentation;
+    cv::Mat regionAdjacencyMat;
     std::vector<Region> regions;
     static std::vector<cv::Mat> filterBank;
 };

@@ -23,7 +23,19 @@ SegmentedImage::SegmentedImage(const cv::Mat &_image)
     loadFilterBank(filterBankFilename, filterBank);
   }
   oversegmentImage(image, segmentation);
+  cout << "image is oversegmented" << endl;
   segmentation2regions(image, segmentation, filterBank, regions);
+  regionAdjacencyMat.create(regions.size(), regions.size(), CV_8UC1);
+#pragma omp parallel for schedule(dynamic, 4)
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    Mat dilatedMask;
+    dilate(regions[i].getMask(), dilatedMask, Mat());
+    for (size_t j = 0; j < regions.size(); ++j)
+    {
+      regionAdjacencyMat.at<uchar>(i, j) = (countNonZero(dilatedMask & regions[j].getMask()) == 0) ? 0 : 255;
+    }
+  }
 }
 
 const std::vector<Region>& SegmentedImage::getRegions() const
@@ -163,7 +175,7 @@ void SegmentedImage::showSegmentation(const std::string &title) const
   waitKey(500);
 }
 
-void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
+void SegmentedImage::computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels)
 {
   //TODO: move up
   const int textonCount = 36;
@@ -175,9 +187,9 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
 
   Mat responses;
   convolveImage(image, filterBank, responses);
+  cout << "image is convolved" << endl;
   Mat responsesMLData = responses.reshape(1, image.total());
   CV_Assert(responsesMLData.cols == filterBank.size());
-  Mat textonLabels;
   TermCriteria termCriteria = cvTermCriteria(TermCriteria::MAX_ITER, iterationCount, 0.0);
   Mat responsesMLDataFloat;
   responsesMLData.convertTo(responsesMLDataFloat, CV_32FC1);
@@ -186,6 +198,13 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
   textonLabels = textonLabels.reshape(1, image.rows);
   CV_Assert(textonLabels.size() == image.size());
   CV_Assert(textonLabels.type() == CV_32SC1);
+  cout << "texton labels are computed" << endl;
+}
+
+void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
+{
+  Mat textonLabels;
+  computeTextonLabels(image, textonLabels);
 
   CV_Assert(segmentation.type() == CV_32SC1);
   vector<int> labels = segmentation.reshape(1, 1).clone();
@@ -208,6 +227,11 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
     regions.push_back(currentRegion);
   }
   segmentation -= firstFreeLabel;
+}
+
+bool SegmentedImage::areRegionsAdjacent(int i, int j) const
+{
+  return regionAdjacencyMat.at<uchar>(i, j);
 }
 
 void convolveImage(const cv::Mat &image, const std::vector<cv::Mat> &filterBank, cv::Mat &responses)
@@ -249,6 +273,7 @@ void SegmentedImage::write(const std::string &filename) const
   CV_Assert(fs.isOpened());
   fs << "rgbImage" << image;
   fs << "segmentation" << segmentation;
+  fs << "regionAdjacencyMat" << regionAdjacencyMat;
   fs << "regions" << "[";
   for (size_t i = 0; i < regions.size(); ++i)
   {
@@ -266,6 +291,7 @@ void SegmentedImage::read(const std::string &filename)
   CV_Assert(fs.isOpened());
   fs["rgbImage"] >> image;
   fs["segmentation"] >> segmentation;
+  fs["regionAdjacencyMat"] >> regionAdjacencyMat;
   regions.clear();
   FileNode regionsFN = fs["regions"];
   FileNodeIterator it = regionsFN.begin(), it_end = regionsFN.end();

@@ -189,7 +189,8 @@ int MLData::getDimensionality() const
 
 int MLData::getSamplesCount() const
 {
-  return samples.rows;
+  int result = mask.empty() ? samples.rows : countNonZero(mask);
+  return result;
 }
 
 void MLData::push_back(const MLData &mlData)
@@ -209,11 +210,12 @@ void MLData::evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &con
 {
   int classesCount = computeClassesCount();
   confusionMatrix.create(classesCount, classesCount, CV_32SC1);
+  Mat currentMask = mask.empty() ? Mat(responses.size(), CV_8UC1, Scalar(255)) : mask;
   for (int i = 0; i < classesCount; ++i)
   {
     for (int j = 0; j < classesCount; ++j)
     {
-      confusionMatrix.at<int>(i, j) = countNonZero((responses == i) & (predictedLabels == j));
+      confusionMatrix.at<int>(i, j) = countNonZero((responses == i) & (predictedLabels == j) & currentMask);
     }
   }
 
@@ -232,7 +234,7 @@ void MLData::write(const std::string name) const
     {
       fout << "<- " << i << " ->, ";
     }
-    fout << "label" << endl;
+    fout << "label\n";
     for (int i = 0; i < samples.rows; ++i)
     {
       for (int j = 0; j < samples.cols; ++j)
@@ -240,7 +242,7 @@ void MLData::write(const std::string name) const
         fout << samples.at<float>(i, j) << ", ";
       }
 
-      fout << "[" << responses.at<int>(i) << "]" << endl;
+      fout << "[" << responses.at<int>(i) << "]\n";
     }
     fout.close();
   }
@@ -255,7 +257,7 @@ void MLData::write(const std::string name) const
       {
         fout << j << ":" << samples.at<float>(i, j) << " ";
       }
-      fout << endl;
+      fout << '\n';
     }
     fout.close();
   }
@@ -700,12 +702,19 @@ void GlassClassifier::computeBoundaryPresences(const std::vector<Region> &region
 
 void GlassClassifier::predict(const MLData &data, cv::Mat &confidences) const
 {
-  confidences.create(data.getSamplesCount(), 1, CV_32FC1);
-  for (int i = 0; i < data.getSamplesCount(); ++i)
+  cout << "predicting... " << std::flush;
+  confidences.create(data.samples.rows, 1, CV_32FC1);
+  CV_Assert(data.mask.empty() || (data.mask.type() == CV_8UC1 && data.mask.rows == data.samples.rows));
+  for (int i = 0; i < data.samples.rows; ++i)
   {
+    if (!data.mask.empty() && data.mask.at<uchar>(i) == 0)
+    {
+      continue;
+    }
     Mat sample = data.samples.row(i);
     confidences.at<float>(i) = normalizationSlope * svm.predict(sample, true) + normalizationIntercept;
   }
+  cout << "done" << std::endl;
 }
 
 void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies) const
@@ -713,15 +722,18 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   Mat pairwiseSamples;
   segmentedImage2pairwiseSamples(testImage, pairwiseSamples, scalingSlope, scalingIntercept);
   Mat pairwiseResponses;
-  segmentedImage2pairwiseResponses(testImage, groundTruthMask, pairwiseResponses);
+  segmentedImage2pairwiseResponses(testImage, groundTruthMask, true, pairwiseResponses);
+  Mat samplesMask = (pairwiseResponses != INVALID);
 
   MLData testData;
   testData.samples = pairwiseSamples.reshape(1, pairwiseSamples.total());
+  testData.mask = samplesMask.reshape(1, samplesMask.total());
   testData.responses = pairwiseResponses.reshape(1, pairwiseResponses.total());
   testData.write("testData");
 
   Mat testConfidences;
   predict(testData, testConfidences);
+  testConfidences.setTo(0.0, ~testData.mask);
   discrepancies = testConfidences.reshape(1, pairwiseResponses.rows);
   Mat diag = discrepancies.diag();
   diag.setTo(0.0);
@@ -761,9 +773,12 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 
 
   CV_Assert(affinityWeight >= 0.0f && affinityWeight <= 1.0f);
+
+  vector<Region> regions = testImage.getRegions();
+
+#ifdef USE_AFFINITY
   //TODO: use lazy evaluations
   Mat affinities = getFromCache("affinities");
-  vector<Region> regions = testImage.getRegions();
   if (affinities.empty())
   {
     computeAllAffinities(regions, graph, affinities);
@@ -777,6 +792,10 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
     saveToCache("boundaryPresences", boundaryPresences);
   }
   affinities.setTo(0, boundaryPresences);
+
+  CV_Assert(affinities.type() == CV_32FC1);
+#endif
+
 #if 1
   Mat discrepancies = getFromCache("discrepancies");
   if (discrepancies.empty())
@@ -787,11 +806,12 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   CV_Assert(discrepancies.type() == CV_32FC1);
 #endif
 
-  CV_Assert(affinities.type() == CV_32FC1);
 
   Mat segmentation = testImage.getSegmentation();
   Mat pixelDiscrepancies(segmentation.size(), CV_32FC1, Scalar(0));
+#ifdef USE_AFFINITY
   Mat pixelAffinities(segmentation.size(), CV_32FC1);
+#endif
   for (int i = 0; i < segmentation.rows; ++i)
   {
     for (int j = 0; j < segmentation.cols; ++j)
@@ -818,18 +838,26 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 #if 1
             maxDiscrepancy = std::max(maxDiscrepancy, discrepancies.at<float>(srcRegionIndex, regionIndex));
 #endif
+#ifdef USE_AFFINITY
             maxAffinity = std::max(maxAffinity, affinities.at<float>(srcRegionIndex, regionIndex));
+#endif
           }
         }
       }
 #if 1
       pixelDiscrepancies.at<float>(srcPt) = maxDiscrepancy;
 #endif
+#ifdef USE_AFFINITY
       pixelAffinities.at<float>(srcPt) = maxAffinity;
+#endif
     }
   }
 
+#ifdef USE_AFFINITY
   boundaryStrength = pixelDiscrepancies - affinityWeight * pixelAffinities;
+#else
+  boundaryStrength = pixelDiscrepancies;
+#endif
 }
 
 void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope, const cv::Mat &scalingIntercept)
@@ -852,7 +880,7 @@ void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segme
   }
 }
 
-void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, cv::Mat &responses)
+void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, cv::Mat &responses)
 {
   CV_Assert(!groundTruthMask.empty());
   //TODO: move up
@@ -893,12 +921,12 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   responses.create(regions.size(), regions.size(), CV_32SC1);
   for (size_t i = 0; i < regions.size(); ++i)
   {
-    Mat dilatedMask;
-    dilate(regions[i].getMask(), dilatedMask, Mat());
     for (size_t j = 0; j < regions.size(); ++j)
     {
       int currentLabel;
-      if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j)// || countNonZero(dilatedMask & regions[j].getMask()) == 0)
+      if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j ||
+          regionLabels[i] == GLASS && regionLabels[j] == GLASS ||
+          useOnlyAdjacentRegions && !segmentedImage.areRegionsAdjacent(i, j))
       {
         currentLabel = INVALID;
       }
@@ -929,13 +957,11 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
   Mat samples;
   segmentedImage2pairwiseSamples(segmentedImage, samples);
   Mat responses;
-  segmentedImage2pairwiseResponses(segmentedImage, groundTruthMask, responses);
+  segmentedImage2pairwiseResponses(segmentedImage, groundTruthMask, false, responses);
 
   vector<Region> regions = segmentedImage.getRegions();
   for (size_t i = 0; i < regions.size(); ++i)
   {
-    Mat dilatedMask;
-    dilate(regions[i].getMask(), dilatedMask, Mat());
     for (size_t j = i + 1; j < regions.size(); ++j)
     {
       int currentResponse = responses.at<int>(i, j);
@@ -980,7 +1006,10 @@ void GlassClassifier::test(const SegmentedImage &testImage, const cv::Mat &groun
   Canny(grayscaleImage, edges, cannyThreshold1, cannyThreshold2);
   imshow("edges", edges.clone());
   Graph graph;
+
+#ifdef USE_AFFINITY
   edges2graph(testImage.getSegmentation(), testImage.getRegions(), edges, graph);
+#endif
 
   computeBoundaryStrength(testImage, edges, groundTruthMask, graph, affinityWeight, boundaryStrength);
   //TODO: do you need this?

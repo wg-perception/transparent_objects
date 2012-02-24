@@ -118,16 +118,24 @@ int main(int argc, char *argv[])
 //  Mat testGlassMask = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/mask_image_00050_croped.png", CV_LOAD_IMAGE_GRAYSCALE);
 //  Mat testImage = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/image_00050_croped.png");
 
-  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_17.png", CV_LOAD_IMAGE_GRAYSCALE);
-//  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_17.png");
+//  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_17.png", CV_LOAD_IMAGE_GRAYSCALE);
+
+  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_00017.png", CV_LOAD_IMAGE_GRAYSCALE);
+  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_00017.png");
+//  imshow("testImage", testImage);
+//  waitKey(500);
 
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");
 //  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/wineB1f.jpg");
 
+//  SegmentedImage segmentedImage(testImage);
+//  segmentedImage.write("image_00017.xml");
+
   SegmentedImage segmentedImage;
-  segmentedImage.read("segmentedImage.xml");
+//  segmentedImage.read("segmentedImage.xml");
+  segmentedImage.read("image_00017.xml");
   segmentedImage.showSegmentation("test segmentation");
 
   Mat boundaryStrength;
