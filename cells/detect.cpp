@@ -139,7 +139,7 @@ namespace transparent_objects
         PoseResult pose_result;
         pose_result.set_R(poses[bestDetectionIndex].getRotationMatrix());
         pose_result.set_T(poses[bestDetectionIndex].getTvec());
-        pose_result.set_object_id(object_db_->parameters(), detectedObjects[bestDetectionIndex]);
+        pose_result.set_object_id(*object_db_, detectedObjects[bestDetectionIndex]);
         pose_results_->push_back(pose_result);
       }
 
