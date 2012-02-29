@@ -1,4 +1,4 @@
-find_package(PCL)
+find_pcl_package()
 
 #TDS: dont glob together sources.
 set(src 

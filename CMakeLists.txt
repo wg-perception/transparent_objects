@@ -9,7 +9,7 @@ endif()
 find_package(ecto REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(object_recognition_core REQUIRED)
-find_package(PCL REQUIRED)
+find_pcl_package()
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
