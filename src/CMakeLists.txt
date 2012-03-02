@@ -28,6 +28,8 @@ add_library(edges_pose_refiner SHARED
     ${src}
     )
 
+set_target_properties(edges_pose_refiner PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+
 #
 # Hey!  if you're going to do this, you better test it, thoroughly.  In this case
 # it appears the first person to attempt to build on natty was a user.  I'm guessing
@@ -60,3 +62,9 @@ install(TARGETS edges_pose_refiner
 
 add_executable(enhancedGlassSegmenter glass_segmentation/demo.cpp)
 target_link_libraries(enhancedGlassSegmenter edges_pose_refiner)
+
+add_executable(createSegmentedImage glass_segmentation/createSegmentedImage.cpp)
+target_link_libraries(createSegmentedImage edges_pose_refiner)
+
+add_executable(createSegmentation glass_segmentation/createSegmentation.cpp)
+target_link_libraries(createSegmentation edges_pose_refiner)
