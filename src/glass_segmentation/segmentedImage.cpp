@@ -1,6 +1,7 @@
 #include <fstream>
 #include <opencv2/opencv.hpp>
 #include "edges_pose_refiner/segmentedImage.hpp"
+#include "edges_pose_refiner/utils.hpp"
 
 using namespace cv;
 using std::cout;
@@ -24,8 +25,9 @@ SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segment
   }
   oversegmentImage(image, segmentationFilename, segmentation);
   cout << "image is oversegmented" << endl;
-  segmentation2regions(image, segmentation, filterBank, regions);
+  segmentation2regions(image, segmentation, textonLabelsMap, filterBank, regions);
   regionAdjacencyMat.create(regions.size(), regions.size(), CV_8UC1);
+
 #pragma omp parallel for schedule(dynamic, 4)
   for (size_t i = 0; i < regions.size(); ++i)
   {
@@ -36,11 +38,17 @@ SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segment
       regionAdjacencyMat.at<uchar>(i, j) = (countNonZero(dilatedMask & regions[j].getMask()) == 0) ? 0 : 255;
     }
   }
+  cout << "adjacency mat is computed" << endl;
 }
 
 const std::vector<Region>& SegmentedImage::getRegions() const
 {
   return regions;
+}
+
+const Region& SegmentedImage::getRegion(int regionIndex) const
+{
+  return regions[regionIndex];
 }
 
 const cv::Mat& SegmentedImage::getSegmentation() const
@@ -63,6 +71,7 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, const std::string &s
   const float k = 300.0f;
 //  const float k = 500.0f;
   const int min_size = 200;
+
 
   const string sourceFilename = "imageForSegmenation.ppm";
   const string outputImageFilename = "segmentedImage.ppm";
@@ -152,6 +161,31 @@ void SegmentedImage::mergeThinRegions(cv::Mat &segmentation, vector<int> &labels
   std::swap(labels, newLabels);
 }
 
+void SegmentedImage::showTextonLabelsMap(const std::string &title) const
+{
+  //TODO: move up
+  const int textonCount = 36;
+
+  vector<Vec3b> colors(textonCount);
+  for (int i = 0; i < textonCount; ++i)
+  {
+    const int minColor = 56;
+    const int rndWidth = 200;
+    colors[i] = Vec3b(minColor + rand() % rndWidth, minColor + rand() % rndWidth, minColor + rand() % rndWidth);
+  }
+
+  CV_Assert(textonLabelsMap.type() == CV_32SC1);
+  Mat image(textonLabelsMap.size(), CV_8UC3);
+  for (int i = 0; i < image.rows; ++i)
+  {
+    for (int j = 0; j < image.cols; ++j)
+    {
+      image.at<Vec3b>(i, j) = colors[textonLabelsMap.at<int>(i, j)];
+    }
+  }
+  imshow(title, image);
+}
+
 void SegmentedImage::showSegmentation(const std::string &title) const
 {
   CV_Assert(segmentation.type() == CV_32SC1);
@@ -168,6 +202,20 @@ void SegmentedImage::showSegmentation(const std::string &title) const
     {
       visualization.at<Vec3b>(i, j) = colors[segmentation.at<int>(i, j)];
     }
+  }
+
+  imshow(title, visualization);
+  waitKey(500);
+}
+
+void SegmentedImage::showBoundaries(const std::string &title, const cv::Scalar &color) const
+{
+  Mat visualization = image.clone();
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    Mat gradientMask;
+    morphologyEx(regions[i].getMask(), gradientMask, MORPH_GRADIENT, Mat());
+    visualization.setTo(color, gradientMask);
   }
 
   imshow(title, visualization);
@@ -200,10 +248,14 @@ void SegmentedImage::computeTextonLabels(const cv::Mat &image, cv::Mat &textonLa
   cout << "texton labels are computed" << endl;
 }
 
-void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
+void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, cv::Mat &textonLabels, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions)
 {
-  Mat textonLabels;
-  computeTextonLabels(image, textonLabels);
+//  textonLabels = getFromCache("textonLabels.xml");
+//  if (textonLabels.empty())
+  {
+    computeTextonLabels(image, textonLabels);
+//    saveToCache("textonLabels.xml", textonLabels);
+  }
 
   CV_Assert(segmentation.type() == CV_32SC1);
   vector<int> labels = segmentation.reshape(1, 1).clone();
@@ -226,6 +278,7 @@ void SegmentedImage::segmentation2regions(const cv::Mat &image, cv::Mat &segment
     regions.push_back(currentRegion);
   }
   segmentation -= firstFreeLabel;
+  cout << "all regions are created" << endl;
 }
 
 bool SegmentedImage::areRegionsAdjacent(int i, int j) const
@@ -273,6 +326,7 @@ void SegmentedImage::write(const std::string &filename) const
   CV_Assert(fs.isOpened());
   fs << "rgbImage" << image;
   fs << "segmentation" << segmentation;
+  fs << "textonLabelsMap" << textonLabelsMap;
   fs << "regionAdjacencyMat" << regionAdjacencyMat;
   fs << "regions" << "[";
   for (size_t i = 0; i < regions.size(); ++i)
@@ -288,9 +342,13 @@ void SegmentedImage::write(const std::string &filename) const
 void SegmentedImage::read(const std::string &filename)
 {
   FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
+  if (!fs.isOpened())
+  {
+    CV_Error(CV_StsBadArg, "Cannot open the file " + filename);
+  }
   fs["rgbImage"] >> image;
   fs["segmentation"] >> segmentation;
+  fs["textonLabelsMap"] >> textonLabelsMap;
   fs["regionAdjacencyMat"] >> regionAdjacencyMat;
   regions.clear();
   FileNode regionsFN = fs["regions"];
