@@ -32,6 +32,14 @@ void computeColorSimilarity(const Region &region_1, const Region &region_2, floa
   distance = norm(hist_1 - hist_2);
 }
 
+void computeMedianColorDistance(const Region &region_1, const Region &region_2, float &distance)
+{
+  Vec3i color_1 = region_1.getMedianColor();
+  Vec3i color_2 = region_2.getMedianColor();
+
+  distance = norm(color_1 - color_2);
+}
+
 void computeTextureDistortion(const Region &region_1, const Region &region_2, float &distance)
 {
   Mat hist_1 = region_1.getTextonHistogram();
@@ -86,6 +94,8 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
 {
   float colorDistance;
   computeColorSimilarity(region_1, region_2, colorDistance);
+  float medianColorDistance;
+  computeMedianColorDistance(region_1, region_2, medianColorDistance);
   float slope, intercept;
   computeOverlayConsistency(region_1, region_2, slope, intercept);
   float textureDistance;
@@ -94,8 +104,10 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
   const int dim = 3;
   ecaSample = (Mat_<float>(1, dim) << intercept, colorDistance, slope);
   dcaSample = (Mat_<float>(1, dim) << textureDistance, colorDistance, slope);
-  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance);
+//  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance);
+
+  fullSample = (Mat_<float>(1, Sample::channels + 1) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
 }
 
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept)
@@ -298,6 +310,7 @@ void GlassClassifier::train()
     SegmentedImage segmentedImage;
     segmentedImage.read(trainingFiles[imageIndex]);
     segmentedImage.showSegmentation("train segmentation");
+    segmentedImage.showBoundaries("train boundaries");
 
     MLData currentMLData;
     //TODO: move up parameter

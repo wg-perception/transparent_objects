@@ -33,6 +33,7 @@ typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
 
 
 void computeColorSimilarity(const Region &region_1, const Region &region_2, float &distance);
+void computeMedianColorDistance(const Region &region_1, const Region &region_2, float &distance);
 void computeTextureDistortion(const Region &region_1, const Region &region_2, float &distance);
 void computeOverlayConsistency(const Region &region_1, const Region &region_2, float &slope, float &intercept);
 
@@ -66,6 +67,8 @@ class GlassClassifier
   public:
     void train();
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
+
+    static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
   private:
     typedef cv::Vec4f Sample;
 
@@ -85,7 +88,6 @@ class GlassClassifier
     void computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const;
 
 
-    static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
 
     CvSVM svm;
     cv::Mat scalingSlope, scalingIntercept;
