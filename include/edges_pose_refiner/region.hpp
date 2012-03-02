@@ -26,7 +26,7 @@ class Region
     void clusterIntensities();
     void computeCenter();
     void computeMedianColor();
-    static void computeErodedMask(const cv::Mat &mask, const cv::Mat &erodedMask);
+    static void computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask);
 
     cv::Mat image, textonLabels, mask, erodedMask;
     cv::Mat grayscaleImage;
