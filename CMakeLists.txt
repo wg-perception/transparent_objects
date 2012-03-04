@@ -8,7 +8,7 @@ endif()
 
 find_package(object_recognition_core QUIET)
 find_package(ecto QUIET)
-if (ecto_FOUND and object_recognition_core_FOUND)
+if (${ecto_FOUND} AND ${object_recognition_core_FOUND})
     set(DO_BUILD_ECTO_CELLS True)
 endif()
 
