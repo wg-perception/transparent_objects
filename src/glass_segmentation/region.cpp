@@ -193,7 +193,7 @@ void Region::computeTextonHistogram()
 
   if (isEmpty())
   {
-    textonHistogram = Mat(1, textonCount, CV_32FC1, Scalar(0));
+    textonHistogram = Mat(textonCount, 1, CV_32FC1, Scalar(0));
     return;
   }
 

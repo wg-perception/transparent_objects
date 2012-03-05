@@ -70,7 +70,7 @@ class GlassClassifier
 
     static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
   private:
-    typedef cv::Vec4f Sample;
+    typedef cv::Vec<float, 5> Sample;
 
     static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, MLData &mlData);
     static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());

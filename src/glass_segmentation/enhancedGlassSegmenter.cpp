@@ -45,6 +45,11 @@ void computeTextureDistortion(const Region &region_1, const Region &region_2, fl
   Mat hist_1 = region_1.getTextonHistogram();
   Mat hist_2 = region_2.getTextonHistogram();
 
+  if (hist_2.size() != hist_1.size())
+  {
+    hist_2 = hist_2.t();
+  }
+
   //TODO: experiment with different distances
   distance = norm(hist_1 - hist_2);
 }
@@ -107,7 +112,7 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
 //  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance);
 
-  fullSample = (Mat_<float>(1, Sample::channels + 1) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
+  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
 }
 
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept)
@@ -749,7 +754,9 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   Mat pairwiseSamples;
   segmentedImage2pairwiseSamples(testImage, pairwiseSamples, scalingSlope, scalingIntercept);
   Mat pairwiseResponses;
-  segmentedImage2pairwiseResponses(testImage, groundTruthMask, true, pairwiseResponses);
+//  segmentedImage2pairwiseResponses(testImage, groundTruthMask, true, pairwiseResponses);
+  segmentedImage2pairwiseResponses(testImage, groundTruthMask, false, pairwiseResponses);
+
   Mat samplesMask = (pairwiseResponses != INVALID);
 
   MLData testData;
@@ -886,6 +893,23 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 #else
   boundaryStrength = pixelDiscrepancies;
 #endif
+
+  discrepancies.setTo(0.0, discrepancies < normalizationIntercept);
+
+  Mat summedDiscrepancies;
+//  reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_AVG);
+
+  reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_SUM);
+  Mat sortedIndices;
+  sortIdx(summedDiscrepancies, sortedIndices, CV_SORT_EVERY_COLUMN + CV_SORT_DESCENDING);
+  Mat bestRegionsImage(pixelDiscrepancies.size(), CV_8UC1, Scalar(0));
+  int bestRegionsCount = 20;
+  for (int i = 0; i < bestRegionsCount; ++i)
+  {
+    int currentIndex = sortedIndices.at<int>(i);
+    bestRegionsImage.setTo(255 - i * 10, regions[currentIndex].getMask());
+  }
+  imshow("bestRegions", bestRegionsImage);
 }
 
 void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope, const cv::Mat &scalingIntercept)
@@ -913,6 +937,9 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   CV_Assert(!groundTruthMask.empty());
   //TODO: move up
   const float confidentLabelArea = 0.7f;
+  const int minErodedArea = 11;
+//  const int maxDistanceBetweenRegions = 100;
+  const int maxDistanceBetweenRegions = 50;
 //  float confidentLabelArea = 0.6f;
 
   vector<Region> regions = segmentedImage.getRegions();
@@ -923,13 +950,15 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   {
     //TODO: move up
     const uchar invalidArea = 127;
-    if (countNonZero(regions[i].getMask() & (groundTruthMask == invalidArea)) != 0)
+    if (countNonZero(regions[i].getMask() & (groundTruthMask == invalidArea)) != 0 ||
+        countNonZero(regions[i].getErodedMask()) < minErodedArea)
     {
       regionLabels[i] = NOT_VALID;
       ++invalidRegionsCount;
       invalidRegionsImage.setTo(255, regions[i].getMask());
       continue;
     }
+
 
     int regionArea = countNonZero(regions[i].getMask() != 0);
     int glassArea = countNonZero(regions[i].getMask() & groundTruthMask);
@@ -964,7 +993,8 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
       int currentLabel;
       if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j ||
           regionLabels[i] == GLASS && regionLabels[j] == GLASS ||
-          useOnlyAdjacentRegions && !segmentedImage.areRegionsAdjacent(i, j))
+          useOnlyAdjacentRegions && !segmentedImage.areRegionsAdjacent(i, j) ||
+          norm(regions[i].getCenter() - regions[j].getCenter()) > maxDistanceBetweenRegions)
       {
         currentLabel = INVALID;
       }
