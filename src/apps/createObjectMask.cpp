@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
   const int closingIterationsCount = 5;
   const float downFactor = 1.0f;
-  bool visualize = true;
+  bool visualize = false;
 
   string testFolder = argv[1];
   int imageIndex = atoi(argv[2]);

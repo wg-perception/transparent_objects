@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import cv2 
 import sys 
 import numpy as np
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     thresholdValue = 120
     minContourLength = 100
     patternSize = (4, 11)
-    visualize = True 
+    visualize = False
 
     image = cv2.imread(filename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
     assert image != None, 'Cannot read ' + filename

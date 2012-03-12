@@ -14,6 +14,7 @@ set(src
     registerPointClouds.cpp
     silhouette.cpp
     tangentVectorsEstimator.cpp
+    TODBaseImporter.cpp
     transparentDetector.cpp
     utils.cpp
     chamfer_matching/chamfer_matching.cpp
@@ -68,3 +69,6 @@ target_link_libraries(createSegmentedImage edges_pose_refiner)
 
 add_executable(createSegmentation glass_segmentation/createSegmentation.cpp)
 target_link_libraries(createSegmentation edges_pose_refiner)
+
+add_executable(createObjectMask apps/createObjectMask.cpp)
+target_link_libraries(createObjectMask edges_pose_refiner)
