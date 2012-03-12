@@ -18,11 +18,14 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
   computeErodedMask(mask, erodedMask);
   erodedArea = countNonZero(erodedMask);
 
+  computeIntensities();
   computeColorHistogram();
   computeTextonHistogram();
   clusterIntensities();
   computeCenter();
   computeMedianColor();
+  computeRMSContrast();
+  computeMichelsonContrast();
 }
 
 void Region::computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask)
@@ -37,6 +40,21 @@ void Region::computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask)
 bool Region::isEmpty() const
 {
   return (erodedArea == 0);
+}
+
+float Region::getRMSContrast() const
+{
+  return rmsContrast;
+}
+
+float Region::getMichelsonContrast() const
+{
+  return michelsonContrast;
+}
+
+float Region::getRobustMichelsonContrast() const
+{
+  return robustMichelsonContrast;
 }
 
 cv::Point2f Region::getCenter() const
@@ -72,6 +90,87 @@ const cv::Mat& Region::getMask() const
 const cv::Mat& Region::getErodedMask() const
 {
   return erodedMask;
+}
+
+void Region::computeRMSContrast()
+{
+  if (intensities.empty())
+  {
+    rmsContrast = std::numeric_limits<float>::quiet_NaN();
+    return;
+  }
+
+  CV_Assert(!intensities.empty());
+  Mat intensitiesMat(intensities);
+  Scalar mean, stdDev;
+  meanStdDev(intensitiesMat, mean, stdDev);
+  rmsContrast = stdDev[0];
+}
+
+void Region::computeMichelsonContrast()
+{
+  if (intensities.size() <= 1)
+  {
+    michelsonContrast = std::numeric_limits<float>::quiet_NaN();
+    return;
+  }
+
+  const float eps = 1e-4;
+  CV_Assert(intensities.size() > 1);
+  int lastIndex = static_cast<int>(intensities.size()) - 1;
+  michelsonContrast = (intensities[lastIndex] - intensities[0]) / (eps + intensities[lastIndex] + intensities[0]);
+}
+
+void Region::computeRobustMichelsonContrast()
+{
+  if (intensities.size() <= 1)
+  {
+    robustMichelsonContrast = std::numeric_limits<float>::quiet_NaN();
+    return;
+  }
+
+  //TODO: move up
+  const float outliersRatio = 0.1f;
+  const float eps = 1e-4;
+  CV_Assert(intensities.size() > 1);
+  int firstIndex = floor(outliersRatio * intensities.size());
+  int lastIndex = floor((1.0f - outliersRatio) * intensities.size());
+
+  int firstMedianIndex = (static_cast<int>(intensities.size()) - 1) / 2;
+  int secondMedianIndex = intensities.size() / 2;
+  robustMichelsonContrast = (intensities[lastIndex] - intensities[firstIndex]) / (eps + intensities[firstMedianIndex] + intensities[secondMedianIndex]);
+}
+
+void Region::computeIntensities()
+{
+  if (grayscaleImage.empty())
+  {
+    if (image.channels() == 3)
+    {
+      cvtColor(image, grayscaleImage, CV_BGR2GRAY);
+    }
+    else
+    {
+      grayscaleImage = image;
+    }
+  }
+  CV_Assert(grayscaleImage.type() == CV_8UC1);
+  CV_Assert(erodedMask.type() == CV_8UC1);
+  CV_Assert(grayscaleImage.size() == erodedMask.size());
+
+  intensities.clear();
+  for (int i = 0; i < erodedMask.rows; ++i)
+  {
+    for (int j = 0; j < erodedMask.cols; ++j)
+    {
+      if (erodedMask.at<uchar>(i, j) == 255)
+      {
+        intensities.push_back(grayscaleImage.at<uchar>(i, j));
+      }
+    }
+  }
+
+  std::sort(intensities.begin(), intensities.end());
 }
 
 void Region::computeCenter()
@@ -219,32 +318,6 @@ void Region::clusterIntensities()
   //TODO: move up
   const int clusterCount = 10;
 
-  if (grayscaleImage.empty())
-  {
-    if (image.channels() == 3)
-    {
-      cvtColor(image, grayscaleImage, CV_BGR2GRAY);
-    }
-    else
-    {
-      grayscaleImage = image;
-    }
-  }
-  CV_Assert(grayscaleImage.type() == CV_8UC1);
-  CV_Assert(erodedMask.type() == CV_8UC1);
-  CV_Assert(grayscaleImage.size() == erodedMask.size());
-
-  vector<int> intensities;
-  for (int i = 0; i < erodedMask.rows; ++i)
-  {
-    for (int j = 0; j < erodedMask.cols; ++j)
-    {
-      if (erodedMask.at<uchar>(i, j) == 255)
-      {
-        intensities.push_back(grayscaleImage.at<uchar>(i, j));
-      }
-    }
-  }
   if (intensities.size() < clusterCount)
   {
     //TODO: move up
@@ -252,7 +325,6 @@ void Region::clusterIntensities()
     return;
   }
 
-  std::sort(intensities.begin(), intensities.end());
   vector<int> boundaries;
   int currentBoundaryIndex = 0;
   int step = intensities.size() / clusterCount;
@@ -294,6 +366,11 @@ void Region::read(const Mat &_image, const Mat &_mask, const FileNode &fn)
   image = _image;
   mask = _mask;
   computeErodedMask(mask, erodedMask);
+
+  computeIntensities();
+  computeRMSContrast();
+  computeMichelsonContrast();
+  computeRobustMichelsonContrast();
 
   fn["colorHistogram"] >> colorHistogram;
   fn["textonHistogram"] >> textonHistogram;

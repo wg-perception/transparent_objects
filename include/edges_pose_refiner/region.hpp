@@ -16,16 +16,23 @@ class Region
     const cv::Mat& getColorHistogram() const;
     const cv::Mat& getTextonHistogram() const;
     const cv::Mat& getIntensityClusters() const;
+    float getRMSContrast() const;
+    float getMichelsonContrast() const;
+    float getRobustMichelsonContrast() const;
     bool isEmpty() const;
 
     void write(cv::FileStorage &fs) const;
     void read(const cv::Mat &image, const cv::Mat &mask, const cv::FileNode &fn);
   private:
+    void computeIntensities();
     void computeColorHistogram();
     void computeTextonHistogram();
     void clusterIntensities();
     void computeCenter();
     void computeMedianColor();
+    void computeRMSContrast();
+    void computeMichelsonContrast();
+    void computeRobustMichelsonContrast();
     static void computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask);
 
     cv::Mat image, textonLabels, mask, erodedMask;
@@ -38,6 +45,9 @@ class Region
     cv::Point2f center;
     cv::Vec3b medianColor;
     int erodedArea;
+
+    float rmsContrast, michelsonContrast, robustMichelsonContrast;
+    std::vector<int> intensities;
 };
 
 #endif
