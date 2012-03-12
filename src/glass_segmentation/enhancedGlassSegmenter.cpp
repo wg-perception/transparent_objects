@@ -22,6 +22,27 @@ EdgeProperties::EdgeProperties()
   maximumAngle = 0.0f;
 }
 
+float getMinToMaxRatio(float a, float b)
+{
+  const float eps = 1e-4;
+  float ratio = a < b ? a / (b + eps) : b / (a + eps);
+  return ratio;
+}
+
+void computeContrastDistance(const Region &region_1, const Region &region_2, float &rmsDistance, float &michelsonDistance, float &robustMichelsonDistance)
+{
+  float rms_1 = region_1.getRMSContrast();
+  float rms_2 = region_2.getRMSContrast();
+  rmsDistance = getMinToMaxRatio(rms_1, rms_2);
+
+  float michelson_1 = region_1.getMichelsonContrast();
+  float michelson_2 = region_2.getMichelsonContrast();
+  michelsonDistance = getMinToMaxRatio(michelson_1, michelson_2);
+
+  float robustMichelson_1 = region_1.getRobustMichelsonContrast();
+  float robustMichelson_2 = region_2.getRobustMichelsonContrast();
+  robustMichelsonDistance = getMinToMaxRatio(robustMichelson_1, robustMichelson_2);
+}
 
 void computeColorSimilarity(const Region &region_1, const Region &region_2, float &distance)
 {
@@ -95,7 +116,7 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
 }
 
 
-void GlassClassifier::regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample)
+void GlassClassifier::regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample)
 {
   float colorDistance;
   computeColorSimilarity(region_1, region_2, colorDistance);
@@ -106,13 +127,15 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
   float textureDistance;
   computeTextureDistortion(region_1, region_2, textureDistance);
 
-  const int dim = 3;
-  ecaSample = (Mat_<float>(1, dim) << intercept, colorDistance, slope);
-  dcaSample = (Mat_<float>(1, dim) << textureDistance, colorDistance, slope);
-//  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance);
-//  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance);
 
-  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
+  float rmsDistance, michelsonDistance, robustMichelsonDistance;
+  computeContrastDistance(region_1, region_2, rmsDistance, michelsonDistance, robustMichelsonDistance);
+
+//  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
+
+  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance);
+
+//  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, robustMichelsonDistance, colorDistance, textureDistance, medianColorDistance);
 }
 
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept)
@@ -749,7 +772,7 @@ void GlassClassifier::predict(const MLData &data, cv::Mat &confidences) const
   cout << "done" << std::endl;
 }
 
-void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies) const
+void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies, std::vector<bool> &isRegionValid) const
 {
   Mat pairwiseSamples;
   segmentedImage2pairwiseSamples(testImage, pairwiseSamples, scalingSlope, scalingIntercept);
@@ -758,6 +781,13 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   segmentedImage2pairwiseResponses(testImage, groundTruthMask, false, pairwiseResponses);
 
   Mat samplesMask = (pairwiseResponses != INVALID);
+  isRegionValid.resize(samplesMask.rows);
+  for (int i = 0; i < samplesMask.rows; ++i)
+  {
+    Mat row = samplesMask.row(i);
+    int invalidLabelsCount = countNonZero(row == 0);
+    isRegionValid[i] = (invalidLabelsCount != samplesMask.cols);
+  }
 
   MLData testData;
   testData.samples = pairwiseSamples.reshape(1, pairwiseSamples.total());
@@ -767,10 +797,10 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
 
   Mat testConfidences;
   predict(testData, testConfidences);
-  testConfidences.setTo(0.0, ~testData.mask);
+  testConfidences.setTo(-std::numeric_limits<float>::max(), ~testData.mask);
   discrepancies = testConfidences.reshape(1, pairwiseResponses.rows);
   Mat diag = discrepancies.diag();
-  diag.setTo(0.0);
+  diag.setTo(-std::numeric_limits<float>::max());
 
   Mat predictedLabels = testConfidences > normalizationIntercept;
   predictedLabels.setTo(GLASS_COVERED, predictedLabels == 255);
@@ -833,9 +863,10 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 
 #if 1
   Mat discrepancies = getFromCache("discrepancies");
+  vector<bool> isRegionValid;
   if (discrepancies.empty())
   {
-    computeAllDiscrepancies(testImage, groundTruthMask, discrepancies);
+    computeAllDiscrepancies(testImage, groundTruthMask, discrepancies, isRegionValid);
     saveToCache("discrepancies", discrepancies);
   }
   CV_Assert(discrepancies.type() == CV_32FC1);
@@ -898,18 +929,51 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 
   Mat summedDiscrepancies;
 //  reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_AVG);
-
   reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_SUM);
+
+  CV_Assert(regions.size() == isRegionValid.size());
+  for (size_t i = 0; i < isRegionValid.size(); ++i)
+  {
+    if (isRegionValid[i])
+    {
+      continue;
+    }
+
+    float maxDiscrepancy = -std::numeric_limits<float>::max();
+    for (size_t j = 0; j < regions.size(); ++j)
+    {
+      if (!testImage.areRegionsAdjacent(i, j))
+      {
+        continue;
+      }
+      CV_Assert(summedDiscrepancies.type() == CV_32FC1);
+      const float eps = 1e-4;
+      maxDiscrepancy = std::max(maxDiscrepancy, summedDiscrepancies.at<float>(j)) - eps;
+    }
+
+    summedDiscrepancies.at<float>(i) = maxDiscrepancy;
+  }
+
+
   Mat sortedIndices;
   sortIdx(summedDiscrepancies, sortedIndices, CV_SORT_EVERY_COLUMN + CV_SORT_DESCENDING);
   Mat bestRegionsImage(pixelDiscrepancies.size(), CV_8UC1, Scalar(0));
-  int bestRegionsCount = 20;
-  for (int i = 0; i < bestRegionsCount; ++i)
+  int bestRegionsCount = 40;
+  Mat regionsStrength(pixelDiscrepancies.size(), CV_32FC1);
+  for (int i = 0; i < sortedIndices.rows; ++i)
   {
     int currentIndex = sortedIndices.at<int>(i);
-    bestRegionsImage.setTo(255 - i * 10, regions[currentIndex].getMask());
+    regionsStrength.setTo(summedDiscrepancies.at<float>(currentIndex), regions[currentIndex].getMask());
+    if (i < bestRegionsCount)
+    {
+      bestRegionsImage.setTo(255 - i * 255.0 / bestRegionsCount, regions[currentIndex].getMask());
+    }
+//    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
+
   }
   imshow("bestRegions", bestRegionsImage);
+
+  boundaryStrength = regionsStrength;
 }
 
 void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope, const cv::Mat &scalingIntercept)
@@ -921,8 +985,8 @@ void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segme
   {
     for (int j = 0; j < regions.size(); ++j)
     {
-      Mat ecaSample, dcaSample, fullSample;
-      regions2samples(regions[i], regions[j], ecaSample, dcaSample, fullSample);
+      Mat fullSample;
+      regions2samples(regions[i], regions[j], fullSample);
       if (!scalingSlope.empty() && !scalingIntercept.empty())
       {
         fullSample = fullSample.mul(scalingSlope) + scalingIntercept;
@@ -937,7 +1001,9 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   CV_Assert(!groundTruthMask.empty());
   //TODO: move up
   const float confidentLabelArea = 0.7f;
-  const int minErodedArea = 11;
+//  const int minErodedArea = 11;
+
+  const int minErodedArea = 16;
 //  const int maxDistanceBetweenRegions = 100;
   const int maxDistanceBetweenRegions = 50;
 //  float confidentLabelArea = 0.6f;

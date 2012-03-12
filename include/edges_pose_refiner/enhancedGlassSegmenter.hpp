@@ -36,6 +36,7 @@ void computeColorSimilarity(const Region &region_1, const Region &region_2, floa
 void computeMedianColorDistance(const Region &region_1, const Region &region_2, float &distance);
 void computeTextureDistortion(const Region &region_1, const Region &region_2, float &distance);
 void computeOverlayConsistency(const Region &region_1, const Region &region_2, float &slope, float &intercept);
+void computeContrastDistance(const Region &region_1, const Region &region_2, float &rmsDistance, float &michelsonDistance, float &robustMichelsonDistance);
 
 //TODO: is it possible to use the index to access a vertex directly?
 VertexDescriptor getRegionVertex(const Graph &graph, int regionIndex);
@@ -68,9 +69,9 @@ class GlassClassifier
     void train();
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
 
-    static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &ecaSample, cv::Mat &dcaSample, cv::Mat &fullSample);
+    static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample);
   private:
-    typedef cv::Vec<float, 5> Sample;
+    typedef cv::Vec<float, 8> Sample;
 
     static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, MLData &mlData);
     static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());
@@ -84,7 +85,7 @@ class GlassClassifier
     static void estimateAffinities(const Graph &graph, size_t regionCount, cv::Size imageSize, int regionIndex, std::vector<float> &affinities);
     static void computeAllAffinities(const std::vector<Region> &regions, const Graph &graph, cv::Mat &affinities);
     static void computeBoundaryPresences(const std::vector<Region> &regions, const cv::Mat &edges, cv::Mat &boundaryPresences);
-    void computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies) const;
+    void computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies, std::vector<bool> &isRegionValid) const;
     void computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const;
 
 
