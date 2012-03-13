@@ -24,7 +24,7 @@ if __name__ == '__main__':
         modelFilename = trainedModelsFolder + '/' + obj + '.xml' 
         testFolder = baseFolder + '/' + obj + '/'
 
-        for imageFilename in glob.glob(testFolder + '/image_*.png'):
+        for imageFilename in sorted(glob.glob(testFolder + '/image_*.png')):
             print imageFilename
             match = re.search('_(0*([1-9][0-9]*))\.', imageFilename)
             if (match == None):
@@ -37,7 +37,9 @@ if __name__ == '__main__':
 
             call([objectMasker, testFolder, imageIndex, modelFilename, objectMaskFilename])
             imageFilename = testFolder + '/image_' + fullImageIndex + '.png'
-            call([backgroundMasker, imageFilename, backgroundMaskFilename])
+            exitStatus = call([backgroundMasker, imageFilename, backgroundMaskFilename])
+            if (exitStatus != 0):
+                continue
 
             objectMask = cv2.imread(objectMaskFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
             backgroundMask = cv2.imread(backgroundMaskFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
@@ -46,6 +48,14 @@ if __name__ == '__main__':
             mask[np.nonzero(backgroundMask)] = backgroundValue
             maskFilename = testFolder + '/glassMask_' + fullImageIndex + '.png'
             cv2.imwrite(maskFilename, mask)
+
+            image = cv2.imread(imageFilename, cv2.CV_LOAD_IMAGE_UNCHANGED)
+            image[np.nonzero(mask == backgroundValue)] = 0
+            image[np.nonzero(mask == 255)] /= 1.5
+            maskedImageFilename = testFolder + '/maskedImage_' + fullImageIndex + '.png'
+            cv2.imwrite(maskedImageFilename, image)
+#            cv2.imshow('masked image', image)
+#            cv2.waitKey()
 #            cv2.imshow('mask', mask)
 #            cv2.waitKey()
     os.remove(objectMaskFilename)
