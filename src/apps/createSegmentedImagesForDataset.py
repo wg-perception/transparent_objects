@@ -16,7 +16,7 @@ if __name__ == '__main__':
     for obj in objects:
         testFolder = baseFolder + '/' + obj + '/'
 
-        for imageFilename in glob.glob(testFolder + '/image_[0-9]*.png'):
+        for imageFilename in sorted(glob.glob(testFolder + '/image_[0-9]*.png')):
             print imageFilename
             segmentationFilename = imageFilename.replace('/image_', '/' + segmentationPrefix + '_')
             segmentationFilename = segmentationFilename.replace('.png', '.txt')

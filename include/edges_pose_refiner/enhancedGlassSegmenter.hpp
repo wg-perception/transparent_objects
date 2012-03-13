@@ -57,6 +57,8 @@ struct MLData
   int getSamplesCount() const;
   void write(const std::string name) const;
 
+  void removeMaskedOutSamples();
+
   void evaluate(const cv::Mat &predictedLabels, float &error, cv::Mat &confusionMatrix) const;
 
 private:
@@ -70,6 +72,9 @@ class GlassClassifier
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
 
     static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample);
+
+    bool read(const std::string &filename);
+    void write(const std::string &filename);
   private:
     typedef cv::Vec<float, 8> Sample;
 
@@ -87,8 +92,6 @@ class GlassClassifier
     static void computeBoundaryPresences(const std::vector<Region> &regions, const cv::Mat &edges, cv::Mat &boundaryPresences);
     void computeAllDiscrepancies(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &discrepancies, std::vector<bool> &isRegionValid) const;
     void computeBoundaryStrength(const SegmentedImage &testImage, const cv::Mat &edges, const cv::Mat &groundTruthMask, const Graph &graph, float affinityWeight, cv::Mat &boundaryStrength) const;
-
-
 
     CvSVM svm;
     cv::Mat scalingSlope, scalingIntercept;

@@ -31,7 +31,7 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
 void Region::computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask)
 {
   //TODO: move up
-  const int erosionCount = 3;
+  const int erosionCount = 2;
 
   erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
 //  erodedMask = mask.clone();

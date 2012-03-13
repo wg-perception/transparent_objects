@@ -14,7 +14,9 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-enum RegionLabel {GLASS, BACKGROUND, NOT_VALID};
+//#define VISUALIZE_SEGMENTATION
+
+enum RegionLabel {GLASS, GLASS_BACKGROUND, OTHER_BACKGROUND, NOT_VALID};
 
 EdgeProperties::EdgeProperties()
 {
@@ -306,14 +308,38 @@ void MLData::write(const std::string name) const
   }
 }
 
+void MLData::removeMaskedOutSamples()
+{
+  CV_Assert(!mask.empty());
+  int newSamplesCount = getSamplesCount();
+  Mat newSamples(newSamplesCount, samples.cols, samples.type());
+  Mat newResponses(newSamplesCount, responses.cols, responses.type());
+
+  int newIndex = 0;
+  for (int i = 0; i < mask.rows; ++i)
+  {
+    if (mask.at<uchar>(i) == 0)
+    {
+      continue;
+    }
+
+    Mat currentNewSample = newSamples.row(newIndex);
+    samples.row(i).copyTo(currentNewSample);
+
+    Mat currentNewResponse = newResponses.row(newIndex);
+    responses.row(i).copyTo(currentNewResponse);
+    ++newIndex;
+  }
+  samples = newSamples;
+  responses = newResponses;
+  mask = Mat();
+}
+
 void GlassClassifier::train()
 {
   //TODO: move up
   const string trainingFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImages.txt";
   const string groundTruthFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImagesGroundTruth.txt";
-  const float maxSampleDistance = 0.1f;
-  float confidentLabelArea = 0.9f;
-//  float confidentLabelArea = 0.6f;
 
   vector<string> trainingGroundTruhFiles;
   readLinesInFile(groundTruthFilesList, trainingGroundTruhFiles);
@@ -337,18 +363,42 @@ void GlassClassifier::train()
 
     SegmentedImage segmentedImage;
     segmentedImage.read(trainingFiles[imageIndex]);
+#ifdef VISUALIZE_SEGMENTATION
     segmentedImage.showSegmentation("train segmentation");
     segmentedImage.showBoundaries("train boundaries");
+#endif
 
     MLData currentMLData;
     //TODO: move up parameter
-    bool useOnlyAdjacentRegions = countNonZero(groundTruthMask == 255) == 0;
-    segmentedImage2MLData(segmentedImage, groundTruthMask, useOnlyAdjacentRegions, currentMLData);
+//    bool useOnlyAdjacentRegions = countNonZero(groundTruthMask == 255) == 0;
+//    segmentedImage2MLData(segmentedImage, groundTruthMask, useOnlyAdjacentRegions, currentMLData);
+    segmentedImage2MLData(segmentedImage, groundTruthMask, false, currentMLData);
 
     CV_Assert(currentMLData.isValid());
     trainingData.push_back(currentMLData);
   }
   CV_Assert(trainingData.isValid());
+  //TODO: move up
+  const int targetNegativeSamplesCount = 60000;
+  int randomizer = trainingData.getSamplesCount() / targetNegativeSamplesCount;
+  CV_Assert(trainingData.mask.empty());
+  CV_Assert(trainingData.responses.type() == CV_32SC1);
+  trainingData.mask = Mat(trainingData.responses.size(), CV_8UC1, Scalar(255));
+  for (int i = 0; i < trainingData.responses.rows; ++i)
+  {
+    if (trainingData.responses.at<int>(i) == GLASS_COVERED)
+    {
+      continue;
+    }
+
+    if (rand() % randomizer != 0)
+    {
+      trainingData.mask.at<uchar>(i) = 0;
+    }
+  }
+  trainingData.removeMaskedOutSamples();
+
+
 //  Mat ecaTrainingData = fullTrainingData.colRange(Range(0, 3));
 //  Mat dcaTrainingData = fullTrainingData.colRange(Range(1, 4));
 //  CV_Assert(ecaTrainingData.size() == dcaTrainingData.size());
@@ -971,7 +1021,9 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
 //    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
 
   }
+#ifdef VISUALIZE_SEGMENTATION
   imshow("bestRegions", bestRegionsImage);
+#endif
 
   boundaryStrength = regionsStrength;
 }
@@ -996,6 +1048,13 @@ void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segme
   }
 }
 
+bool isRegionLabeled(const Region &region, int regionArea, const cv::Mat &mask, float confidentLabelArea)
+{
+  int labelArea = countNonZero(region.getMask() & mask);
+  float areaRatio = static_cast<float>(labelArea) / regionArea;
+  return (areaRatio > confidentLabelArea);
+}
+
 void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, cv::Mat &responses)
 {
   CV_Assert(!groundTruthMask.empty());
@@ -1008,72 +1067,79 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   const int maxDistanceBetweenRegions = 50;
 //  float confidentLabelArea = 0.6f;
 
+  const uchar glassBackgroundLabel = 0;
+  const uchar otherBackgroundLabel = 127;
+  const uchar glassLabel = 255;
+
   vector<Region> regions = segmentedImage.getRegions();
   vector<RegionLabel> regionLabels(regions.size());
   int invalidRegionsCount = 0;
   Mat invalidRegionsImage(groundTruthMask.size(), CV_8UC1, Scalar(0));
+  Mat glassBackgroundMask = groundTruthMask == glassBackgroundLabel;
+  Mat otherBackgroundMask = groundTruthMask == otherBackgroundLabel;
+  Mat glassMask = groundTruthMask == glassLabel;
   for (size_t i = 0; i < regions.size(); ++i)
   {
-    //TODO: move up
-    const uchar invalidArea = 127;
-    if (countNonZero(regions[i].getMask() & (groundTruthMask == invalidArea)) != 0 ||
-        countNonZero(regions[i].getErodedMask()) < minErodedArea)
+    regionLabels[i] = NOT_VALID;
+    if (countNonZero(regions[i].getErodedMask()) < minErodedArea)
     {
-      regionLabels[i] = NOT_VALID;
       ++invalidRegionsCount;
       invalidRegionsImage.setTo(255, regions[i].getMask());
       continue;
     }
 
-
     int regionArea = countNonZero(regions[i].getMask() != 0);
-    int glassArea = countNonZero(regions[i].getMask() & groundTruthMask);
-    float glassAreaRatio = static_cast<float>(glassArea) / regionArea;
-    if (glassAreaRatio > confidentLabelArea)
+
+    if (isRegionLabeled(regions[i], regionArea, glassBackgroundMask, confidentLabelArea))
+    {
+      regionLabels[i] = GLASS_BACKGROUND;
+    }
+    if (isRegionLabeled(regions[i], regionArea, otherBackgroundMask, confidentLabelArea))
+    {
+      regionLabels[i] = OTHER_BACKGROUND;
+    }
+    if (isRegionLabeled(regions[i], regionArea, glassMask, confidentLabelArea))
     {
       regionLabels[i] = GLASS;
     }
-    else
+
+    if (regionLabels[i] == NOT_VALID)
     {
-      if (glassAreaRatio < 1.0 - confidentLabelArea)
-      {
-        regionLabels[i] = BACKGROUND;
-      }
-      else
-      {
-        regionLabels[i] = NOT_VALID;
-        ++invalidRegionsCount;
-        invalidRegionsImage.setTo(255, regions[i].getMask());
-      }
+      ++invalidRegionsCount;
+      invalidRegionsImage.setTo(255, regions[i].getMask());
     }
   }
   cout << "invalid regions: " << invalidRegionsCount << endl;
+#ifdef VISUALIZE_SEGMENTATION
   imshow("invalid regions", invalidRegionsImage);
   waitKey(100);
+#endif
 
   responses.create(regions.size(), regions.size(), CV_32SC1);
   for (size_t i = 0; i < regions.size(); ++i)
   {
     for (size_t j = 0; j < regions.size(); ++j)
     {
-      int currentLabel;
+      int currentLabel = INVALID;
       if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j ||
           regionLabels[i] == GLASS && regionLabels[j] == GLASS ||
           useOnlyAdjacentRegions && !segmentedImage.areRegionsAdjacent(i, j) ||
           norm(regions[i].getCenter() - regions[j].getCenter()) > maxDistanceBetweenRegions)
       {
-        currentLabel = INVALID;
+        responses.at<int>(i, j) = currentLabel;
+        continue;
       }
-      else
+
+      if (regionLabels[i] == GLASS || regionLabels[j] == GLASS)
       {
-        if (regionLabels[i] ^ regionLabels[j])
+        if (regionLabels[i] == GLASS_BACKGROUND || regionLabels[j] == GLASS_BACKGROUND)
         {
           currentLabel = GLASS_COVERED;
         }
-        else
-        {
-          currentLabel = THE_SAME;
-        }
+      }
+      if (regionLabels[i] == regionLabels[j])
+      {
+        currentLabel = THE_SAME;
       }
 
       responses.at<int>(i, j) = currentLabel;
@@ -1140,7 +1206,9 @@ void GlassClassifier::test(const SegmentedImage &testImage, const cv::Mat &groun
   cvtColor(testImage.getOriginalImage(), grayscaleImage, CV_BGR2GRAY);
   Mat edges;
   Canny(grayscaleImage, edges, cannyThreshold1, cannyThreshold2);
+#ifdef VISUALIZE_SEGMENTATION
   imshow("edges", edges.clone());
+#endif
   Graph graph;
 
 #ifdef USE_AFFINITY
@@ -1154,9 +1222,48 @@ void GlassClassifier::test(const SegmentedImage &testImage, const cv::Mat &groun
   Mat strengthVisualization = boundaryStrength.clone();
   strengthVisualization -= normalizationIntercept;
   strengthVisualization.setTo(0, strengthVisualization < 0);
-  imshow("boundary", strengthVisualization);
 
+#ifdef VISUALIZE_SEGMENTATION
+  imshow("boundary", strengthVisualization);
   imshow("boundary binary", strengthVisualization > 0);
 //  imshow("boundary", boundaryStrength);
   waitKey();
+#endif
+}
+
+bool GlassClassifier::read(const std::string &filename)
+{
+  FileStorage fs(filename, FileStorage::READ);
+  if (!fs.isOpened())
+  {
+    return false;
+  }
+
+  fs["scalingSlope"] >> scalingSlope;
+  fs["scalingIntercept"] >> scalingIntercept;
+  fs["normalizationSlope"] >> normalizationSlope;
+  fs["normalizationIntercept"] >> normalizationIntercept;
+  string svmFilename;
+  fs["svmFilename"] >> svmFilename;
+  svm.load(svmFilename.c_str());
+  fs.release();
+
+  return true;
+}
+
+void GlassClassifier::write(const std::string &filename)
+{
+  FileStorage fs(filename, FileStorage::WRITE);
+  CV_Assert(fs.isOpened());
+
+  string svmFilename = filename + ".svm.xml";
+  svm.save(svmFilename.c_str());
+
+  fs << "scalingSlope" << scalingSlope;
+  fs << "scalingIntercept" << scalingIntercept;
+  fs << "normalizationSlope" << normalizationSlope;
+  fs << "normalizationIntercept" << normalizationIntercept;
+  fs << "svmFilename" << svmFilename;
+
+  fs.release();
 }

@@ -8,8 +8,13 @@ using std::endl;
 
 int main(int argc, char *argv[])
 {
-  omp_set_num_threads(3);
-  CV_Assert(argc == 4);
+  omp_set_num_threads(4);
+  if (argc != 4)
+  {
+      cout << argv[0] << " <imageFilename> <segmentationFilename> <outputFilename>" << endl << endl;
+      cout << "Creates and writes SegmentedImage" << endl;
+      return -1;
+  }
   const string rgbFilename = argv[1];
   const string segmentationFilename = argv[2];
   const string outputFilename = argv[3];
