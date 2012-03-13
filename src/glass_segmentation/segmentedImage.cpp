@@ -310,7 +310,10 @@ void loadFilterBank(const std::string &filename, std::vector<cv::Mat> &filterBan
 {
   filterBank.clear();
   FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
+  if (!fs.isOpened())
+  {
+    CV_Error(CV_StsBadArg, "cannot open the file " + filename);
+  }
   FileNode filtersNode = fs["filters"];
   for (FileNodeIterator it = filtersNode.begin(); it != filtersNode.end(); ++it)
   {

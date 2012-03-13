@@ -32,14 +32,17 @@ if __name__ == '__main__':
         outFilename = None
 
 
-    topLineShift = (0, 100)
+    topLineShift = (0, 90)
     topLinePointShift = 10
     thresholdValue = 120
-    minContourLength = 100
+    minContourLength = 300
     patternSize = (4, 11)
     visualize = False
 
     image = cv2.imread(filename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+    if visualize:
+        cv2.imshow("image", image)
+        cv2.waitKey()
     assert image != None, 'Cannot read ' + filename
 
     params = cv2.SimpleBlobDetector_Params()
@@ -47,21 +50,24 @@ if __name__ == '__main__':
     params.minArea = 15.0
     blackDetector = cv2.SimpleBlobDetector(params)
     params.blobColor = 255
+
     whiteDetector = cv2.SimpleBlobDetector(params)
     whiteCenters = np.empty((0, 0))
     blackCenters = np.empty((0, 0))
     isBlackFound, blackCenters = cv2.findCirclesGrid(image, patternSize, blackCenters, cv2.CALIB_CB_ASYMMETRIC_GRID + cv2.CALIB_CB_CLUSTERING, blackDetector)
     isWhiteFound, whiteCenters = cv2.findCirclesGrid(image, patternSize, whiteCenters, cv2.CALIB_CB_ASYMMETRIC_GRID + cv2.CALIB_CB_CLUSTERING, whiteDetector)
-    whiteCentroid = np.mean(whiteCenters, 0)
-    blackCentroid = np.mean(blackCenters, 0)
-
-    assert (isBlackFound and isWhiteFound), 'Cannot find two circles grids'
 
     circlesImage = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     cv2.drawChessboardCorners(circlesImage, patternSize, blackCenters, isBlackFound)
     cv2.drawChessboardCorners(circlesImage, patternSize, whiteCenters, isWhiteFound)
     if visualize:
         cv2.imshow("corners", circlesImage)
+        cv2.waitKey()
+
+    assert (isBlackFound and isWhiteFound), 'Cannot find two circles grids'
+    whiteCentroid = np.mean(whiteCenters, 0)
+    blackCentroid = np.mean(blackCenters, 0)
+
 
     mask = np.zeros(image.shape, np.uint8)
     """    
@@ -91,6 +97,7 @@ if __name__ == '__main__':
         cv2.imshow("filled mask", mask)
 
     retval, thresholdedImage = cv2.threshold(image, thresholdValue, 255, cv2.THRESH_BINARY )
+    thresholdedImage[np.nonzero(mask)] = 0
     if visualize:
         cv2.imshow('gray image', image)
         cv2.imshow('thresholded image', thresholdedImage)

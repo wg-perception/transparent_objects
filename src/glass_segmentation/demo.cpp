@@ -1,17 +1,47 @@
 #include "edges_pose_refiner/enhancedGlassSegmenter.hpp"
 #include "edges_pose_refiner/segmentedImage.hpp"
+#include <omp.h>
 
 using namespace cv;
 using std::cout;
 using std::endl;
 
+void drawHistogram1D(const cv::Mat &histogram, cv::Mat &image)
+{
+  CV_Assert(histogram.type() == CV_32FC1);
+  int dim = std::max(histogram.rows, histogram.cols);
+  const int binWidth = 5;
+  const int binHeight = 100;
+  image.create(binHeight, binWidth * dim, CV_8UC3);
+  image.setTo(Scalar::all(255));
+
+  for (int i = 0; i < dim; ++i)
+  {
+    int currentHeight = cvRound(histogram.at<float>(i) * binHeight);
+    rectangle(image, Point(i * binWidth, binHeight - currentHeight), Point((i+1) * binWidth, binHeight), Scalar(255, 0, 0), -1);
+  }
+}
+
+void computeHistogram1D(const cv::Mat &grayscaleImage, const cv::Mat &mask, cv::Mat &histogram)
+{
+  const int binCount = 256;
+
+  int histSize[] = {binCount};
+  float intensityRanges[] = {0, 256};
+  const float* ranges[] = {intensityRanges};
+  int channels[] = {0};
+  calcHist(&grayscaleImage, 1, channels, mask, histogram, 1, histSize, ranges, true, false);
+  histogram /= countNonZero(mask);
+}
+
 struct InteractiveClassificationData
 {
-  CvSVM *svm;
-  Mat edges, segmentation;
+  Mat segmentation;
+  Mat grayscaleImage;
   vector<Region> regions;
 
-  Graph graph;
+  bool isFirstClick;
+  int firstRegionIndex;
 };
 
 void visualizeClassification(const vector<Region> &regions, const vector<float> &labels, cv::Mat &visualization)
@@ -32,7 +62,6 @@ void visualizeClassification(const vector<Region> &regions, const vector<float> 
   }
 }
 
-#if 0
 void onMouse(int event, int x, int y, int, void *rawData)
 {
   //TODO: move up
@@ -46,7 +75,61 @@ void onMouse(int event, int x, int y, int, void *rawData)
   InteractiveClassificationData *data = static_cast<InteractiveClassificationData*>(rawData);
 
   int regionIndex = data->segmentation.at<int>(y, x);
+  if (data->isFirstClick)
+  {
+    data->firstRegionIndex = regionIndex;
+  }
+  else
+  {
+    Region firstRegion = data->regions[data->firstRegionIndex];
+    Region secondRegion = data->regions[regionIndex];
+    Mat firstIntensityClusters = firstRegion.getIntensityClusters();
+    Mat secondIntensityClusters = secondRegion.getIntensityClusters();
+    cout << firstIntensityClusters << endl;
+    cout << secondIntensityClusters << endl;
+    float slope, intercept;
+    computeOverlayConsistency(firstRegion, secondRegion, slope, intercept);
+    Mat fullSample;
+    GlassClassifier::regions2samples(firstRegion, secondRegion, fullSample);
+    cout << fullSample << endl;
+    cout << slope << " " << intercept << endl;
+    cout << endl << endl;
 
+    Mat firstHistogram, secondHistogram;
+    computeHistogram1D(data->grayscaleImage, firstRegion.getErodedMask(), firstHistogram);
+    computeHistogram1D(data->grayscaleImage, secondRegion.getErodedMask(), secondHistogram);
+    Mat firstHistogramImage, secondHistogramImage;
+    drawHistogram1D(firstHistogram, firstHistogramImage);
+    drawHistogram1D(secondHistogram, secondHistogramImage);
+    imshow("first histogram", firstHistogramImage);
+    imshow("second histogram", secondHistogramImage);
+
+
+    Mat closeRegionsImage(data->grayscaleImage.size(), CV_8UC1, Scalar(0));
+    for (size_t i = 0; i < data->regions.size(); ++i)
+    {
+      Mat fullSample;
+      GlassClassifier::regions2samples(firstRegion, data->regions[i], fullSample);
+      //TODO: move up
+      const float maxDistance = 10.0f;
+      if (fullSample.at<float>(4) < maxDistance)
+      {
+        closeRegionsImage.setTo(255, data->regions[i].getMask());
+      }
+      else
+      {
+        if (fullSample.at<float>(4) < 30.0f)
+        {
+          closeRegionsImage.setTo(128, data->regions[i].getMask());
+        }
+      }
+    }
+    imshow("close regions", closeRegionsImage);
+  }
+
+  data->isFirstClick = !data->isFirstClick;
+
+#if 0
   vector<float> labels(data->regions.size());
   for (size_t i = 0; i < data->regions.size(); ++i)
   {
@@ -88,8 +171,8 @@ void onMouse(int event, int x, int y, int, void *rawData)
  // regionAffinities.convertTo(affinityImage, CV_8UC1, 10.0);
   imshow("affinities", affinityImage);
   */
-}
 #endif
+}
 
 void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
 {
@@ -101,70 +184,106 @@ void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
   Rect contourRect(tl, br);
   rectangle(contourEdges, contourRect, Scalar(255), 2);
 }
+
+#define CLASSIFY
+
 int main(int argc, char *argv[])
 {
   std::system("date");
+  omp_set_num_threads(4);
 
+  if (argc != 5 && argc != 6)
+  {
+    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilename> [--visualize]" << endl;
+    return -1;
+  }
+
+  const string testFolder = argv[1];
+  const string fullTestIndex = argv[2];
+  const string classifierFilename = argv[3];
+  const string segmentationFilename = argv[4];
+
+  bool visualize;
+  if (argc == 5)
+  {
+    visualize = false;
+  }
+  else
+  {
+    visualize = true;
+    CV_Assert(string(argv[argc - 1]) == "--visualize");
+  }
+
+#ifdef CLASSIFY
   GlassClassifier classifier;
-  classifier.train();
+  bool doesExist = classifier.read(classifierFilename);
+  if (!doesExist)
+  {
+    classifier.train();
+    classifier.write(classifierFilename);
+  }
+  cout << "classifier is ready" << endl;
+#endif
 
-  const string testSegmentationTitle = "test segmentation";
-
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/plate_building.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/tea_table2.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Test/table_misc3.jpg");
-
-
-//  Mat testGlassMask = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/mask_image_00050_croped.png", CV_LOAD_IMAGE_GRAYSCALE);
-//  Mat testImage = imread("/media/2Tb/transparentBases/fixedOnTable/base/glass/image_00050_croped.png");
-
-//  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_17.png", CV_LOAD_IMAGE_GRAYSCALE);
-
-  Mat testGlassMask = imread("/media/2Tb/transparentBases/segmentation/rgb/mask_00017.png", CV_LOAD_IMAGE_GRAYSCALE);
-  Mat testImage = imread("/media/2Tb/transparentBases/segmentation/rgb/image_00017.png");
-//  imshow("testImage", testImage);
-//  waitKey(500);
-
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB1f.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/teaB2f.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/plateB1fc.jpg");
-//  Mat testImage = imread("/media/2Tb/transparentBases/rgbGlassData/Training/wineB1f.jpg");
-
-//  SegmentedImage segmentedImage(testImage);
-//  segmentedImage.write("image_00017.xml");
+  Mat testGlassMask = imread(testFolder + "/glassMask_" + fullTestIndex + ".png", CV_LOAD_IMAGE_GRAYSCALE);
+  Mat testImage = imread(testFolder + "/image_" + fullTestIndex + ".png");
+  CV_Assert(!testImage.empty());
+  CV_Assert(!testGlassMask.empty());
 
   SegmentedImage segmentedImage;
-//  segmentedImage.read("segmentedImage.xml");
-  segmentedImage.read("image_00017.xml");
-  segmentedImage.showSegmentation("test segmentation");
+  segmentedImage.read(testFolder + "/segmentedImage_" + fullTestIndex + ".xml");
 
+  if (visualize)
+  {
+    segmentedImage.showSegmentation("segmentation");
+    segmentedImage.showBoundaries("boundaries", Scalar(255, 0, 255));
+    segmentedImage.showTextonLabelsMap("textons");
+
+    vector<Region> regions = segmentedImage.getRegions();
+    Mat maskImage = Mat(testImage.size(), CV_8UC1, Scalar(0));
+    for (size_t i = 0; i < regions.size(); ++i)
+    {
+      Mat mask = regions[i].getMask();
+      const int erosionCount = 2;
+      Mat erodedMask;
+      erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
+
+      testImage.copyTo(maskImage, erodedMask);
+    }
+    imshow("maskImage", maskImage);
+    waitKey(500);
+  }
+
+#ifdef CLASSIFY
   Mat boundaryStrength;
   classifier.test(segmentedImage, testGlassMask, boundaryStrength);
 
   Mat finalSegmentation;
-
-//  Mat contour;
-//  createContour(testImage.size(), contour);
-//  geodesicActiveContour(contour, finalSegmentation);
   geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation);
-  imshow("finalSegmentation", finalSegmentation);
-  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
-  imwrite("final.png", gac);
-  waitKey();
+//  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
+  imwrite(segmentationFilename, finalSegmentation);
+#endif
 
-/*
+  if (visualize)
+  {
+    imshow("finalSegmentation", finalSegmentation);
+    waitKey();
 
-  namedWindow(testSegmentationTitle);
-  InteractiveClassificationData data;
-  data.svm = &svm;
-  data.edges = edges;
-  data.segmentation = segmentedImage.getSegmentation();
-  data.regions = regions;
-  data.graph = graph;
+    const string testSegmentationTitle = "test segmentation";
+    namedWindow(testSegmentationTitle);
+    InteractiveClassificationData data;
+    data.segmentation = segmentedImage.getSegmentation();
+    data.regions = segmentedImage.getRegions();
+    cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
+    data.isFirstClick = true;
 
-  setMouseCallback(testSegmentationTitle, onMouse, &data);
-  segmentedImage.showSegmentation(testSegmentationTitle);
-*/
+    setMouseCallback(testSegmentationTitle, onMouse, &data);
+  //  segmentedImage.showSegmentation(testSegmentationTitle);
+
+    segmentedImage.showBoundaries(testSegmentationTitle);
+    waitKey();
+  }
+
   std::system("date");
 
   return 0;

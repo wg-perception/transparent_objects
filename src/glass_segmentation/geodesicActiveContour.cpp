@@ -15,6 +15,7 @@
 #include "edges_pose_refiner/utils.hpp"
 
 #define DEBUG_GAC
+//#define VISUALIZE_GAC
 
 using namespace cv;
 using std::cout;
@@ -93,7 +94,8 @@ class GACIterationUpdate : public itk::Command
 GACIterationUpdate::GACIterationUpdate()
 {
   //TODO: move up
-  iterationStep = 50;
+//  iterationStep = 50;
+  iterationStep = 1000;
 }
 
 void GACIterationUpdate::setBgrImage(const cv::Mat &_bgrImage)
@@ -129,6 +131,7 @@ void GACIterationUpdate::Execute(const itk::Object *object, const itk::EventObje
     cv::Mat currentSegmentation = BridgeType::ITKImageToCVMat<OutputImageType>(thresholder->GetOutput());
     Mat currentCurve = drawSegmentation(bgrImage, currentSegmentation, Scalar(255, 0, 0), 2);
     imshow("current curve", currentCurve);
+
 /*
     std::stringstream filename;
     static int i = 10;
@@ -136,6 +139,7 @@ void GACIterationUpdate::Execute(const itk::Object *object, const itk::EventObje
     imwrite(filename.str(), currentCurve);
     i += 10;
 */
+
     waitKey(5);
   }
 }
@@ -162,27 +166,21 @@ void initializeGeodesicActiveContour(const cv::Mat &edges, cv::Mat &initialLevel
   Mat edgesFloat;
   edges.convertTo(edgesFloat, CV_32FC1);
   featureImage = edgesFloat;
-
-  imshow("featureImage", featureImage);
-//  imshow("featureImage divided ", featureImage / 100.0);
-  waitKey();
 }
 
 void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation)
 {
   //TODO: move up
-//  const float alpha = -1.0f;
- const float alpha = -0.2f;
-//  const float beta = 3.0f;
-//  const float beta = 0.01f;
-  const float beta = 0.38f;
+ const float beta = 7.0f;
+ const float alpha = -0.86f;
 
-  const float propagationScaling = -0.3f;
+//  const float propagationScaling = -0.3f;
+  const float propagationScaling = -0.01f;
   const float curvatureScaling = 1.0f;
   const float advectionScaling = 1.0f;
 
   const float maximumRMSError = 0.001f;
-  const int numberOfIterations = 6000;
+  const int numberOfIterations = 80000;
 
 /*
   const float seedX = 320.0f;
@@ -261,9 +259,11 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
   geodesicActiveContour->SetFeatureImage(sigmoid->GetOutput());
 
 
+#ifdef VISUALIZE_GAC
   GACIterationUpdate::Pointer observer = GACIterationUpdate::New();
   observer->setBgrImage(bgrImage);
   geodesicActiveContour->AddObserver(itk::IterationEvent(), observer);
+#endif
 
 
   typedef itk::BinaryThresholdImageFilter<InternalImageType, OutputImageType> ThresholdingFilterType;
