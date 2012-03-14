@@ -14,9 +14,10 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-//#define VISUALIZE_SEGMENTATION
+#define VISUALIZE_SEGMENTATION
+//#define DEBUG_ML
 
-enum RegionLabel {GLASS, GLASS_BACKGROUND, OTHER_BACKGROUND, NOT_VALID};
+enum RegionLabel {GLASS, GLASS_BACKGROUND, OTHER_BACKGROUND, REGION_GROUND_TRUTH_INVALID, REGION_COMPLETELY_INVALID};
 
 EdgeProperties::EdgeProperties()
 {
@@ -335,12 +336,8 @@ void MLData::removeMaskedOutSamples()
   mask = Mat();
 }
 
-void GlassClassifier::train()
+void GlassClassifier::train(const std::string &trainingFilesList, const std::string &groundTruthFilesList)
 {
-  //TODO: move up
-  const string trainingFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImages.txt";
-  const string groundTruthFilesList = "/media/2Tb/transparentBases/rgbGlassData/trainingImagesGroundTruth.txt";
-
   vector<string> trainingGroundTruhFiles;
   readLinesInFile(groundTruthFilesList, trainingGroundTruhFiles);
 
@@ -444,7 +441,9 @@ void GlassClassifier::train()
 //  cout << dcaTrainingData << endl;
 //  saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
 //  saveMLData("dcaData.csv", dcaTrainingData, trainingLabels);
+#ifdef DEBUG_ML
   trainingData.write("fullTrainingData");
+#endif
 
 //  cout << ecaTrainingData << endl;
 //  cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
@@ -452,7 +451,8 @@ void GlassClassifier::train()
 //  cout << "fullTrainingData size: " << fullTrainingData.rows << " x " << fullTrainingData.cols << endl;
   cout << "The same: " << countNonZero(trainingData.responses == THE_SAME) << endl;
   cout << "Glass covered: " << countNonZero(trainingData.responses == GLASS_COVERED) << endl;
-  cout << "Invalid: " << countNonZero(trainingData.responses == INVALID) << endl;
+  cout << "Completely invalid: " << countNonZero(trainingData.responses == COMPLETELY_INVALID) << endl;
+  cout << "Ground truth invalid: " << countNonZero(trainingData.responses == GROUND_TRUTH_INVALID) << endl;
 
   cout << "training...  " << std::flush;
 
@@ -810,6 +810,8 @@ void GlassClassifier::predict(const MLData &data, cv::Mat &confidences) const
   cout << "predicting... " << std::flush;
   confidences.create(data.samples.rows, 1, CV_32FC1);
   CV_Assert(data.mask.empty() || (data.mask.type() == CV_8UC1 && data.mask.rows == data.samples.rows));
+
+#pragma omp parallel for schedule(dynamic, 100)
   for (int i = 0; i < data.samples.rows; ++i)
   {
     if (!data.mask.empty() && data.mask.at<uchar>(i) == 0)
@@ -830,7 +832,7 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
 //  segmentedImage2pairwiseResponses(testImage, groundTruthMask, true, pairwiseResponses);
   segmentedImage2pairwiseResponses(testImage, groundTruthMask, false, pairwiseResponses);
 
-  Mat samplesMask = (pairwiseResponses != INVALID);
+  Mat samplesMask = (pairwiseResponses != COMPLETELY_INVALID);
   isRegionValid.resize(samplesMask.rows);
   for (int i = 0; i < samplesMask.rows; ++i)
   {
@@ -843,11 +845,10 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   testData.samples = pairwiseSamples.reshape(1, pairwiseSamples.total());
   testData.mask = samplesMask.reshape(1, samplesMask.total());
   testData.responses = pairwiseResponses.reshape(1, pairwiseResponses.total());
-  testData.write("testData");
 
   Mat testConfidences;
   predict(testData, testConfidences);
-  testConfidences.setTo(-std::numeric_limits<float>::max(), ~testData.mask);
+//  testConfidences.setTo(-std::numeric_limits<float>::max(), ~testData.mask);
   discrepancies = testConfidences.reshape(1, pairwiseResponses.rows);
   Mat diag = discrepancies.diag();
   diag.setTo(-std::numeric_limits<float>::max());
@@ -861,6 +862,9 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
   cout << "test error: " << error << endl;
   cout << "confusion matrix: " << confusionMatrix << endl;
 
+#ifdef DEBUG_ML
+  testData.write("testData");
+#endif
 /*
   {
     MLData testDataInTrainFormat;
@@ -1008,7 +1012,9 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   Mat sortedIndices;
   sortIdx(summedDiscrepancies, sortedIndices, CV_SORT_EVERY_COLUMN + CV_SORT_DESCENDING);
   Mat bestRegionsImage(pixelDiscrepancies.size(), CV_8UC1, Scalar(0));
-  int bestRegionsCount = 40;
+//  int bestRegionsCount = 40;
+
+  int bestRegionsCount = 100;
   Mat regionsStrength(pixelDiscrepancies.size(), CV_32FC1);
   for (int i = 0; i < sortedIndices.rows; ++i)
   {
@@ -1080,7 +1086,7 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   Mat glassMask = groundTruthMask == glassLabel;
   for (size_t i = 0; i < regions.size(); ++i)
   {
-    regionLabels[i] = NOT_VALID;
+    regionLabels[i] = REGION_COMPLETELY_INVALID;
     if (countNonZero(regions[i].getErodedMask()) < minErodedArea)
     {
       ++invalidRegionsCount;
@@ -1103,8 +1109,9 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
       regionLabels[i] = GLASS;
     }
 
-    if (regionLabels[i] == NOT_VALID)
+    if (regionLabels[i] == REGION_COMPLETELY_INVALID)
     {
+      regionLabels[i] = REGION_GROUND_TRUTH_INVALID;
       ++invalidRegionsCount;
       invalidRegionsImage.setTo(255, regions[i].getMask());
     }
@@ -1120,12 +1127,20 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
   {
     for (size_t j = 0; j < regions.size(); ++j)
     {
-      int currentLabel = INVALID;
-      if (regionLabels[i] == NOT_VALID || regionLabels[j] == NOT_VALID || i == j ||
-          regionLabels[i] == GLASS && regionLabels[j] == GLASS ||
+      int currentLabel;
+      if (regionLabels[i] == REGION_COMPLETELY_INVALID || regionLabels[j] == REGION_COMPLETELY_INVALID || i == j ||
           useOnlyAdjacentRegions && !segmentedImage.areRegionsAdjacent(i, j) ||
           norm(regions[i].getCenter() - regions[j].getCenter()) > maxDistanceBetweenRegions)
       {
+        currentLabel = COMPLETELY_INVALID;
+        responses.at<int>(i, j) = currentLabel;
+        continue;
+      }
+
+      if (regionLabels[i] == REGION_GROUND_TRUTH_INVALID || regionLabels[j] == REGION_GROUND_TRUTH_INVALID || i == j ||
+          regionLabels[i] == GLASS && regionLabels[j] == GLASS)
+      {
+        currentLabel = GROUND_TRUTH_INVALID;
         responses.at<int>(i, j) = currentLabel;
         continue;
       }
@@ -1165,13 +1180,13 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
     for (size_t j = i + 1; j < regions.size(); ++j)
     {
       int currentResponse = responses.at<int>(i, j);
-      if (currentResponse == INVALID)
+      if (currentResponse == COMPLETELY_INVALID || currentResponse == GROUND_TRUTH_INVALID)
       {
         continue;
       }
       CV_Assert(! (useOnlyAdjacentRegions && responses.at<int>(i, j) == GLASS_COVERED));
 
-      CV_Assert(responses.at<int>(j, i) != INVALID);
+      CV_Assert(responses.at<int>(j, i) != COMPLETELY_INVALID || responses.at<int>(j, i) != GROUND_TRUTH_INVALID);
 
       Mat currentSample = Mat(samples.at<Sample>(i, j)).reshape(1, 1);
       CV_Assert(currentSample.rows == 1);

@@ -15,7 +15,7 @@
 #include "edges_pose_refiner/utils.hpp"
 
 #define DEBUG_GAC
-//#define VISUALIZE_GAC
+#define VISUALIZE_GAC
 
 using namespace cv;
 using std::cout;
@@ -175,12 +175,12 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
  const float alpha = -0.86f;
 
 //  const float propagationScaling = -0.3f;
-  const float propagationScaling = -0.01f;
+  const float propagationScaling = -0.02f;
   const float curvatureScaling = 1.0f;
   const float advectionScaling = 1.0f;
 
   const float maximumRMSError = 0.001f;
-  const int numberOfIterations = 80000;
+  const int numberOfIterations = 60000;
 
 /*
   const float seedX = 320.0f;
@@ -275,7 +275,11 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
   thresholder->SetInsideValue(255);
 
   thresholder->SetInput( geodesicActiveContour->GetOutput() );
+  thresholder->Update();
 
+  segmentation = BridgeType::ITKImageToCVMat<OutputImageType>(thresholder->GetOutput());
+
+#ifdef DEBUG_GAC
   typedef itk::ImageFileWriter<OutputImageType> WriterType;
   WriterType::Pointer writer = WriterType::New();
   writer->SetInput(thresholder->GetOutput());
@@ -283,7 +287,6 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
   writer->SetFileName(tmpOutputFilename);
   writer->Update();
 
-#ifdef DEBUG_GAC
   typedef itk::RescaleIntensityImageFilter<InternalImageType, OutputImageType> CastFilterType;
   WriterType::Pointer fmWriter = WriterType::New();
   CastFilterType::Pointer fmCaster = CastFilterType::New();
@@ -326,8 +329,4 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
   std::cout << "No. elpased iterations: " << geodesicActiveContour->GetElapsedIterations() << std::endl;
   std::cout << "RMS change: " << geodesicActiveContour->GetRMSChange() << std::endl;
 #endif
-
-  //TODO: don't use files
-  sleep(2);
-  segmentation = imread(tmpOutputFilename, CV_LOAD_IMAGE_GRAYSCALE);
 }

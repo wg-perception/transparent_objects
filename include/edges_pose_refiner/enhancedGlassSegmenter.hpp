@@ -68,7 +68,7 @@ private:
 class GlassClassifier
 {
   public:
-    void train();
+    void train(const std::string &trainingFilesList, const std::string &groundTruthFilesList);
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
 
     static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample);
@@ -98,7 +98,7 @@ class GlassClassifier
     float normalizationSlope, normalizationIntercept;
 };
 
-enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1, INVALID = 2};
+enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1, GROUND_TRUTH_INVALID = 2, COMPLETELY_INVALID = 3};
 void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat &scalingIntercept);
 void getNormalizationParameters(const CvSVM *svm, const cv::Mat &trainingData, const std::vector<int> &trainingLabelsVec, float &normalizationSlope, float &normalizationIntercept);
 

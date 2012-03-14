@@ -190,13 +190,16 @@ void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
 int main(int argc, char *argv[])
 {
   std::system("date");
-  omp_set_num_threads(4);
+  omp_set_num_threads(5);
 
   if (argc != 5 && argc != 6)
   {
     cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilename> [--visualize]" << endl;
     return -1;
   }
+
+  const string trainingFilesList = "/media/2Tb/transparentBases/fixedOnTable/base/trainingImages.txt";
+  const string groundTruthFilesList = "/media/2Tb/transparentBases/fixedOnTable/base/trainingImagesGroundTruth.txt";
 
   const string testFolder = argv[1];
   const string fullTestIndex = argv[2];
@@ -219,16 +222,25 @@ int main(int argc, char *argv[])
   bool doesExist = classifier.read(classifierFilename);
   if (!doesExist)
   {
-    classifier.train();
+    classifier.train(trainingFilesList, groundTruthFilesList);
     classifier.write(classifierFilename);
   }
   cout << "classifier is ready" << endl;
 #endif
 
-  Mat testGlassMask = imread(testFolder + "/glassMask_" + fullTestIndex + ".png", CV_LOAD_IMAGE_GRAYSCALE);
-  Mat testImage = imread(testFolder + "/image_" + fullTestIndex + ".png");
-  CV_Assert(!testImage.empty());
-  CV_Assert(!testGlassMask.empty());
+  string testImageFilename = testFolder + "/image_" + fullTestIndex + ".png";
+  Mat testImage = imread(testImageFilename);
+  if (testImage.empty())
+  {
+    CV_Error(CV_StsBadArg, "Cannot read " + testImageFilename);
+  }
+
+  string testGlassMaskFilename = testFolder + "/glassMask_" + fullTestIndex + ".png";
+  Mat testGlassMask = imread(testGlassMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
+  if (testGlassMask.empty())
+  {
+    CV_Error(CV_StsBadArg, "Cannot read" + testGlassMaskFilename);
+  }
 
   SegmentedImage segmentedImage;
   segmentedImage.read(testFolder + "/segmentedImage_" + fullTestIndex + ".xml");

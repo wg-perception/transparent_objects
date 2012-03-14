@@ -37,6 +37,7 @@ if __name__ == '__main__':
     thresholdValue = 120
     minContourLength = 300
     patternSize = (4, 11)
+    dilationIterationCount = 5
     visualize = False
 
     image = cv2.imread(filename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
@@ -132,6 +133,10 @@ if __name__ == '__main__':
     mask[np.nonzero(fiducialMask)] = 255
     if visualize:
         cv2.imshow("mask with fiducials", mask)
+
+    mask = cv2.dilate(mask, None, mask, (-1, -1), dilationIterationCount)
+    if visualize:
+        cv2.imshow("final mask", mask)
 
     maskedImage = image.copy()
     maskedImage[np.nonzero(mask)] = 0
