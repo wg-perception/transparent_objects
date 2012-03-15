@@ -4,11 +4,29 @@
 #include <opencv2/core/core.hpp>
 #include "edges_pose_refiner/region.hpp"
 
+struct SegmentedImageParams
+{
+  std::string filterBankFilename;
+  int textonCount;
+  int iterationCount;
+  int attempts;
+  int erosionIterations;
+
+  SegmentedImageParams()
+  {
+    filterBankFilename = "textureFilters.xml";
+    textonCount = 36;
+    iterationCount = 30;
+    attempts = 20;
+    erosionIterations = 1;
+  }
+};
+
 class SegmentedImage
 {
   public:
-    SegmentedImage();
-    SegmentedImage(const cv::Mat &image, const std::string &segmentationFilename = "seg.txt");
+    SegmentedImage(const SegmentedImageParams &params = SegmentedImageParams());
+    SegmentedImage(const cv::Mat &image, const std::string &segmentationFilename = "seg.txt", const SegmentedImageParams &params = SegmentedImageParams());
 
     const std::vector<Region>& getRegions() const;
     const Region& getRegion(int regionIndex) const;
@@ -22,16 +40,17 @@ class SegmentedImage
     void write(const std::string &filename) const;
     void read(const std::string &filename);
   private:
-    static void computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels);
-    static void oversegmentImage(const cv::Mat &image, const std::string &segmentationFilename, cv::Mat &segmentation);
-    static void mergeThinRegions(cv::Mat &segmentation, std::vector<int> &labels);
-    static void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, cv::Mat &textonLabels, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions);
+    void computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels);
+    void oversegmentImage(const cv::Mat &image, const std::string &segmentationFilename, cv::Mat &segmentation);
+    void mergeThinRegions(cv::Mat &segmentation, std::vector<int> &labels);
+    void segmentation2regions(const cv::Mat &image, cv::Mat &segmentation, cv::Mat &textonLabels, const std::vector<cv::Mat> &filterBank, std::vector<Region> &regions);
 
     cv::Mat image, segmentation;
     cv::Mat textonLabelsMap;
     cv::Mat regionAdjacencyMat;
     std::vector<Region> regions;
     static std::vector<cv::Mat> filterBank;
+    SegmentedImageParams params;
 };
 
 

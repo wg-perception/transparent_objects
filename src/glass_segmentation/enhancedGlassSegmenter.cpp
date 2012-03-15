@@ -14,7 +14,7 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-#define VISUALIZE_SEGMENTATION
+//#define VISUALIZE_SEGMENTATION
 //#define DEBUG_ML
 
 enum RegionLabel {GLASS, GLASS_BACKGROUND, OTHER_BACKGROUND, REGION_GROUND_TRUTH_INVALID, REGION_COMPLETELY_INVALID};
@@ -336,6 +336,11 @@ void MLData::removeMaskedOutSamples()
   mask = Mat();
 }
 
+GlassClassifier::GlassClassifier(const GlassClassifierParams &_params)
+{
+  params = _params;
+}
+
 void GlassClassifier::train(const std::string &trainingFilesList, const std::string &groundTruthFilesList)
 {
   vector<string> trainingGroundTruhFiles;
@@ -375,9 +380,7 @@ void GlassClassifier::train(const std::string &trainingFilesList, const std::str
     trainingData.push_back(currentMLData);
   }
   CV_Assert(trainingData.isValid());
-  //TODO: move up
-  const int targetNegativeSamplesCount = 60000;
-  int randomizer = trainingData.getSamplesCount() / targetNegativeSamplesCount;
+  int randomizer = trainingData.getSamplesCount() / params.targetNegativeSamplesCount;
   CV_Assert(trainingData.mask.empty());
   CV_Assert(trainingData.responses.type() == CV_32SC1);
   trainingData.mask = Mat(trainingData.responses.size(), CV_8UC1, Scalar(255));

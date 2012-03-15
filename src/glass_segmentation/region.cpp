@@ -6,12 +6,14 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-Region::Region()
+Region::Region(const RegionParams &_params)
 {
+  params = _params;
 }
 
-Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Mat &_mask)
+Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Mat &_mask, const RegionParams &_params)
 {
+  params = _params;
   image = _image;
   textonLabels = _textonLabels;
   mask = _mask;
@@ -30,10 +32,7 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
 
 void Region::computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask)
 {
-  //TODO: move up
-  const int erosionCount = 2;
-
-  erode(mask, erodedMask, Mat(), Point(-1, -1), erosionCount);
+  erode(mask, erodedMask, Mat(), Point(-1, -1), params.erosionCount);
 //  erodedMask = mask.clone();
 }
 
@@ -129,12 +128,10 @@ void Region::computeRobustMichelsonContrast()
     return;
   }
 
-  //TODO: move up
-  const float outliersRatio = 0.1f;
   const float eps = 1e-4;
   CV_Assert(intensities.size() > 1);
-  int firstIndex = floor(outliersRatio * intensities.size());
-  int lastIndex = floor((1.0f - outliersRatio) * intensities.size());
+  int firstIndex = floor(params.outliersRatio * intensities.size());
+  int lastIndex = floor((1.0f - params.outliersRatio) * intensities.size());
 
   int firstMedianIndex = (static_cast<int>(intensities.size()) - 1) / 2;
   int secondMedianIndex = intensities.size() / 2;
@@ -218,7 +215,6 @@ void Region::computeMedianColor()
 
   if (channels[0].empty())
   {
-    //TODO: move up
     medianColor = Vec3b(128, 128, 128);
     return;
   }
@@ -234,8 +230,7 @@ void Region::computeMedianColor()
 void Region::computeColorHistogram()
 {
 /*
-  //TODO: move up
-  const int bins = 20;
+  int params.bins = 20;
 
   CV_Assert(image.type() == CV_8UC3);
   CV_Assert(erodedMask.type() == CV_8UC1);
@@ -257,14 +252,9 @@ void Region::computeColorHistogram()
   calcHist(&image, 1, channels, erodedMask, colorHistogram, 3, histSize, ranges, true, false);
 */
 
-
-  //TODO: move up
-  const int hbins = 20;
-  const int sbins = 20;
-
   if (isEmpty())
   {
-    colorHistogram = Mat(hbins, sbins, CV_32FC1, Scalar(0));
+    colorHistogram = Mat(params.hbins, params.sbins, CV_32FC1, Scalar(0));
     return;
   }
 
@@ -273,7 +263,7 @@ void Region::computeColorHistogram()
   Mat hsv;
   cvtColor(image, hsv, CV_BGR2HSV);
 
-  int histSize[] = {hbins, sbins};
+  int histSize[] = {params.hbins, params.sbins};
   float hranges[] = {0, 180};
   float sranges[] = {0, 256};
   const float* ranges[] = {hranges, sranges};
@@ -287,21 +277,17 @@ void Region::computeColorHistogram()
 
 void Region::computeTextonHistogram()
 {
-  //TODO: move up
-  const int textonCount = 36;
-
   if (isEmpty())
   {
-    textonHistogram = Mat(textonCount, 1, CV_32FC1, Scalar(0));
+    textonHistogram = Mat(params.textonCount, 1, CV_32FC1, Scalar(0));
     return;
   }
-
 
   Mat textonLabels_8U;
   textonLabels.convertTo(textonLabels_8U, CV_8UC1);
 
-  int histSize[] = {textonCount};
-  float labelRanges[] = {0, textonCount};
+  int histSize[] = {params.textonCount};
+  float labelRanges[] = {0, params.textonCount};
   const float* ranges[] = {labelRanges};
   int channels[] = {0};
   int narrays = 1;
@@ -315,20 +301,16 @@ void Region::computeTextonHistogram()
 
 void Region::clusterIntensities()
 {
-  //TODO: move up
-  const int clusterCount = 10;
-
-  if (intensities.size() < clusterCount)
+  if (intensities.size() < params.clusterCount)
   {
-    //TODO: move up
-    intensityClusterCenters = Mat(clusterCount, 1, CV_32FC1, Scalar(128));
+    intensityClusterCenters = Mat(params.clusterCount, 1, CV_32FC1, Scalar(128));
     return;
   }
 
   vector<int> boundaries;
   int currentBoundaryIndex = 0;
-  int step = intensities.size() / clusterCount;
-  int residual = intensities.size() % clusterCount;
+  int step = intensities.size() / params.clusterCount;
+  int residual = intensities.size() % params.clusterCount;
   while (currentBoundaryIndex <= intensities.size())
   {
     boundaries.push_back(currentBoundaryIndex);
@@ -339,10 +321,10 @@ void Region::clusterIntensities()
       --residual;
     }
   }
-  CV_Assert(boundaries.size() == clusterCount + 1);
+  CV_Assert(boundaries.size() == params.clusterCount + 1);
 
-  vector<float> clusterCenters(clusterCount);
-  for (int i = 0; i < clusterCount; ++i)
+  vector<float> clusterCenters(params.clusterCount);
+  for (int i = 0; i < params.clusterCount; ++i)
   {
     int intensitiesSum = std::accumulate(intensities.begin() + boundaries[i], intensities.begin() + boundaries[i + 1], 0);
     clusterCenters[i] = static_cast<float>(intensitiesSum) / (boundaries[i + 1] - boundaries[i]);

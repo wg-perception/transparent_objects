@@ -14,8 +14,8 @@
 #include "edges_pose_refiner/geodesicActiveContour.hpp"
 #include "edges_pose_refiner/utils.hpp"
 
-#define DEBUG_GAC
-#define VISUALIZE_GAC
+//#define DEBUG_GAC
+//#define VISUALIZE_GAC
 
 using namespace cv;
 using std::cout;
@@ -168,27 +168,9 @@ void initializeGeodesicActiveContour(const cv::Mat &edges, cv::Mat &initialLevel
   featureImage = edgesFloat;
 }
 
-void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation)
+void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation,
+                           const GeodesicActiveContourParams &params)
 {
-  //TODO: move up
- const float beta = 7.0f;
- const float alpha = -0.86f;
-
-//  const float propagationScaling = -0.3f;
-  const float propagationScaling = -0.02f;
-  const float curvatureScaling = 1.0f;
-  const float advectionScaling = 1.0f;
-
-  const float maximumRMSError = 0.001f;
-  const int numberOfIterations = 60000;
-
-/*
-  const float seedX = 320.0f;
-  const float seedY = 240.0f;
-  const float initialDistance = 230.0f;
-  const float speedConstant = 1.0f;
-*/
-
   Mat initialLevelSetMat, featureImageMat;
   initializeGeodesicActiveContour(edges, initialLevelSetMat, featureImageMat);
 
@@ -240,18 +222,18 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
   sigmoid->SetOutputMaximum(1.0);
 
   sigmoid->SetInput(featureImage);
-  sigmoid->SetAlpha(alpha);
-  sigmoid->SetBeta(beta);
+  sigmoid->SetAlpha(params.alpha);
+  sigmoid->SetBeta(params.beta);
 
 
   GeodesicActiveContourFilterType::Pointer geodesicActiveContour = GeodesicActiveContourFilterType::New();
 
-  geodesicActiveContour->SetPropagationScaling(propagationScaling);
-  geodesicActiveContour->SetCurvatureScaling(curvatureScaling);
-  geodesicActiveContour->SetAdvectionScaling(advectionScaling);
+  geodesicActiveContour->SetPropagationScaling(params.propagationScaling);
+  geodesicActiveContour->SetCurvatureScaling(params.curvatureScaling);
+  geodesicActiveContour->SetAdvectionScaling(params.advectionScaling);
 
-  geodesicActiveContour->SetMaximumRMSError(maximumRMSError);
-  geodesicActiveContour->SetNumberOfIterations(numberOfIterations);
+  geodesicActiveContour->SetMaximumRMSError(params.maximumRMSError);
+  geodesicActiveContour->SetNumberOfIterations(params.numberOfIterations);
 
 //  geodesicActiveContour->SetInput(fastMarching->GetOutput());
   geodesicActiveContour->SetInput(initialLevelSet);

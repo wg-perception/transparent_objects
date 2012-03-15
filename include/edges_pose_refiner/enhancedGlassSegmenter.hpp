@@ -65,9 +65,20 @@ private:
   int computeClassesCount() const;
 };
 
+struct GlassClassifierParams
+{
+  int targetNegativeSamplesCount;
+
+  GlassClassifierParams()
+  {
+    targetNegativeSamplesCount = 60000;
+  }
+};
+
 class GlassClassifier
 {
   public:
+    GlassClassifier(const GlassClassifierParams &params = GlassClassifierParams());
     void train(const std::string &trainingFilesList, const std::string &groundTruthFilesList);
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
 
@@ -96,6 +107,8 @@ class GlassClassifier
     CvSVM svm;
     cv::Mat scalingSlope, scalingIntercept;
     float normalizationSlope, normalizationIntercept;
+
+    GlassClassifierParams params;
 };
 
 enum TrainingLabels {THE_SAME = 0, GLASS_COVERED = 1, GROUND_TRUTH_INVALID = 2, COMPLETELY_INVALID = 3};

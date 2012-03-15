@@ -3,11 +3,32 @@
 
 #include <opencv2/core/core.hpp>
 
+struct RegionParams
+{
+  int hbins;
+  int sbins;
+  int textonCount;
+  int clusterCount;
+  int erosionCount;
+  float outliersRatio;
+
+  RegionParams()
+  {
+    hbins = 20;
+    sbins = 20;
+    textonCount = 36;
+    clusterCount = 10;
+    erosionCount = 2;
+    outliersRatio = 0.1f;
+  }
+};
+
 class Region
 {
   public:
-    Region();
-    Region(const cv::Mat &image, const cv::Mat &textonLabels, const cv::Mat &mask);
+    Region(const RegionParams &params = RegionParams());
+    Region(const cv::Mat &image, const cv::Mat &textonLabels, const cv::Mat &mask,
+           const RegionParams &params = RegionParams());
 
     cv::Point2f getCenter() const;
     cv::Vec3b getMedianColor() const;
@@ -33,7 +54,7 @@ class Region
     void computeRMSContrast();
     void computeMichelsonContrast();
     void computeRobustMichelsonContrast();
-    static void computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask);
+    void computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask);
 
     cv::Mat image, textonLabels, mask, erodedMask;
     cv::Mat grayscaleImage;
@@ -48,6 +69,8 @@ class Region
 
     float rmsContrast, michelsonContrast, robustMichelsonContrast;
     std::vector<int> intensities;
+
+    RegionParams params;
 };
 
 #endif

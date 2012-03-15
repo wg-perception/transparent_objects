@@ -9,19 +9,20 @@ using std::endl;
 
 std::vector<cv::Mat> SegmentedImage::filterBank;
 
-SegmentedImage::SegmentedImage()
+SegmentedImage::SegmentedImage(const SegmentedImageParams &_params)
 {
+  params = _params;
 }
 
-SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segmentationFilename)
+SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segmentationFilename, const SegmentedImageParams &_params)
 {
+  params = _params;
+
   image = _image;
-  //TODO: move up
-  const string filterBankFilename = "textureFilters.xml";
 
   if (filterBank.empty())
   {
-    loadFilterBank(filterBankFilename, filterBank);
+    loadFilterBank(params.filterBankFilename, filterBank);
   }
   oversegmentImage(image, segmentationFilename, segmentation);
   cout << "image is oversegmented" << endl;
@@ -103,17 +104,13 @@ void SegmentedImage::oversegmentImage(const cv::Mat &image, const std::string &s
 
 void SegmentedImage::mergeThinRegions(cv::Mat &segmentation, vector<int> &labels)
 {
-  //TODO: move up
-//  const int erosionIterations = 6;
-  const int erosionIterations = 1;
-
   vector<bool> isThin(labels.size(), false);
   vector<Mat> masks(labels.size());
   for (size_t i = 0; i < labels.size(); ++i)
   {
     masks[i] = (segmentation == labels[i]);
     Mat erodedMask;
-    erode(masks[i], erodedMask, Mat(), Point(-1, -1), erosionIterations);
+    erode(masks[i], erodedMask, Mat(), Point(-1, -1), params.erosionIterations);
 
     if (countNonZero(erodedMask) == 0)
     {
@@ -163,11 +160,8 @@ void SegmentedImage::mergeThinRegions(cv::Mat &segmentation, vector<int> &labels
 
 void SegmentedImage::showTextonLabelsMap(const std::string &title) const
 {
-  //TODO: move up
-  const int textonCount = 36;
-
-  vector<Vec3b> colors(textonCount);
-  for (int i = 0; i < textonCount; ++i)
+  vector<Vec3b> colors(params.textonCount);
+  for (int i = 0; i < params.textonCount; ++i)
   {
     const int minColor = 56;
     const int rndWidth = 200;
@@ -224,23 +218,15 @@ void SegmentedImage::showBoundaries(const std::string &title, const cv::Scalar &
 
 void SegmentedImage::computeTextonLabels(const cv::Mat &image, cv::Mat &textonLabels)
 {
-  //TODO: move up
-  const int textonCount = 36;
-  const int iterationCount = 30;
-  const int attempts = 20;
-
-//  const int iterationCount = 20;
-//  const int attempts = 1;
-
   Mat responses;
   convolveImage(image, filterBank, responses);
   cout << "image is convolved" << endl;
   Mat responsesMLData = responses.reshape(1, image.total());
   CV_Assert(responsesMLData.cols == filterBank.size());
-  TermCriteria termCriteria = cvTermCriteria(TermCriteria::MAX_ITER, iterationCount, 0.0);
+  TermCriteria termCriteria = cvTermCriteria(TermCriteria::MAX_ITER, params.iterationCount, 0.0);
   Mat responsesMLDataFloat;
   responsesMLData.convertTo(responsesMLDataFloat, CV_32FC1);
-  kmeans(responsesMLDataFloat, textonCount, textonLabels, termCriteria, attempts, KMEANS_PP_CENTERS);
+  kmeans(responsesMLDataFloat, params.textonCount, textonLabels, termCriteria, params.attempts, KMEANS_PP_CENTERS);
 //  kmeans(responsesMLDataFloat, textonCount, textonLabels, termCriteria, attempts, KMEANS_RANDOM_CENTERS);
   textonLabels = textonLabels.reshape(1, image.rows);
   CV_Assert(textonLabels.size() == image.size());
