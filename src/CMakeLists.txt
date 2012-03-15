@@ -24,9 +24,12 @@ set(src
     glass_segmentation/segmentedImage.cpp
 )
 
+file(GLOB inc "../include/edges_pose_refiner/*.hpp")
+
 #EAR: is there a reason to list headers in this target?
 add_library(edges_pose_refiner SHARED
     ${src}
+    ${inc}
     )
 
 set_target_properties(edges_pose_refiner PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
@@ -54,14 +57,15 @@ install(TARGETS edges_pose_refiner
   DESTINATION lib
   )
 
-#add_executable(transparentExperiments transparent_experiments/transparentExperiments.cpp transparent_experiments/TODBaseImporter.cpp)
-#set_target_properties(transparentExperiments
-#  PROPERTIES
-#  COMPILE_FLAGS "-std=c++0x"
-#  )
-#target_link_libraries(transparentExperiments edges_pose_refiner)
+add_executable(transparentExperiments transparent_experiments/transparentExperiments.cpp)
+set_target_properties(transparentExperiments
+  PROPERTIES
+  COMPILE_FLAGS "-std=c++0x"
+  )
+target_link_libraries(transparentExperiments edges_pose_refiner)
 
 add_executable(enhancedGlassSegmenter glass_segmentation/demo.cpp)
+set_target_properties(enhancedGlassSegmenter PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(enhancedGlassSegmenter edges_pose_refiner)
 
 add_executable(createSegmentedImage glass_segmentation/createSegmentedImage.cpp)

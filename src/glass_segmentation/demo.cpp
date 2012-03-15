@@ -192,9 +192,9 @@ int main(int argc, char *argv[])
   std::system("date");
   omp_set_num_threads(5);
 
-  if (argc != 5 && argc != 6)
+  if (argc != 5 && argc != 6 && argc != 7)
   {
-    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilename> [--visualize]" << endl;
+    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilesList> <propagationScalingsList> [--visualize]" << endl;
     return -1;
   }
 
@@ -204,10 +204,22 @@ int main(int argc, char *argv[])
   const string testFolder = argv[1];
   const string fullTestIndex = argv[2];
   const string classifierFilename = argv[3];
-  const string segmentationFilename = argv[4];
+  const string segmentationFilesList = argv[4];
+  const string propagationScalingsList = argv[5];
+  vector<string> segmentationFilenames;
+  readLinesInFile(segmentationFilesList, segmentationFilenames);
+  CV_Assert(!segmentationFilenames.empty());
+  vector<string> propagationScalingsStrings;
+  readLinesInFile(propagationScalingsList, propagationScalingsStrings);
+  CV_Assert(propagationScalingsStrings.size() == segmentationFilenames.size());
+  vector<float> propagationScalings(propagationScalingsStrings.size());
+  for (size_t i = 0; i < propagationScalingsStrings.size(); ++i)
+  {
+    propagationScalings[i] = atof(propagationScalingsStrings[i].c_str());
+  }
 
   bool visualize;
-  if (argc == 5)
+  if (argc < 7)
   {
     visualize = false;
   }
@@ -270,31 +282,43 @@ int main(int argc, char *argv[])
   Mat boundaryStrength;
   classifier.test(segmentedImage, testGlassMask, boundaryStrength);
 
-  Mat finalSegmentation;
-  geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation);
-//  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
-  imwrite(segmentationFilename, finalSegmentation);
-#endif
+#pragma omp parallel for schedule(dynamic, 1)
+  for (size_t i = 0; i < segmentationFilenames.size(); ++i)
+  {
+    Mat finalSegmentation;
+    GeodesicActiveContourParams params;
+    params.propagationScaling = propagationScalings[i];
+    geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation, params);
+  //  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
+    CV_Assert(!finalSegmentation.empty());
+    imwrite(segmentationFilenames[i], finalSegmentation);
 
+    if (visualize)
+    {
+      std::stringstream indexStr;
+      indexStr << i;
+      imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
+
+      const string testSegmentationTitle = "test segmentation " + indexStr.str();
+      namedWindow(testSegmentationTitle);
+      InteractiveClassificationData data;
+      data.segmentation = segmentedImage.getSegmentation();
+      data.regions = segmentedImage.getRegions();
+      cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
+      data.isFirstClick = true;
+
+      setMouseCallback(testSegmentationTitle, onMouse, &data);
+    //  segmentedImage.showSegmentation(testSegmentationTitle);
+
+      segmentedImage.showBoundaries(testSegmentationTitle);
+    }
+  }
   if (visualize)
   {
-    imshow("finalSegmentation", finalSegmentation);
-    waitKey();
-
-    const string testSegmentationTitle = "test segmentation";
-    namedWindow(testSegmentationTitle);
-    InteractiveClassificationData data;
-    data.segmentation = segmentedImage.getSegmentation();
-    data.regions = segmentedImage.getRegions();
-    cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
-    data.isFirstClick = true;
-
-    setMouseCallback(testSegmentationTitle, onMouse, &data);
-  //  segmentedImage.showSegmentation(testSegmentationTitle);
-
-    segmentedImage.showBoundaries(testSegmentationTitle);
     waitKey();
   }
+#endif
+
 
   std::system("date");
 
