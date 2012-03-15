@@ -6,6 +6,7 @@ from subprocess import call
 import glob
 import re
 import os
+import tempfile
 
 if __name__ == '__main__':
     assert len(sys.argv) == 3, sys.argv[0] + ' <baseFolder> <trainedModelsFolder>'
@@ -18,8 +19,8 @@ if __name__ == '__main__':
     baseFolder = sys.argv[1]
     trainedModelsFolder = sys.argv[2]
 
-    objectMaskFilename = 'objectMask.png'
-    backgroundMaskFilename = 'backgroundMask.png'
+    (objectMaskFD, objectMaskFilename) = tempfile.mkstemp('.png', 'objMask_')
+    (backgroundMaskFD, backgroundMaskFilename) = tempfile.mkstemp('.png', 'backMask_')
     for obj in objects:
         modelFilename = trainedModelsFolder + '/' + obj + '.xml' 
         testFolder = baseFolder + '/' + obj + '/'
@@ -58,6 +59,8 @@ if __name__ == '__main__':
 #            cv2.waitKey()
 #            cv2.imshow('mask', mask)
 #            cv2.waitKey()
+    os.close(objectMaskFD)
+    os.close(backgroundMaskFD)
     os.remove(objectMaskFilename)
     os.remove(backgroundMaskFilename)
     

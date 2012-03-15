@@ -6,25 +6,34 @@ import cv2
 from subprocess import call
 import numpy as np
 import matplotlib.pyplot as plt
+import tempfile
+import os
 
 if __name__ == '__main__':
-    assert len(sys.argv) == 5, sys.argv[0] + ' <testImagesFilename> <classifierFilename> <segmentationFilesList> <propagationScaligsList>'
+    assert len(sys.argv) == 4, sys.argv[0] + ' <testListFilename> <classifierFilename> <propagationScaligsList>'
 
     segmentImage = '/home/ilysenkov/itseezMachine/home/ilysenkov/ecto/server_build/bin/enhancedGlassSegmenter'
-    tmpSegmentationFilename = 'segmentation.png'
     groundTruthPrefix = 'glassMask'
 
-    testImagesFilename = sys.argv[1]
+    testListFilename = sys.argv[1]
     classifierFilename = sys.argv[2]
-    segmentationFilesList = sys.argv[3]
-    propagationScalingsList = sys.argv[4]
+    propagationScalingsList = sys.argv[3]
 
-    segmentationFilenames = open(segmentationFilesList, 'r').read().splitlines()
-    testFilenames = open(testImagesFilename, 'r').read().splitlines()
+    propagationScalings = open(propagationScalingsList, 'r').read().splitlines()
+
+    segmentationTemporaryFiles = [tempfile.mkstemp('.png', 'segmentation_') for scale in propagationScalings]
+
+    (segmentationListFD, segmentationListFilename) = tempfile.mkstemp('.txt', 'segmentationList_', text=True)
+    segmentationListFile = open(segmentationListFilename, 'w')
+    for (fd, filename) in segmentationTemporaryFiles:
+        segmentationListFile.write(filename + '\n')
+    segmentationListFile.close()
+
+    testFilenames = open(testListFilename, 'r').read().splitlines()
     
-    allTrueGlassArea = [0] * len(segmentationFilenames)
-    allPredictedGlassArea = [0] * len(segmentationFilenames)
-    allValidPredictedGlassArea = [0] * len(segmentationFilenames)
+    allTrueGlassArea = [0] * len(segmentationTemporaryFiles)
+    allPredictedGlassArea = [0] * len(segmentationTemporaryFiles)
+    allValidPredictedGlassArea = [0] * len(segmentationTemporaryFiles)
 
     for imageFilename in testFilenames:
         print imageFilename
@@ -40,16 +49,16 @@ if __name__ == '__main__':
         groundTruthFilename = imageFilename.replace('/image_', '/' + groundTruthPrefix + '_')
         testFolder = imageFilename.replace('/image_' + fullImageIndex + '.png', '/')
 
-        call([segmentImage, testFolder, fullImageIndex, classifierFilename, segmentationFilesList, propagationScalingsList])
+        call([segmentImage, testFolder, fullImageIndex, classifierFilename, segmentationListFilename, propagationScalingsList])
 
         groundTruth = cv2.imread(groundTruthFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
-        for (index, filename) in enumerate(segmentationFilenames):
-            segmentation = cv2.imread(filename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+        for (index, temporaryFile) in enumerate(segmentationTemporaryFiles):
+            segmentationImage = cv2.imread(temporaryFile[1], cv2.CV_LOAD_IMAGE_GRAYSCALE)
 
             glassLabel = 255
             trueGlassArea = len(np.nonzero(groundTruth == glassLabel)[0])
-            predictedGlassArea = len(np.nonzero(segmentation == glassLabel)[0])
-            validPredictedGlassArea = len(np.nonzero(np.logical_and(groundTruth == glassLabel, segmentation == groundTruth))[0])
+            predictedGlassArea = len(np.nonzero(segmentationImage == glassLabel)[0])
+            validPredictedGlassArea = len(np.nonzero(np.logical_and(groundTruth == glassLabel, segmentationImage == groundTruth))[0])
             allTrueGlassArea[index] += trueGlassArea
             allPredictedGlassArea[index] += predictedGlassArea
             allValidPredictedGlassArea[index] += validPredictedGlassArea
@@ -59,7 +68,7 @@ if __name__ == '__main__':
 
     invertedPrecisions = [None] * len(allTrueGlassArea)
     recalls = [None] * len(allTrueGlassArea)
-    for i in range(0, len(allTrueGlassArea)):
+    for i in range(len(allTrueGlassArea)):
         invertedPrecisions[i] = 1.0 - float(allValidPredictedGlassArea[i]) / allPredictedGlassArea[i]
         recalls[i] = float(allValidPredictedGlassArea[i]) / allTrueGlassArea[i]
         print 'overall precision =', 1.0 - invertedPrecisions[i]
@@ -75,4 +84,10 @@ if __name__ == '__main__':
     plt.legend(['RGB data'], title='Algorithm', loc='best')
     plt.savefig('evaluation.png')
     plt.show()
+
+    for segmentationFile in segmentationTemporaryFiles:
+        os.close(segmentationFile[0])
+        os.remove(segmentationFile[1])
+    os.close(segmentationListFD)
+    os.remove(segmentationListFilename)
 
