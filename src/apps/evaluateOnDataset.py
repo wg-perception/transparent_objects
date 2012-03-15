@@ -5,7 +5,7 @@ import re
 import cv2
 from subprocess import call
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     assert len(sys.argv) == 5, sys.argv[0] + ' <testImagesFilename> <classifierFilename> <segmentationFilesList> <propagationScaligsList>'
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     allPredictedGlassArea = [0] * len(segmentationFilenames)
     allValidPredictedGlassArea = [0] * len(segmentationFilenames)
 
-    for imageFilename in testFilenames[:2]:
+    for imageFilename in testFilenames:
         print imageFilename
 
         match = re.search('_(0*([1-9][0-9]*))\.', imageFilename)
@@ -57,7 +57,22 @@ if __name__ == '__main__':
             print 'precision =', float(validPredictedGlassArea) / predictedGlassArea
             print 'recall =', float(validPredictedGlassArea) / trueGlassArea
 
+    invertedPrecisions = [None] * len(allTrueGlassArea)
+    recalls = [None] * len(allTrueGlassArea)
     for i in range(0, len(allTrueGlassArea)):
-        print 'overall precision =', float(allValidPredictedGlassArea[i]) / allPredictedGlassArea[i]
-        print 'overall recall =', float(allValidPredictedGlassArea[i]) / allTrueGlassArea[i]
+        invertedPrecisions[i] = 1.0 - float(allValidPredictedGlassArea[i]) / allPredictedGlassArea[i]
+        recalls[i] = float(allValidPredictedGlassArea[i]) / allTrueGlassArea[i]
+        print 'overall precision =', 1.0 - invertedPrecisions[i]
+        print 'overall recall =', recalls[i]
+
+    plt.plot(invertedPrecisions, recalls)
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.xlabel('1 - precision')
+    plt.ylabel('recall')
+    plt.title('Evaluation of Glass Segmentation Algorithms')
+    plt.grid(True)
+    plt.legend(['RGB data'], title='Algorithm', loc='best')
+    plt.savefig('evaluation.png')
+    plt.show()
 
