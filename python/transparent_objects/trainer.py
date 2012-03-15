@@ -4,7 +4,7 @@ Module defining the transparent objects trainer
 """
 
 from object_recognition_core.db.dbtools import db_params_to_db
-from object_recognition_core.db.interface import DbModels, Document, DbDocuments
+from object_recognition_core.db.object_db import DbModels, Document, DbDocuments
 from object_recognition_core.db.models import Model, find_model_for_object
 from object_recognition_core.pipelines.training import TrainingPipeline
 from object_recognition_core.utils.json_helper import dict_to_cpp_json_str

@@ -3,8 +3,7 @@
 Module defining the transparent objects detector to find objects in a scene
 """
 
-from object_recognition_core.db.object_db import ObjectDb
-from object_recognition_core.db.interface import DbModels
+from object_recognition_core.db.object_db import ObjectDb, DbModels
 from object_recognition_core.pipelines.detection import DetectionPipeline
 from object_recognition_core.utils import json_helper
 import transparent_objects_cells
