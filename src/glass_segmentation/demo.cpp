@@ -1,5 +1,6 @@
 #include "edges_pose_refiner/enhancedGlassSegmenter.hpp"
 #include "edges_pose_refiner/segmentedImage.hpp"
+#include "edges_pose_refiner/glassDetector.hpp"
 #include <omp.h>
 
 using namespace cv;
@@ -201,14 +202,15 @@ bool isArgumentSet(int argc, char *argv[], const std::string &argument)
   return false;
 }
 
+
 int main(int argc, char *argv[])
 {
   std::system("date");
   omp_set_num_threads(5);
 
-  if (argc != 6 && argc != 7 && argc != 8)
+  if (argc != 7 && argc != 8)
   {
-    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilesList> <propagationScalingsList> [--use_GAC] [--visualize]" << endl;
+    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilesList> <propagationScalingsList> <algorithmName> [--visualize]" << endl;
     return -1;
   }
 
@@ -220,6 +222,7 @@ int main(int argc, char *argv[])
   const string classifierFilename = argv[3];
   const string segmentationFilesList = argv[4];
   const string propagationScalingsList = argv[5];
+  const string algorithmName = argv[6];
   vector<string> segmentationFilenames;
   readLinesInFile(segmentationFilesList, segmentationFilenames);
   CV_Assert(!segmentationFilenames.empty());
@@ -235,17 +238,6 @@ int main(int argc, char *argv[])
   bool useGAC = isArgumentSet(argc, argv, "--use_GAC");
   bool visualize = isArgumentSet(argc, argv, "--visualize");
 
-#ifdef CLASSIFY
-  GlassClassifier classifier;
-  bool doesExist = classifier.read(classifierFilename);
-  if (!doesExist)
-  {
-    classifier.train(trainingFilesList, groundTruthFilesList);
-    classifier.write(classifierFilename);
-  }
-  cout << "classifier is ready" << endl;
-#endif
-
   string testImageFilename = testFolder + "/image_" + fullTestIndex + ".png";
   Mat testImage = imread(testImageFilename);
   if (testImage.empty())
@@ -259,6 +251,46 @@ int main(int argc, char *argv[])
   {
     CV_Error(CV_StsBadArg, "Cannot read" + testGlassMaskFilename);
   }
+
+  if (algorithmName == "Depth")
+  {
+    //TODO: move up
+    const std::string registrationMaskFilename = "/media/2Tb/transparentBases/fixedOnTable/base/registrationMask.png";
+    Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
+    CV_Assert(!registrationMask.empty());
+
+    //TODO: use TODBaseImporter
+    string depthMatFilename = testFolder + "/depth_image_" + fullTestIndex + ".xml.gz";
+    FileStorage depthFs(depthMatFilename, FileStorage::READ);
+    Mat testDepthMat;
+    depthFs["depth_image"] >> testDepthMat;
+    depthFs.release();
+    CV_Assert(!testDepthMat.empty());
+
+    for (size_t i = 0; i < segmentationFilenames.size(); ++i)
+    {
+      GlassSegmentationParams params;
+      params.finalClosingIterations = propagationScalings[i];
+      GlassSegmentator glassSegmentator(params);
+      int numberOfComponents;
+      Mat currentGlassMask;
+      glassSegmentator.segment(testImage, testDepthMat, registrationMask, numberOfComponents, currentGlassMask);
+      imwrite(segmentationFilenames[i], currentGlassMask);
+    }
+
+    return 0;
+  }
+
+#ifdef CLASSIFY
+  GlassClassifier classifier;
+  bool doesExist = classifier.read(classifierFilename);
+  if (!doesExist)
+  {
+    classifier.train(trainingFilesList, groundTruthFilesList);
+    classifier.write(classifierFilename);
+  }
+  cout << "classifier is ready" << endl;
+#endif
 
   SegmentedImage segmentedImage;
   segmentedImage.read(testFolder + "/segmentedImage_" + fullTestIndex + ".xml");
@@ -289,7 +321,7 @@ int main(int argc, char *argv[])
   classifier.test(segmentedImage, testGlassMask, boundaryStrength);
 
 
-  if (!useGAC)
+  if (algorithmName == "Voting")
   {
     for (size_t i = 0; i < segmentationFilenames.size(); ++i)
     {
@@ -298,7 +330,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  if (useGAC)
+  if (algorithmName == "GAC")
   {
 #pragma omp parallel for schedule(dynamic, 1)
     for (size_t i = 0; i < segmentationFilenames.size(); ++i)

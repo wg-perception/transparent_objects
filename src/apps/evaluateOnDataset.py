@@ -10,7 +10,7 @@ import tempfile
 import os
 
 if __name__ == '__main__':
-    assert len(sys.argv) == 4, sys.argv[0] + ' <testListFilename> <classifierFilename> <propagationScaligsList>'
+    assert len(sys.argv) == 5, sys.argv[0] + ' <testListFilename> <classifierFilename> <propagationScaligsList> <algorithmName>'
 
     segmentImage = '/home/ilysenkov/itseezMachine/home/ilysenkov/ecto/server_build/bin/enhancedGlassSegmenter'
     groundTruthPrefix = 'glassMask'
@@ -18,6 +18,7 @@ if __name__ == '__main__':
     testListFilename = sys.argv[1]
     classifierFilename = sys.argv[2]
     propagationScalingsList = sys.argv[3]
+    algorithmName = sys.argv[4]
 
     propagationScalings = open(propagationScalingsList, 'r').read().splitlines()
 
@@ -49,7 +50,7 @@ if __name__ == '__main__':
         groundTruthFilename = imageFilename.replace('/image_', '/' + groundTruthPrefix + '_')
         testFolder = imageFilename.replace('/image_' + fullImageIndex + '.png', '/')
 
-        call([segmentImage, testFolder, fullImageIndex, classifierFilename, segmentationListFilename, propagationScalingsList])
+        call([segmentImage, testFolder, fullImageIndex, classifierFilename, segmentationListFilename, propagationScalingsList, algorithmName])
 
         groundTruth = cv2.imread(groundTruthFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
         for (index, temporaryFile) in enumerate(segmentationTemporaryFiles):
