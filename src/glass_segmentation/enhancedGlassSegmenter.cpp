@@ -1017,18 +1017,20 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   Mat bestRegionsImage(pixelDiscrepancies.size(), CV_8UC1, Scalar(0));
 //  int bestRegionsCount = 40;
 
+  //TODO: move up
   int bestRegionsCount = 100;
   Mat regionsStrength(pixelDiscrepancies.size(), CV_32FC1);
   for (int i = 0; i < sortedIndices.rows; ++i)
   {
     int currentIndex = sortedIndices.at<int>(i);
     regionsStrength.setTo(summedDiscrepancies.at<float>(currentIndex), regions[currentIndex].getMask());
+#ifdef VISUALIZE_SEGMENTATION
     if (i < bestRegionsCount)
     {
       bestRegionsImage.setTo(255 - i * 255.0 / bestRegionsCount, regions[currentIndex].getMask());
     }
 //    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
-
+#endif
   }
 #ifdef VISUALIZE_SEGMENTATION
   imshow("bestRegions", bestRegionsImage);

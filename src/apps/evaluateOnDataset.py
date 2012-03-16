@@ -62,15 +62,18 @@ if __name__ == '__main__':
             allTrueGlassArea[index] += trueGlassArea
             allPredictedGlassArea[index] += predictedGlassArea
             allValidPredictedGlassArea[index] += validPredictedGlassArea
-
-            print 'precision =', float(validPredictedGlassArea) / predictedGlassArea
-            print 'recall =', float(validPredictedGlassArea) / trueGlassArea
+            if predictedGlassArea != 0:
+                print 'precision =', float(validPredictedGlassArea) / predictedGlassArea
+            if trueGlassArea != 0:
+                print 'recall =', float(validPredictedGlassArea) / trueGlassArea
 
     invertedPrecisions = [None] * len(allTrueGlassArea)
     recalls = [None] * len(allTrueGlassArea)
     for i in range(len(allTrueGlassArea)):
-        invertedPrecisions[i] = 1.0 - float(allValidPredictedGlassArea[i]) / allPredictedGlassArea[i]
-        recalls[i] = float(allValidPredictedGlassArea[i]) / allTrueGlassArea[i]
+        if allPredictedGlassArea[i] != 0:
+            invertedPrecisions[i] = 1.0 - float(allValidPredictedGlassArea[i]) / allPredictedGlassArea[i]
+        if allTrueGlassArea[i] != 0:
+            recalls[i] = float(allValidPredictedGlassArea[i]) / allTrueGlassArea[i]
         print 'overall precision =', 1.0 - invertedPrecisions[i]
         print 'overall recall =', recalls[i]
 

@@ -187,14 +187,28 @@ void createContour(const cv::Size &imageSize, cv::Mat &contourEdges)
 
 #define CLASSIFY
 
+bool isArgumentSet(int argc, char *argv[], const std::string &argument)
+{
+  for (int i = 0; i < argc; ++i)
+  {
+    string currentArgument = argv[i];
+    if (currentArgument == argument)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 int main(int argc, char *argv[])
 {
   std::system("date");
   omp_set_num_threads(5);
 
-  if (argc != 5 && argc != 6 && argc != 7)
+  if (argc != 6 && argc != 7 && argc != 8)
   {
-    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilesList> <propagationScalingsList> [--visualize]" << endl;
+    cout << argv[0] << " <testFolder> <fullTestIndex> <classifierFilename> <segmentationFilesList> <propagationScalingsList> [--use_GAC] [--visualize]" << endl;
     return -1;
   }
 
@@ -218,16 +232,8 @@ int main(int argc, char *argv[])
     propagationScalings[i] = atof(propagationScalingsStrings[i].c_str());
   }
 
-  bool visualize;
-  if (argc < 7)
-  {
-    visualize = false;
-  }
-  else
-  {
-    visualize = true;
-    CV_Assert(string(argv[argc - 1]) == "--visualize");
-  }
+  bool useGAC = isArgumentSet(argc, argv, "--use_GAC");
+  bool visualize = isArgumentSet(argc, argv, "--visualize");
 
 #ifdef CLASSIFY
   GlassClassifier classifier;
@@ -282,40 +288,53 @@ int main(int argc, char *argv[])
   Mat boundaryStrength;
   classifier.test(segmentedImage, testGlassMask, boundaryStrength);
 
-#pragma omp parallel for schedule(dynamic, 1)
-  for (size_t i = 0; i < segmentationFilenames.size(); ++i)
+
+  if (!useGAC)
   {
-    Mat finalSegmentation;
-    GeodesicActiveContourParams params;
-    params.propagationScaling = propagationScalings[i];
-    geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation, params);
-  //  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
-    CV_Assert(!finalSegmentation.empty());
-    imwrite(segmentationFilenames[i], finalSegmentation);
-
-    if (visualize)
+    for (size_t i = 0; i < segmentationFilenames.size(); ++i)
     {
-      std::stringstream indexStr;
-      indexStr << i;
-      imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
-
-      const string testSegmentationTitle = "test segmentation " + indexStr.str();
-      namedWindow(testSegmentationTitle);
-      InteractiveClassificationData data;
-      data.segmentation = segmentedImage.getSegmentation();
-      data.regions = segmentedImage.getRegions();
-      cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
-      data.isFirstClick = true;
-
-      setMouseCallback(testSegmentationTitle, onMouse, &data);
-    //  segmentedImage.showSegmentation(testSegmentationTitle);
-
-      segmentedImage.showBoundaries(testSegmentationTitle);
+      Mat currentMask = boundaryStrength > propagationScalings[i];
+      imwrite(segmentationFilenames[i], currentMask);
     }
   }
-  if (visualize)
+
+  if (useGAC)
   {
-    waitKey();
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t i = 0; i < segmentationFilenames.size(); ++i)
+    {
+      Mat finalSegmentation;
+      GeodesicActiveContourParams params;
+      params.propagationScaling = propagationScalings[i];
+      geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation, params);
+    //  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
+      CV_Assert(!finalSegmentation.empty());
+      imwrite(segmentationFilenames[i], finalSegmentation);
+
+      if (visualize)
+      {
+        std::stringstream indexStr;
+        indexStr << i;
+        imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
+
+        const string testSegmentationTitle = "test segmentation " + indexStr.str();
+        namedWindow(testSegmentationTitle);
+        InteractiveClassificationData data;
+        data.segmentation = segmentedImage.getSegmentation();
+        data.regions = segmentedImage.getRegions();
+        cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
+        data.isFirstClick = true;
+
+        setMouseCallback(testSegmentationTitle, onMouse, &data);
+        segmentedImage.showSegmentation(testSegmentationTitle);
+
+        segmentedImage.showBoundaries(testSegmentationTitle);
+      }
+    }
+    if (visualize)
+    {
+      waitKey();
+    }
   }
 #endif
 
