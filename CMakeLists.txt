@@ -29,7 +29,7 @@ if (DO_BUILD_ECTO_CELLS)
     add_subdirectory(cells)
     add_subdirectory(python)
 
-    catkin_add_env_hooks(10transparent_objects SHELLS all )
+    catkin_add_env_hooks(10.transparent_objects SHELLS all )
 endif()
 
 # deal with the tests
