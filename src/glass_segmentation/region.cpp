@@ -30,6 +30,19 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
   computeMichelsonContrast();
 }
 
+void Region::setDepth(const cv::Mat &invalidDepthMask)
+{
+  int invalidDepthArea = countNonZero(invalidDepthMask & mask);
+  int allArea = countNonZero(mask);
+
+  depthRatio = static_cast<float>(invalidDepthArea) / allArea;
+}
+
+float Region::getDepthRatio() const
+{
+  return depthRatio;
+}
+
 void Region::computeErodedMask(const cv::Mat &mask, cv::Mat &erodedMask)
 {
   erode(mask, erodedMask, Mat(), Point(-1, -1), params.erosionCount);

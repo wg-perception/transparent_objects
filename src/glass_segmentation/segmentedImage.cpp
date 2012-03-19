@@ -42,6 +42,14 @@ SegmentedImage::SegmentedImage(const cv::Mat &_image, const std::string &segment
   cout << "adjacency mat is computed" << endl;
 }
 
+void SegmentedImage::setDepth(const cv::Mat &invalidDepthMask)
+{
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    regions[i].setDepth(invalidDepthMask);
+  }
+}
+
 const std::vector<Region>& SegmentedImage::getRegions() const
 {
   return regions;

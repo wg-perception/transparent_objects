@@ -783,3 +783,13 @@ cv::Mat getFromCache(const std::string &name)
 
   return result;
 }
+
+cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registrationMask)
+{
+  Mat invalidDepthMask = (depthMat != depthMat);
+  CV_Assert(!registrationMask.empty());
+  CV_Assert(registrationMask.size() == depthMat.size());
+  CV_Assert(registrationMask.type() == CV_8UC1);
+  invalidDepthMask.setTo(0, registrationMask);
+  return invalidDepthMask;
+}

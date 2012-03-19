@@ -111,4 +111,6 @@ void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &oreintations, int me
 void saveToCache(const std::string &name, const cv::Mat &mat);
 cv::Mat getFromCache(const std::string &name);
 
+cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registrationMask);
+
 #endif /* UTILS_HPP_ */

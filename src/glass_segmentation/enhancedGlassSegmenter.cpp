@@ -118,6 +118,14 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
   intercept = model.at<float>(1);
 }
 
+void computeDepthDistance(const Region &region_1, const Region &region_2, float &depthDistance)
+{
+  float depthRatio_1 = region_1.getDepthRatio();
+  float depthRatio_2 = region_2.getDepthRatio();
+
+  depthDistance = fabs(depthRatio_1 - depthRatio_2);
+}
+
 
 void GlassClassifier::regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample)
 {
@@ -129,6 +137,8 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
   computeOverlayConsistency(region_1, region_2, slope, intercept);
   float textureDistance;
   computeTextureDistortion(region_1, region_2, textureDistance);
+  float depthDistance;
+  computeDepthDistance(region_1, region_2, depthDistance);
 
 
   float rmsDistance, michelsonDistance, robustMichelsonDistance;
@@ -136,8 +146,9 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
 
 //  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
 
-  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance);
-
+  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance, depthDistance);
+//  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance);
+//  fullSample = (Mat_<float>(1, Sample::channels) << depthDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, robustMichelsonDistance, colorDistance, textureDistance, medianColorDistance);
 }
 
@@ -149,6 +160,8 @@ void normalizeTrainingData(cv::Mat &trainingData, cv::Mat &scalingSlope, cv::Mat
 //  Mat scalingSlope, scalingIntercept;
   scalingSlope = 2.0 / (maxData - minData);
   scalingIntercept = -scalingSlope.mul(minData) - 1.0;
+//  scalingSlope = 1.0 / (maxData - minData);
+//  scalingIntercept = -scalingSlope.mul(minData);
   CV_Assert(scalingSlope.size() == scalingIntercept.size());
   CV_Assert(scalingSlope.rows == 1 && scalingSlope.cols == trainingData.cols);
   for (int i = 0; i < trainingData.rows; ++i)
@@ -341,13 +354,19 @@ GlassClassifier::GlassClassifier(const GlassClassifierParams &_params)
   params = _params;
 }
 
-void GlassClassifier::train(const std::string &trainingFilesList, const std::string &groundTruthFilesList)
+void GlassClassifier::train(const std::string &trainingFilesList, const std::string &groundTruthFilesList, const std::string &depthMatFilesList, const cv::Mat &registrationMask)
 {
   vector<string> trainingGroundTruhFiles;
   readLinesInFile(groundTruthFilesList, trainingGroundTruhFiles);
 
   vector<string> trainingFiles;
   readLinesInFile(trainingFilesList, trainingFiles);
+
+  vector<string> depthMatFiles;
+  if (!depthMatFilesList.empty())
+  {
+    readLinesInFile(depthMatFilesList, depthMatFiles);
+  }
 
   const size_t imageCount = trainingGroundTruhFiles.size();
   CV_Assert(trainingFiles.size() == imageCount);
@@ -360,11 +379,26 @@ void GlassClassifier::train(const std::string &trainingFilesList, const std::str
       continue;
     }
 
+    cout << "training image #" << imageIndex << endl;
+
     Mat groundTruthMask = imread(trainingGroundTruhFiles[imageIndex], CV_LOAD_IMAGE_GRAYSCALE);
     CV_Assert(!groundTruthMask.empty());
 
     SegmentedImage segmentedImage;
     segmentedImage.read(trainingFiles[imageIndex]);
+    if (!depthMatFiles.empty())
+    {
+      //TODO: use TODBaseImporter
+      FileStorage depthFs(depthMatFiles[imageIndex], FileStorage::READ);
+      Mat depthMat;
+      depthFs["depth_image"] >> depthMat;
+      depthFs.release();
+      CV_Assert(!depthMat.empty());
+
+      Mat invalidDepthMask = getInvalidDepthMask(depthMat, registrationMask);
+      segmentedImage.setDepth(invalidDepthMask);
+    }
+
 #ifdef VISUALIZE_SEGMENTATION
     segmentedImage.showSegmentation("train segmentation");
     segmentedImage.showBoundaries("train boundaries");
@@ -421,6 +455,8 @@ void GlassClassifier::train(const std::string &trainingFilesList, const std::str
   normalizeTrainingData(trainingData.samples, fullScalingSlope, fullScalingIntercept);
   scalingSlope = fullScalingSlope;
   scalingIntercept = fullScalingIntercept;
+  cout << "scaling slope: " << scalingSlope << endl;
+  cout << "scaling intercept: " << scalingIntercept << endl;
 
 //  CV_Assert(trainingLabels.rows == ecaTrainingData.rows);
 //  CV_Assert(trainingLabels.cols == 1);
@@ -444,9 +480,9 @@ void GlassClassifier::train(const std::string &trainingFilesList, const std::str
 //  cout << dcaTrainingData << endl;
 //  saveMLData("ecaData.csv", ecaTrainingData, trainingLabels);
 //  saveMLData("dcaData.csv", dcaTrainingData, trainingLabels);
-#ifdef DEBUG_ML
+//#ifdef DEBUG_ML
   trainingData.write("fullTrainingData");
-#endif
+//#endif
 
 //  cout << ecaTrainingData << endl;
 //  cout << "ecaTrainingData size: " << ecaTrainingData.rows << " x " << ecaTrainingData.cols << endl;
@@ -851,7 +887,7 @@ void GlassClassifier::computeAllDiscrepancies(const SegmentedImage &testImage, c
 
   Mat testConfidences;
   predict(testData, testConfidences);
-//  testConfidences.setTo(-std::numeric_limits<float>::max(), ~testData.mask);
+  testConfidences.setTo(-std::numeric_limits<float>::max(), ~testData.mask);
   discrepancies = testConfidences.reshape(1, pairwiseResponses.rows);
   Mat diag = discrepancies.diag();
   diag.setTo(-std::numeric_limits<float>::max());
@@ -987,6 +1023,7 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   Mat summedDiscrepancies;
 //  reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_AVG);
   reduce(discrepancies, summedDiscrepancies, 1, CV_REDUCE_SUM);
+  Mat neighboredSummedDiscrepances = summedDiscrepancies.clone();
 
   CV_Assert(regions.size() == isRegionValid.size());
   for (size_t i = 0; i < isRegionValid.size(); ++i)
@@ -1005,11 +1042,14 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
       }
       CV_Assert(summedDiscrepancies.type() == CV_32FC1);
       const float eps = 1e-4;
-      maxDiscrepancy = std::max(maxDiscrepancy, summedDiscrepancies.at<float>(j)) - eps;
+//      maxDiscrepancy = std::max(maxDiscrepancy, summedDiscrepancies.at<float>(j)) - eps;
+      maxDiscrepancy = std::max(maxDiscrepancy, summedDiscrepancies.at<float>(j) - eps);
     }
 
-    summedDiscrepancies.at<float>(i) = maxDiscrepancy;
+//    summedDiscrepancies.at<float>(i) = maxDiscrepancy;
+    neighboredSummedDiscrepances.at<float>(i) = maxDiscrepancy;
   }
+  summedDiscrepancies = neighboredSummedDiscrepances.clone();
 
 
   Mat sortedIndices;
@@ -1025,10 +1065,13 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
     int currentIndex = sortedIndices.at<int>(i);
     regionsStrength.setTo(summedDiscrepancies.at<float>(currentIndex), regions[currentIndex].getMask());
 #ifdef VISUALIZE_SEGMENTATION
+//    cout << "depth: " << regions[currentIndex].getDepthRatio() << endl;
     if (i < bestRegionsCount)
     {
       bestRegionsImage.setTo(255 - i * 255.0 / bestRegionsCount, regions[currentIndex].getMask());
     }
+//    imshow("bestRegions", bestRegionsImage);
+//    waitKey();
 //    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
 #endif
   }

@@ -30,6 +30,8 @@ class Region
     Region(const cv::Mat &image, const cv::Mat &textonLabels, const cv::Mat &mask,
            const RegionParams &params = RegionParams());
 
+    void setDepth(const cv::Mat &invalidDepthMask);
+
     cv::Point2f getCenter() const;
     cv::Vec3b getMedianColor() const;
     const cv::Mat& getMask() const;
@@ -40,6 +42,7 @@ class Region
     float getRMSContrast() const;
     float getMichelsonContrast() const;
     float getRobustMichelsonContrast() const;
+    float getDepthRatio() const;
     bool isEmpty() const;
 
     void write(cv::FileStorage &fs) const;
@@ -69,6 +72,8 @@ class Region
 
     float rmsContrast, michelsonContrast, robustMichelsonContrast;
     std::vector<int> intensities;
+
+    float depthRatio;
 
     RegionParams params;
 };

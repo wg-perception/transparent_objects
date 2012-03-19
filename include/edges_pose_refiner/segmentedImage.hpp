@@ -28,6 +28,8 @@ class SegmentedImage
     SegmentedImage(const SegmentedImageParams &params = SegmentedImageParams());
     SegmentedImage(const cv::Mat &image, const std::string &segmentationFilename = "seg.txt", const SegmentedImageParams &params = SegmentedImageParams());
 
+    void setDepth(const cv::Mat &invalidDepthMask);
+
     const std::vector<Region>& getRegions() const;
     const Region& getRegion(int regionIndex) const;
 

@@ -37,6 +37,7 @@ void computeMedianColorDistance(const Region &region_1, const Region &region_2, 
 void computeTextureDistortion(const Region &region_1, const Region &region_2, float &distance);
 void computeOverlayConsistency(const Region &region_1, const Region &region_2, float &slope, float &intercept);
 void computeContrastDistance(const Region &region_1, const Region &region_2, float &rmsDistance, float &michelsonDistance, float &robustMichelsonDistance);
+void computeDepthDistance(const Region &region_1, const Region &region_2, float &depthDistance);
 
 //TODO: is it possible to use the index to access a vertex directly?
 VertexDescriptor getRegionVertex(const Graph &graph, int regionIndex);
@@ -79,7 +80,7 @@ class GlassClassifier
 {
   public:
     GlassClassifier(const GlassClassifierParams &params = GlassClassifierParams());
-    void train(const std::string &trainingFilesList, const std::string &groundTruthFilesList);
+    void train(const std::string &trainingFilesList, const std::string &groundTruthFilesList, const std::string &depthMatFilesList = "", const cv::Mat &registrationMask = cv::Mat());
     void test(const SegmentedImage &testImage, const cv::Mat &groundTruthMask, cv::Mat &boundaryStrength) const;
 
     static void regions2samples(const Region &region_1, const Region &region_2, cv::Mat &fullSample);
@@ -87,7 +88,8 @@ class GlassClassifier
     bool read(const std::string &filename);
     void write(const std::string &filename);
   private:
-    typedef cv::Vec<float, 8> Sample;
+//    typedef cv::Vec<float, 8> Sample;
+    typedef cv::Vec<float, 9> Sample;
 
     static void segmentedImage2MLData(const SegmentedImage &image, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, MLData &mlData);
     static void segmentedImage2pairwiseSamples(const SegmentedImage &segmentedImage, cv::Mat &samples, const cv::Mat &scalingSlope = cv::Mat(), const cv::Mat &scalingIntercept = cv::Mat());

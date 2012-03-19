@@ -204,22 +204,9 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
 
 void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
-//  Mat srcMask = depthMat == 0;
-  Mat srcMask = (depthMat != depthMat);
-  //TODO: fix
-//  Mat srcMask = (depthMat >= std::numeric_limits<float>::infinity());
-
-  //fill borders
+  Mat srcMask = getInvalidDepthMask(depthMat, registrationMask);
 #ifdef VISUALIZE
-  imshow("mask with registration", srcMask);
-#endif
-
-  CV_Assert(!registrationMask.empty());
-  CV_Assert(registrationMask.size() == depthMat.size());
-  CV_Assert(registrationMask.type() == CV_8UC1);
-  srcMask.setTo(0, registrationMask);
-#ifdef VISUALIZE
-  imshow("mask without registration", srcMask);
+  imshow("mask without registration errors", srcMask);
 #endif
 
   if (camera != 0 && tablePlane != 0 && tableHull != 0)

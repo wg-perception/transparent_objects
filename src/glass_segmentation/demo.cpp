@@ -215,6 +215,7 @@ int main(int argc, char *argv[])
   }
 
   const string trainingFilesList = "/media/2Tb/transparentBases/fixedOnTable/base/trainingImages.txt";
+  const string depthFilesList = "/media/2Tb/transparentBases/fixedOnTable/base/trainingDepths.txt";
   const string groundTruthFilesList = "/media/2Tb/transparentBases/fixedOnTable/base/trainingImagesGroundTruth.txt";
 
   const string testFolder = argv[1];
@@ -252,21 +253,21 @@ int main(int argc, char *argv[])
     CV_Error(CV_StsBadArg, "Cannot read" + testGlassMaskFilename);
   }
 
+  //TODO: move up
+  const std::string registrationMaskFilename = "/media/2Tb/transparentBases/fixedOnTable/base/registrationMask.png";
+  Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
+  CV_Assert(!registrationMask.empty());
+
+  //TODO: use TODBaseImporter
+  string depthMatFilename = testFolder + "/depth_image_" + fullTestIndex + ".xml.gz";
+  FileStorage depthFs(depthMatFilename, FileStorage::READ);
+  Mat testDepthMat;
+  depthFs["depth_image"] >> testDepthMat;
+  depthFs.release();
+  CV_Assert(!testDepthMat.empty());
+
   if (algorithmName == "Depth")
   {
-    //TODO: move up
-    const std::string registrationMaskFilename = "/media/2Tb/transparentBases/fixedOnTable/base/registrationMask.png";
-    Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-    CV_Assert(!registrationMask.empty());
-
-    //TODO: use TODBaseImporter
-    string depthMatFilename = testFolder + "/depth_image_" + fullTestIndex + ".xml.gz";
-    FileStorage depthFs(depthMatFilename, FileStorage::READ);
-    Mat testDepthMat;
-    depthFs["depth_image"] >> testDepthMat;
-    depthFs.release();
-    CV_Assert(!testDepthMat.empty());
-
     for (size_t i = 0; i < segmentationFilenames.size(); ++i)
     {
       GlassSegmentationParams params;
@@ -286,7 +287,7 @@ int main(int argc, char *argv[])
   bool doesExist = classifier.read(classifierFilename);
   if (!doesExist)
   {
-    classifier.train(trainingFilesList, groundTruthFilesList);
+    classifier.train(trainingFilesList, groundTruthFilesList, depthFilesList, registrationMask);
     classifier.write(classifierFilename);
   }
   cout << "classifier is ready" << endl;
@@ -295,8 +296,12 @@ int main(int argc, char *argv[])
   SegmentedImage segmentedImage;
   segmentedImage.read(testFolder + "/segmentedImage_" + fullTestIndex + ".xml");
 
+  Mat invalidDepthMask = getInvalidDepthMask(testDepthMat, registrationMask);
+  segmentedImage.setDepth(invalidDepthMask);
+
   if (visualize)
   {
+    imshow("invalid depth mask", invalidDepthMask);
     segmentedImage.showSegmentation("segmentation");
     segmentedImage.showBoundaries("boundaries", Scalar(255, 0, 255));
     segmentedImage.showTextonLabelsMap("textons");
