@@ -353,6 +353,8 @@ int main(int argc, char *argv[])
         std::stringstream indexStr;
         indexStr << i;
         imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
+        Mat drawedSegmentation = drawSegmentation(testImage, finalSegmentation);
+        imshow("drawedSegmentation_" + indexStr.str(), drawedSegmentation);
 
         const string testSegmentationTitle = "test segmentation " + indexStr.str();
         namedWindow(testSegmentationTitle);
@@ -362,10 +364,11 @@ int main(int argc, char *argv[])
         cvtColor(testImage, data.grayscaleImage, CV_BGR2GRAY);
         data.isFirstClick = true;
 
-        setMouseCallback(testSegmentationTitle, onMouse, &data);
-        segmentedImage.showSegmentation(testSegmentationTitle);
-
-        segmentedImage.showBoundaries(testSegmentationTitle);
+        if (i == 0)
+        {
+          setMouseCallback(testSegmentationTitle, onMouse, &data);
+          segmentedImage.showBoundaries(testSegmentationTitle);
+        }
       }
     }
     if (visualize)

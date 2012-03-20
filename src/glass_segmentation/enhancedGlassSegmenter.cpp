@@ -34,17 +34,21 @@ float getMinToMaxRatio(float a, float b)
 
 void computeContrastDistance(const Region &region_1, const Region &region_2, float &rmsDistance, float &michelsonDistance, float &robustMichelsonDistance)
 {
+  const float eps = 1e-4;
   float rms_1 = region_1.getRMSContrast();
   float rms_2 = region_2.getRMSContrast();
-  rmsDistance = getMinToMaxRatio(rms_1, rms_2);
+//  rmsDistance = getMinToMaxRatio(rms_1, rms_2);
+  rmsDistance = rms_1 / (rms_2 + eps);
 
   float michelson_1 = region_1.getMichelsonContrast();
   float michelson_2 = region_2.getMichelsonContrast();
-  michelsonDistance = getMinToMaxRatio(michelson_1, michelson_2);
+//  michelsonDistance = getMinToMaxRatio(michelson_1, michelson_2);
+  michelsonDistance = michelson_1 / (michelson_2 + eps);
 
   float robustMichelson_1 = region_1.getRobustMichelsonContrast();
   float robustMichelson_2 = region_2.getRobustMichelsonContrast();
-  robustMichelsonDistance = getMinToMaxRatio(robustMichelson_1, robustMichelson_2);
+//  robustMichelsonDistance = getMinToMaxRatio(robustMichelson_1, robustMichelson_2);
+  robustMichelsonDistance = robustMichelson_1 / (robustMichelson_2 + eps);
 }
 
 void computeColorSimilarity(const Region &region_1, const Region &region_2, float &distance)
@@ -99,6 +103,8 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
   solve(A, b, model, DECOMP_SVD);
   CV_Assert(model.type() == CV_32FC1);
   CV_Assert(model.total() == dim);
+
+/*
   if (model.at<float>(0) < minAlpha || model.at<float>(0) > maxAlpha)
   {
     b = clusters_2.clone();
@@ -113,6 +119,7 @@ void computeOverlayConsistency(const Region &region_1, const Region &region_2, f
     //TODO: fix the problem with uniform regions
     CV_Error(CV_StsError, "Cannot estimate overlay consistency");
   }
+*/
 
   slope = model.at<float>(0);
   intercept = model.at<float>(1);
@@ -123,7 +130,8 @@ void computeDepthDistance(const Region &region_1, const Region &region_2, float 
   float depthRatio_1 = region_1.getDepthRatio();
   float depthRatio_2 = region_2.getDepthRatio();
 
-  depthDistance = fabs(depthRatio_1 - depthRatio_2);
+//  depthDistance = fabs(depthRatio_1 - depthRatio_2);
+  depthDistance = depthRatio_1 - depthRatio_2;
 }
 
 
@@ -147,6 +155,7 @@ void GlassClassifier::regions2samples(const Region &region_1, const Region &regi
 //  fullSample = (Mat_<float>(1, Sample::channels) << slope, intercept, colorDistance, textureDistance, medianColorDistance);
 
   fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance, depthDistance);
+//  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, robustMichelsonDistance, textureDistance, medianColorDistance, depthDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, michelsonDistance, robustMichelsonDistance, slope, intercept, colorDistance, textureDistance, medianColorDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << depthDistance);
 //  fullSample = (Mat_<float>(1, Sample::channels) << rmsDistance, robustMichelsonDistance, colorDistance, textureDistance, medianColorDistance);
@@ -1077,6 +1086,9 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
   }
 #ifdef VISUALIZE_SEGMENTATION
   imshow("bestRegions", bestRegionsImage);
+  Mat colorBestRegionsImage;
+  cvtColor(bestRegionsImage, colorBestRegionsImage, CV_GRAY2BGR);
+  imshow("color regions", 0.5 * colorBestRegionsImage + 0.5 * testImage.getOriginalImage());
 #endif
 
   boundaryStrength = regionsStrength;
@@ -1193,9 +1205,10 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
         continue;
       }
 
-      if (regionLabels[i] == GLASS || regionLabels[j] == GLASS)
+      if (regionLabels[i] == GLASS && regionLabels[j] == GLASS_BACKGROUND)
+//      if (regionLabels[i] == GLASS || regionLabels[j] == GLASS)
       {
-        if (regionLabels[i] == GLASS_BACKGROUND || regionLabels[j] == GLASS_BACKGROUND)
+//        if (regionLabels[i] == GLASS_BACKGROUND || regionLabels[j] == GLASS_BACKGROUND)
         {
           currentLabel = GLASS_COVERED;
         }
@@ -1225,8 +1238,13 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
   vector<Region> regions = segmentedImage.getRegions();
   for (size_t i = 0; i < regions.size(); ++i)
   {
-    for (size_t j = i + 1; j < regions.size(); ++j)
+    for (size_t j = 0; j < regions.size(); ++j)
     {
+      if (i == j)
+      {
+        continue;
+      }
+
       int currentResponse = responses.at<int>(i, j);
       if (currentResponse == COMPLETELY_INVALID || currentResponse == GROUND_TRUTH_INVALID)
       {
@@ -1240,16 +1258,17 @@ void GlassClassifier::segmentedImage2MLData(const SegmentedImage &segmentedImage
       CV_Assert(currentSample.rows == 1);
       CV_Assert(currentSample.cols == Sample::channels);
       CV_Assert(currentSample.channels() == 1);
-      Mat symmetricSample = Mat(samples.at<Sample>(j, i)).reshape(1, 1);
+//      Mat symmetricSample = Mat(samples.at<Sample>(j, i)).reshape(1, 1);
       fullTrainingData.push_back(currentSample);
       trainingLabelsVec.push_back(currentResponse);
-
+/*
       if (norm(currentSample - symmetricSample) > maxSampleDistance)
       {
         //TODO: is it a correct way to process such cases?
         fullTrainingData.push_back(symmetricSample);
         trainingLabelsVec.push_back(currentResponse);
       }
+*/
     }
   }
 
