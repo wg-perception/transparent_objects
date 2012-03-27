@@ -37,8 +37,8 @@ if (DO_BUILD_ECTO_CELLS)
     #install targets for all things python
     catkin_python_setup()
 
-    set(PYTHON_PACKAGES_PATH gen/py)
-    set(python_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/gen/py/transparent_objects)
+    find_package(ecto REQUIRED)
+    set_ecto_install_package_name(transparent_objects)
 
     add_subdirectory(cells)
     add_subdirectory(python)
