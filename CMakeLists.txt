@@ -26,10 +26,22 @@ add_subdirectory(src)
 
 # Make sure we can build transparent_objects without ecto or the core
 if (DO_BUILD_ECTO_CELLS)
+    find_package(catkin REQUIRED)
+
+    catkin_stack()
+    catkin_project(transparent_objects
+                   DEPENDS Eigen Boost OpenCV
+                   INCLUDE_DIRS include
+    )
+
+    #install targets for all things python
+    catkin_python_setup()
+
+    set(PYTHON_PACKAGES_PATH gen/py)
+    set(python_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/gen/py/transparent_objects)
+
     add_subdirectory(cells)
     add_subdirectory(python)
-
-    catkin_add_env_hooks(10.transparent_objects SHELLS all )
 endif()
 
 # deal with the tests

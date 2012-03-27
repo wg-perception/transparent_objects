@@ -1,3 +1,5 @@
+set_ecto_install_package_name(transparent_objects)
+
 ectomodule(transparent_objects_cells
     module.cpp
     train.cpp
