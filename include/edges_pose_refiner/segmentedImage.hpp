@@ -33,6 +33,8 @@ class SegmentedImage
     const std::vector<Region>& getRegions() const;
     const Region& getRegion(int regionIndex) const;
 
+    void postprocessMask(const cv::Mat &mask, cv::Mat &postprocessedMask) const;
+
     const cv::Mat& getSegmentation() const;
     const cv::Mat& getOriginalImage() const;
     bool areRegionsAdjacent(int i, int j) const;

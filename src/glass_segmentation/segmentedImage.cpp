@@ -360,3 +360,19 @@ void SegmentedImage::read(const std::string &filename)
   }
   fs.release();
 }
+
+void SegmentedImage::postprocessMask(const cv::Mat &mask, cv::Mat &postprocessedMask) const
+{
+  //TODO: move up
+  float confidentLabelThreshold = 0.5;
+  postprocessedMask.create(mask.size(), CV_8UC1);
+  postprocessedMask = Scalar(0);
+
+  for (size_t i = 0; i < regions.size(); ++i)
+  {
+    if (regions[i].isLabeled(mask, confidentLabelThreshold))
+    {
+      postprocessedMask.setTo(255, regions[i].getMask());
+    }
+  }
+}
