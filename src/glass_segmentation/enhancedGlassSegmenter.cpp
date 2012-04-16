@@ -1079,9 +1079,9 @@ void GlassClassifier::computeBoundaryStrength(const SegmentedImage &testImage, c
     {
       bestRegionsImage.setTo(255 - i * 255.0 / bestRegionsCount, regions[currentIndex].getMask());
     }
-//    imshow("bestRegions", bestRegionsImage);
-//    waitKey();
-//    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
+    imshow("bestRegions", bestRegionsImage);
+    waitKey();
+    cout << summedDiscrepancies.at<float>(currentIndex) << endl;
 #endif
   }
 #ifdef VISUALIZE_SEGMENTATION
@@ -1112,13 +1112,6 @@ void GlassClassifier::segmentedImage2pairwiseSamples(const SegmentedImage &segme
       samples.at<Sample>(i, j) = fullSample;
     }
   }
-}
-
-bool isRegionLabeled(const Region &region, int regionArea, const cv::Mat &mask, float confidentLabelArea)
-{
-  int labelArea = countNonZero(region.getMask() & mask);
-  float areaRatio = static_cast<float>(labelArea) / regionArea;
-  return (areaRatio > confidentLabelArea);
 }
 
 void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &segmentedImage, const cv::Mat &groundTruthMask, bool useOnlyAdjacentRegions, cv::Mat &responses)
@@ -1154,17 +1147,15 @@ void GlassClassifier::segmentedImage2pairwiseResponses(const SegmentedImage &seg
       continue;
     }
 
-    int regionArea = countNonZero(regions[i].getMask() != 0);
-
-    if (isRegionLabeled(regions[i], regionArea, glassBackgroundMask, confidentLabelArea))
+    if (regions[i].isLabeled(glassBackgroundMask, confidentLabelArea))
     {
       regionLabels[i] = GLASS_BACKGROUND;
     }
-    if (isRegionLabeled(regions[i], regionArea, otherBackgroundMask, confidentLabelArea))
+    if (regions[i].isLabeled(otherBackgroundMask, confidentLabelArea))
     {
       regionLabels[i] = OTHER_BACKGROUND;
     }
-    if (isRegionLabeled(regions[i], regionArea, glassMask, confidentLabelArea))
+    if (regions[i].isLabeled(glassMask, confidentLabelArea))
     {
       regionLabels[i] = GLASS;
     }

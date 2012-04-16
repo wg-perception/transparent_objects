@@ -206,7 +206,7 @@ bool isArgumentSet(int argc, char *argv[], const std::string &argument)
 int main(int argc, char *argv[])
 {
   std::system("date");
-  omp_set_num_threads(5);
+  omp_set_num_threads(3);
 
   if (argc != 7 && argc != 8)
   {
@@ -277,6 +277,14 @@ int main(int argc, char *argv[])
       Mat currentGlassMask;
       glassSegmentator.segment(testImage, testDepthMat, registrationMask, numberOfComponents, currentGlassMask);
       imwrite(segmentationFilenames[i], currentGlassMask);
+
+      if (visualize)
+      {
+        imshow("mask", currentGlassMask);
+        Mat drawedMask = drawSegmentation(testImage, currentGlassMask);
+        imshow("drawed mask", drawedMask);
+        waitKey();
+      }
     }
 
     return 0;
@@ -343,21 +351,27 @@ int main(int argc, char *argv[])
       Mat finalSegmentation;
       GeodesicActiveContourParams params;
       params.propagationScaling = propagationScalings[i];
-      geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation, params);
+      geodesicActiveContour(segmentedImage.getOriginalImage(), boundaryStrength, finalSegmentation, segmentedImage, params);
     //  Mat gac = drawSegmentation(segmentedImage.getOriginalImage(), finalSegmentation, 2);
       CV_Assert(!finalSegmentation.empty());
+      Mat postprocessedSegmentation;
+      segmentedImage.postprocessMask(finalSegmentation, postprocessedSegmentation);
+      //finalSegmentation = postprocessedSegmentation;
+      GlassSegmentationParams grabCutParams;
+      grabCutParams.grabCutErosionsIterations = 3;
+      refineSegmentationByGrabCut(testImage, postprocessedSegmentation, finalSegmentation, grabCutParams);
+
       imwrite(segmentationFilenames[i], finalSegmentation);
 
       if (visualize)
       {
         std::stringstream indexStr;
         indexStr << i;
-        imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
+//        imshow("finalSegmentation_" + indexStr.str(), finalSegmentation);
         Mat drawedSegmentation = drawSegmentation(testImage, finalSegmentation);
         imshow("drawedSegmentation_" + indexStr.str(), drawedSegmentation);
 
         const string testSegmentationTitle = "test segmentation " + indexStr.str();
-        namedWindow(testSegmentationTitle);
         InteractiveClassificationData data;
         data.segmentation = segmentedImage.getSegmentation();
         data.regions = segmentedImage.getRegions();
@@ -366,6 +380,7 @@ int main(int argc, char *argv[])
 
         if (i == 0)
         {
+          namedWindow(testSegmentationTitle);
           setMouseCallback(testSegmentationTitle, onMouse, &data);
           segmentedImage.showBoundaries(testSegmentationTitle);
         }
