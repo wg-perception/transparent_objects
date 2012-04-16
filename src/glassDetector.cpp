@@ -66,8 +66,13 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     grabCut(bgrImage(fullRoi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
     curMask.copyTo(refinedMask, curMask);
   }
+
+  Mat prFgd = (refinedMask == GC_PR_FGD);
+  Mat fgd = (refinedMask == GC_FGD);
+  refinedMask = prFgd | fgd;
 #ifdef VISUALIZE
-  showGrabCutResults(commonMask, "initMask");
+  showGrabCutResults(commonMask, "init mask");
+  imshow("final mask", refinedMask);
 #endif
 }
 
@@ -278,13 +283,15 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
     }
   }
 
+
   if (params.useGrabCut)
   {
     Mat refinedGlassMask;
     refineSegmentationByGrabCut(bgrImage, glassMask, refinedGlassMask, params);
-    Mat prFgd = (refinedGlassMask == GC_PR_FGD);
-    Mat fgd = (refinedGlassMask == GC_FGD);
-    glassMask = prFgd | fgd;
+//    Mat prFgd = (refinedGlassMask == GC_PR_FGD);
+//    Mat fgd = (refinedGlassMask == GC_FGD);
+//    glassMask = prFgd | fgd;
+    glassMask = refinedGlassMask;
   }
 
 #ifdef VISUALIZE
