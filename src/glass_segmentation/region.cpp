@@ -17,6 +17,7 @@ Region::Region(const cv::Mat &_image, const cv::Mat &_textonLabels, const cv::Ma
   image = _image;
   textonLabels = _textonLabels;
   mask = _mask;
+  regionArea = countNonZero(mask);
   computeErodedMask(mask, erodedMask);
   erodedArea = countNonZero(erodedMask);
 
@@ -360,7 +361,9 @@ void Region::read(const Mat &_image, const Mat &_mask, const FileNode &fn)
 {
   image = _image;
   mask = _mask;
+  regionArea = countNonZero(mask);
   computeErodedMask(mask, erodedMask);
+  erodedArea = countNonZero(erodedMask);
 
   computeIntensities();
   computeRMSContrast();
@@ -377,4 +380,11 @@ void Region::read(const Mat &_image, const Mat &_mask, const FileNode &fn)
   Mat medianColorMat;
   fn["medianColor"] >> medianColorMat;
   medianColor = medianColorMat;
+}
+
+bool Region::isLabeled(const cv::Mat &labelMask, float confidentLabelArea) const
+{
+  int labelArea = countNonZero(getMask() & labelMask);
+  float areaRatio = static_cast<float>(labelArea) / regionArea;
+  return (areaRatio > confidentLabelArea);
 }

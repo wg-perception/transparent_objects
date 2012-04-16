@@ -44,6 +44,7 @@ class Region
     float getRobustMichelsonContrast() const;
     float getDepthRatio() const;
     bool isEmpty() const;
+    bool isLabeled(const cv::Mat &labelMask, float confidentLabelArea) const;
 
     void write(cv::FileStorage &fs) const;
     void read(const cv::Mat &image, const cv::Mat &mask, const cv::FileNode &fn);
@@ -68,7 +69,7 @@ class Region
 
     cv::Point2f center;
     cv::Vec3b medianColor;
-    int erodedArea;
+    int erodedArea, regionArea;
 
     float rmsContrast, michelsonContrast, robustMichelsonContrast;
     std::vector<int> intensities;
