@@ -95,7 +95,8 @@ GACIterationUpdate::GACIterationUpdate()
 {
   //TODO: move up
 //  iterationStep = 50;
-  iterationStep = 1000;
+//  iterationStep = 500;
+  iterationStep = 10;
 }
 
 void GACIterationUpdate::setBgrImage(const cv::Mat &_bgrImage)
@@ -169,6 +170,7 @@ void initializeGeodesicActiveContour(const cv::Mat &edges, cv::Mat &initialLevel
 }
 
 void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation,
+                           const SegmentedImage &segmentedImage,
                            const GeodesicActiveContourParams &params)
 {
   Mat initialLevelSetMat, featureImageMat;
@@ -240,13 +242,48 @@ void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Ma
 //  geodesicActiveContour->SetFeatureImage(featureImage);
   geodesicActiveContour->SetFeatureImage(sigmoid->GetOutput());
 
-
 #ifdef VISUALIZE_GAC
   GACIterationUpdate::Pointer observer = GACIterationUpdate::New();
   observer->setBgrImage(bgrImage);
   geodesicActiveContour->AddObserver(itk::IterationEvent(), observer);
 #endif
 
+  for (int i = 0; i < params.numberOfFullIterations; ++i)
+  {
+    typedef itk::BinaryThresholdImageFilter<InternalImageType, OutputImageType> ThresholdingFilterType;
+    ThresholdingFilterType::Pointer thresholder = ThresholdingFilterType::New();
+    thresholder->SetLowerThreshold(-std::numeric_limits<float>::max());
+    thresholder->SetUpperThreshold(0.0);
+    thresholder->SetOutsideValue(0);
+    thresholder->SetInsideValue(255);
+    thresholder->SetInput(geodesicActiveContour->GetOutput());
+    thresholder->Update();
+
+    cv::Mat currentSegmentation = BridgeType::ITKImageToCVMat<OutputImageType>(thresholder->GetOutput());
+    Mat postprocessedSegmentation;
+    segmentedImage.postprocessMask(currentSegmentation, postprocessedSegmentation);
+    vector<vector<Point> > contours;
+    findContours(postprocessedSegmentation, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+    Mat currentContourImage = Mat(postprocessedSegmentation.size(), CV_8UC1, Scalar(0));
+    Mat filledCurrentContourImage = Mat(postprocessedSegmentation.size(), CV_8UC1, Scalar(0));
+    drawContours(currentContourImage, contours, -1, Scalar(255));
+    drawContours(filledCurrentContourImage, contours, -1, Scalar(255), -1);
+
+    Mat distanceMap;
+    distanceTransform(~currentContourImage, distanceMap, CV_DIST_L2, CV_DIST_MASK_PRECISE);
+    Mat mulMask = Mat(distanceMap.size(), distanceMap.type());
+    mulMask = 1;
+    mulMask.setTo(-1, filledCurrentContourImage);
+    distanceMap = distanceMap.mul(mulMask);
+//    Mat contourInterior = distanceMap();
+//    contourInterior *= -1;
+    //TODO: distanceMap *= -1 ?
+//    initialLevelSet = distanceMap;
+    cv2itk(distanceMap, initialLevelSet);
+
+//    geodesicActiveContour->SetInput(geodesicActiveContour->GetOutput());
+    geodesicActiveContour->SetInput(initialLevelSet);
+  }
 
   typedef itk::BinaryThresholdImageFilter<InternalImageType, OutputImageType> ThresholdingFilterType;
   ThresholdingFilterType::Pointer thresholder = ThresholdingFilterType::New();

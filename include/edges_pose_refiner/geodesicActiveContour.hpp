@@ -2,6 +2,7 @@
 #define GEODESIC_ACTIVE_CONTOURS_
 
 #include <opencv2/core/core.hpp>
+#include "edges_pose_refiner/segmentedImage.hpp"
 
 struct GeodesicActiveContourParams
 {
@@ -13,7 +14,7 @@ struct GeodesicActiveContourParams
   float advectionScaling;
 
   float maximumRMSError;
-  int numberOfIterations;
+  int numberOfIterations, numberOfFullIterations;
 
   GeodesicActiveContourParams()
   {
@@ -26,11 +27,13 @@ struct GeodesicActiveContourParams
     advectionScaling = 1.0f;
 
     maximumRMSError = 0.001f;
-    numberOfIterations = 60000;
+    numberOfIterations = 1000;
+    numberOfFullIterations = 60;
   }
 };
 
 void geodesicActiveContour(const cv::Mat &bgrImage, const cv::Mat &edges, cv::Mat &segmentation,
+                           const SegmentedImage &segmentedImage,
                            const GeodesicActiveContourParams &params = GeodesicActiveContourParams());
 
 #endif
