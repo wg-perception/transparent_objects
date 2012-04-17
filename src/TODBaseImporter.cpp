@@ -345,22 +345,33 @@ void TODBaseImporter::importTestIndices(vector<int> &testIndices) const
   }
 }
 
+void TODBaseImporter::importDepth(const std::string &filename, cv::Mat &depth)
+{
+  FileStorage fs(filename, FileStorage::READ);
+  CV_Assert(fs.isOpened());
+  fs["depth_image"] >> depth;
+  fs.release();
+  CV_Assert(!depth.empty());
+}
+
 void TODBaseImporter::importDepth(int testImageIdx, cv::Mat &depth) const
 {
   std::stringstream depthFilename;
   depthFilename << testFolder << "/depth_image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".xml.gz";
-  FileStorage fs(depthFilename.str(), FileStorage::READ);
-  CV_Assert(fs.isOpened());
-  fs["depth_image"] >> depth;
-  fs.release();
+  importDepth(depthFilename.str(), depth);
+}
+
+void TODBaseImporter::importBGRImage(const std::string &filename, cv::Mat &bgrImage)
+{
+  bgrImage = imread(filename, CV_LOAD_IMAGE_UNCHANGED);
+  CV_Assert(!bgrImage.empty());
 }
 
 void TODBaseImporter::importBGRImage(int testImageIdx, cv::Mat &bgrImage) const
 {
   std::stringstream imageFilename;
   imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png";
-  bgrImage = imread(imageFilename.str());
-  CV_Assert(!bgrImage.empty());
+  importBGRImage(imageFilename.str(), bgrImage);
 }
 
 void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) const
@@ -381,9 +392,14 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) co
   model2test = model2test * offset;
 }
 
+void TODBaseImporter::importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud)
+{
+  pcl::io::loadPCDFile(filename, cloud);
+}
+
 void TODBaseImporter::importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
   std::stringstream pointCloudFilename;
   pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
-  pcl::io::loadPCDFile(pointCloudFilename.str(), cloud);
+  importPointCloud(pointCloudFilename.str(), cloud);
 }
