@@ -600,7 +600,10 @@ void readPointCloud(const string &filename, std::vector<cv::Point3f> &pointCloud
   if(normals != 0)
     normals->clear();
   std::ifstream file(filename.c_str());
-  CV_Assert(file.is_open());
+  if (!file.is_open())
+  {
+    CV_Error(CV_StsBadArg, "Cannot open the file " + filename);
+  }
 
   const int extSz = 3;
   string ext = filename.substr(filename.size() - extSz, extSz);

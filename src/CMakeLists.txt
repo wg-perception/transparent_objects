@@ -76,3 +76,10 @@ target_link_libraries(createSegmentation edges_pose_refiner)
 
 add_executable(createObjectMask apps/createObjectMask.cpp)
 target_link_libraries(createObjectMask edges_pose_refiner)
+
+add_executable(poseEstimationDemo apps/poseEstimationDemo.cpp)
+set_target_properties(poseEstimationDemo
+  PROPERTIES
+  COMPILE_FLAGS "-std=c++0x"
+  )
+target_link_libraries(poseEstimationDemo edges_pose_refiner)

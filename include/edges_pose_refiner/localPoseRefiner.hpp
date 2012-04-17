@@ -82,7 +82,8 @@ struct LocalPoseRefinerParams
 
     lmDownFactor = 1.0f;
     lmClosingIterationsCount = 10;
-    lmInliersRatio = 0.8f;
+//    lmInliersRatio = 0.8f;
+    lmInliersRatio = 0.6f;
 
     useViewDependentEdges = false;
     closingIterations = 3;

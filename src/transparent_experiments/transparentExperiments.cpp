@@ -468,9 +468,9 @@ int main(int argc, char **argv)
     meanInitialPoseCount /= initialPoseCount.size();
     cout << "mean initial pose count: " << meanInitialPoseCount << endl;
 
-//    const double cmThreshold = 2.0;
+    const double cmThreshold = 2.0;
 
-    const double cmThreshold = 5.0;
+//    const double cmThreshold = 5.0;
     PoseError::evaluateErrors(bestPoses, cmThreshold);
   }
 

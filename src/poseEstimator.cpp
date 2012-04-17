@@ -45,6 +45,7 @@ void PoseEstimator::generateGeometricHashes()
 {
   ghTable.clear();
   canonicScales.resize(silhouettes.size());
+  cout << "number of train silhouettes: " << silhouettes.size() << endl;
   for (size_t i = 0; i < silhouettes.size(); ++i)
   {
     cout << "generating hashes for silhouette #" << i << endl;
