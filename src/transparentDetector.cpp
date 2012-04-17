@@ -198,6 +198,19 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
   for (size_t i = 0; i < poses.size(); ++i)
   {
     cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
+    switch (i)
+    {
+      case 0:
+        color = cv::Scalar(255, 0, 0);
+        break;
+      case 1:
+        color = cv::Scalar(0, 0, 255);
+        break;
+      case 2:
+        color = cv::Scalar(0, 255, 0);
+        break;
+    }
+
     int objectIndex = getObjectIndex(objectNames[i]);
     poseEstimators[objectIndex].visualize(poses[i], image, color);
   }
