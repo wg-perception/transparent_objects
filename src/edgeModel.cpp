@@ -1,5 +1,6 @@
 #include "edges_pose_refiner/edgeModel.hpp"
 #include "edges_pose_refiner/kPartiteGraph.hpp"
+#include "edges_pose_refiner/pclProcessing.hpp"
 #include <pcl/registration/icp_nl.h>
 #include <boost/make_shared.hpp>
 #include <opencv2/opencv.hpp>
@@ -8,6 +9,7 @@
 #ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
+#include <boost/thread/thread.hpp>
 #endif
 
 using namespace cv;
@@ -76,7 +78,7 @@ EdgeModel::EdgeModel()
 {
 }
 
-EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<cv::Point3f> &_normals, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
 {
   params = _params;
 
@@ -85,6 +87,8 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   inModel.hasRotationSymmetry = isAxisCorrect(_points, axis, params.neighborIndex, params.distanceFactor, params.rotationCount);
   inModel.upStraightDirection = axis;
   inModel.points = _points;
+  inModel.normals = _normals;
+
   EdgeModelCreator::computeObjectSystem(inModel.points, inModel.Rt_obj2cam);
 
   Point3d objectCenter = inModel.getObjectCenter();
@@ -126,6 +130,50 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   }
 
   *this = outModel;
+  cout << "normals size: " << normals.size() << endl;
+}
+
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
+{
+  CV_Assert(false);
+  /*
+   * Estimate normals
+
+  pcl::PointCloud<pcl::PointXYZ> pclPoints;
+  cv2pcl(inModel.points, pclPoints);
+  pcl::PointCloud<pcl::Normal> pclNormals;
+
+  cout << "size: " << pclPoints.points.size() << endl;
+  estimateNormals(params.kSearch, pclPoints, pclNormals);
+  inModel.normals.resize(pclNormals.size());
+  for (size_t i = 0; i < pclNormals.points.size(); ++i)
+  {
+    Point3f currentNormal;
+    currentNormal.x = pclNormals.points[i].normal[0];
+    currentNormal.y = pclNormals.points[i].normal[1];
+    currentNormal.z = pclNormals.points[i].normal[2];
+    cout << pclNormals.points[i].curvature << endl;
+    inModel.normals[i] = currentNormal;
+  }
+  */
+
+/*
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+//    viewer->setBackgroundColor (0, 0, 0);
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> pointsColor(pclPoints.makeShared(), 0, 255, 0);
+  viewer->addPointCloud<pcl::PointXYZ>(pclPoints.makeShared(), pointsColor, "tmp");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
+//    viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (pclPoints.makeShared(), pclNormals, 10, 0.05, "normals");
+    viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (pclPoints.makeShared(), pclNormals.makeShared(), 10, 0.05, "normals");
+//    viewer->addCoordinateSystem (1.0);
+//    viewer->initCameraParameters ();
+
+    while (!viewer->wasStopped ())
+    {
+      viewer->spinOnce (100);
+//      boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+    }
+*/
 }
 
 EdgeModel::EdgeModel(const EdgeModel &edgeModel)
@@ -199,6 +247,53 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
     waitKey();
   }
 #endif
+}
+
+static void computeDots(const Mat &mat1, const Mat &mat2, Mat &dst)
+{
+  Mat m1 = mat1.reshape(1);
+  Mat m2 = mat2.reshape(1);
+  CV_Assert(m1.size() == m2.size());
+  CV_Assert(m1.type() == m2.type());
+
+  Mat products = m1.mul(m2);
+  reduce(products, dst, 1, CV_REDUCE_SUM);
+}
+
+static void computeNormalDots(const Mat &Rt, const EdgeModel &rotatedEdgeModel, Mat &dots)
+{
+  Mat R = Rt(Range(0, 3), Range(0, 3));
+  Mat t = Rt(Range(0, 3), Range(3, 4));
+
+  Mat vec;
+  Mat(t.t() * R).reshape(3).convertTo(vec, CV_32FC1);
+  Scalar scalar = Scalar(vec.at<Vec3f>(0));
+  Mat edgelsMat = Mat(rotatedEdgeModel.points) + scalar;
+
+  Mat norms;
+  computeDots(edgelsMat, edgelsMat, norms);
+  sqrt(norms, norms);
+
+  computeDots(edgelsMat, Mat(rotatedEdgeModel.normals), dots);
+  float epsf = 1e-4;
+  Scalar eps = Scalar::all(epsf);
+  dots /= (norms + epsf);
+}
+
+void EdgeModel::computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const
+{
+//  EdgeModel rotatedEdgeModel;
+//  rotate_cam(pose_cam, rotatedEdgeModel);
+
+  computeNormalDots(pose_cam.getProjectiveMatrix(), *this, weights);
+  Mat expWeights;
+  //TODO: move up
+  exp(-10.0 * abs(weights), expWeights);
+  weights = 2 * expWeights;
+
+  Mat doubleWeights;
+  weights.convertTo(doubleWeights, CV_64FC1);
+  weights = doubleWeights;
 }
 
 void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera, const PoseRT &pose_cam, Silhouette &silhouette, float downFactor, int closingIterationsCount) const

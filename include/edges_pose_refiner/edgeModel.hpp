@@ -94,7 +94,10 @@ struct EdgeModel
   /** \brief Empty constructor */
   EdgeModel();
 
+  //TODO: remove this constructor
   EdgeModel(const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &params = EdgeModelCreationParams());
+
+  EdgeModel(const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &params = EdgeModelCreationParams());
 
   /** \brief Create deep copy of the edgeModel object */
   EdgeModel(const EdgeModel &edgeModel);
@@ -111,7 +114,9 @@ struct EdgeModel
    * \param closingIterationsCount number of closing operations in morphology 
    */
   static void computeFootprint(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, cv::Mat &footprintPoints, float downFactor, int closingIterationsCount);
-  
+
+  void computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const;
+
   //TODO: remove imageSize from parameters
   /** \brief Compute a mask (that is a filled footprint) of a point set
    * \param points point set

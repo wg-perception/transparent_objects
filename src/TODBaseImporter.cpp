@@ -318,9 +318,29 @@ void TODBaseImporter::importEdgeModel(const std::string &modelsPath, const std::
   catch(cv::Exception &e)
   {
     cout << "Cannot read edge model: " << modelFilename << endl;
-    vector<Point3f> points;
-    readPointCloud(modelsPath + "/downPointClouds/" + objectName + ".ply", points);
+    vector<Point3f> points, normals;
+    readPointCloud(modelsPath + "/downPointClouds/" + objectName + ".ply", points, &normals);
+    edgeModel = EdgeModel(points, normals, true, true);
+
+/*  uncomment for obsolete models (sourCream)
+
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+      points[i].z *= -1;
+    }
     edgeModel = EdgeModel(points, true, true);
+*/
+/*
+    EdgeModel rotatedEdgeModel;
+    Mat R, tvec;
+    getRotationTranslation(edgeModel.Rt_obj2cam, R, tvec);
+    Mat rvec = Mat::zeros(3, 1, CV_64FC1);
+    tvec = Mat::zeros(3, 1, CV_64FC1);
+    rvec.at<double>(0) = CV_PI;
+    edgeModel.rotate_obj(PoseRT(rvec, 2 * tvec), rotatedEdgeModel);
+    edgeModel = rotatedEdgeModel;
+*/
+
     edgeModel.write(modelFilename);
   }
 }
