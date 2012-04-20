@@ -12,7 +12,7 @@
 
 #include "edges_pose_refiner/utils.hpp"
 
-#include <pcl_visualization/cloud_viewer.h>
+#include <pcl/visualization/cloud_viewer.h>
 
 
 #include "pcl/ModelCoefficients.h"
@@ -54,12 +54,6 @@ void read(const string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
   vector<cv::Point3f> cvSceneCloud;
   readPointCloud(filename, cvSceneCloud);
-  for (size_t i = 0; i < cvSceneCloud.size(); ++i)
-  {
-    const double mm2m = 0.001;
-    cvSceneCloud[i] *= mm2m;
-  }
-
   cv2pcl(cvSceneCloud, cloud);
 }
 
@@ -84,8 +78,8 @@ int main(int argc, char *argv[])
   read(sceneFilename, sceneCloud);
   cout << "all points: " << sceneCloud.points.size() << endl;
 
-  downsample(downLeafSize, sceneCloud);
-  cout << "down points: " << sceneCloud.points.size() << endl;
+//  downsample(downLeafSize, sceneCloud);
+//  cout << "down points: " << sceneCloud.points.size() << endl;
 
   pcl::PointCloud<pcl::Normal> sceneNormals;
   estimateNormals(kSearch, sceneCloud, sceneNormals);
@@ -114,8 +108,8 @@ int main(int argc, char *argv[])
   pcl::PointCloud<pcl::PointXYZ> tablePlane;
   extractPointCloud(sceneCloud, inliers, tablePlane);
 
-  pcl_visualization::CloudViewer viewer ("Simple Cloud Viewer");
-  viewer.showCloud (objectsInScene, "objectsInScene");
+  pcl::visualization::CloudViewer viewer ("Simple Cloud Viewer");
+  viewer.showCloud(objectsInScene.makeShared(), "objectsInScene");
   //viewer.showCloud (tablePlane, "plane");
   while (!viewer.wasStopped ())
   {
