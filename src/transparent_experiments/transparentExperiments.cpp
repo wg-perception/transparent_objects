@@ -34,7 +34,7 @@ using std::stringstream;
 //#define WRITE_GLASS_SEGMENTATION
 
 
-#if defined(VISUALIZE_POSE_REFINEMENT) && USE_3D_VISUALIZATION
+#if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <boost/thread/thread.hpp>
@@ -185,6 +185,7 @@ int main(int argc, char **argv)
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
 
+
 //#ifdef VISUALIZE_POSE_REFINEMENT
 //  edgeModels[0].visualize();
 //#endif
@@ -195,9 +196,11 @@ int main(int argc, char **argv)
 
   params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.openingIterations = 8;
+  //fixedOnTable
   params.glassSegmentationParams.finalClosingIterations = 8;
 
-//  params.glassSegmentationParams.finalClosingIterations = 16;
+  //clutter
+  //params.glassSegmentationParams.finalClosingIterations = 12;
 
   TransparentDetector detector(kinectCamera, params);
 //  TransparentDetector detector(kinectCamera);
@@ -220,6 +223,7 @@ int main(int argc, char **argv)
   vector<float> allChamferDistances;
   vector<size_t> geometricHashingPoseCount;
   vector<int> indicesOfRecognizedObjects;
+  vector<double> allRecognitionTimes;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
 #if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
@@ -379,6 +383,7 @@ int main(int argc, char **argv)
     }
 
     cout << "Recognition time: " << recognitionTime.getTimeSec() << "s" << endl;
+    allRecognitionTimes.push_back(recognitionTime.getTimeSec());
 
     if (objectNames.size() == 1)
     {
@@ -499,6 +504,10 @@ int main(int argc, char **argv)
   float ghSuccessRate = static_cast<float>(ghSuccessCount) / allChamferDistances.size();
   cout << "Success rate: " << ghSuccessRate << endl;
   cout << "Mean chamfer distance (px): " << meanChamferDistance << endl;
+
+  double timesSum = std::accumulate(allRecognitionTimes.begin(), allRecognitionTimes.end(), 0.0);
+  double meanRecognitionTime = timesSum / allRecognitionTimes.size();
+  cout << "Mean recognition time (s): " << meanRecognitionTime << endl;
 
   std::system("date");
   return 0;
