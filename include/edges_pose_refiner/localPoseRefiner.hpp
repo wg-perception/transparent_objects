@@ -72,6 +72,7 @@ struct LocalPoseRefinerParams
   /** \brief Weight of the edges term in the oriented chamfer matching cost function */
   float edgesWeight;
 
+  bool useAccurateSilhouettes;
 
   LocalPoseRefinerParams()
   {
@@ -94,6 +95,8 @@ struct LocalPoseRefinerParams
     objectM = 10;
     viewDependentEdgesWeight = 1.0 / 3.0;
     edgesWeight = 0.1f;
+
+    useAccurateSilhouettes = false;
   }
 };
 

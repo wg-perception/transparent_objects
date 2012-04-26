@@ -71,6 +71,10 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
   if (tablePlane != 0)
   {
     refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
+
+    params.lmParams.useAccurateSilhouettes = true;
+    refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
+    params.lmParams.useAccurateSilhouettes = false;
   }
 
 }
@@ -91,7 +95,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
   for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
   {
 //    cout << "Pose idx: " << initPoseIdx << endl;
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix());
+    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     PoseRT &initialPose_cam = poses_cam[initPoseIdx];
 
@@ -928,7 +932,7 @@ void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv:
   for (size_t initPoseIdx = 0; initPoseIdx < initPoses_cam.size(); ++initPoseIdx)
   {
     //cout << "Pose idx: " << initPoseIdx << endl;
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix());
+    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     PoseRT &initialPose_cam = initPoses_cam[initPoseIdx];
 

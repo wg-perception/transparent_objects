@@ -11,6 +11,7 @@
 #include "edges_pose_refiner/edgeModel.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 #include "edges_pose_refiner/poseRT.hpp"
+#include "edges_pose_refiner/localPoseRefiner.hpp"
 
 #ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
@@ -49,6 +50,8 @@ struct PoseEstimatorParams
   float maxRotation3D;
   float maxTranslation3D;
   float confidentSuppresion3D;
+
+  LocalPoseRefinerParams lmParams;
 
   PoseEstimatorParams()
   {
@@ -151,8 +154,8 @@ private:
   std::vector<cv::Mat> canonicScales;
   //TODO: remove mutable
   mutable GHTable ghTable;
+  mutable PoseEstimatorParams params;
 
-  PoseEstimatorParams params;
   PinholeCamera kinectCamera;
 };
 

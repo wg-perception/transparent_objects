@@ -863,7 +863,30 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
         silhouetteJ = newSilhouetteJ;
       }
 
-      computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
+      if (this->params.useAccurateSilhouettes)
+      {
+        computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
+      }
+      else
+      {
+        //TODO: compute precise Jacobian with this strategy
+        rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
+      }
+
+#ifdef VISUALIZE
+      Mat weightsImage(edgesImage.size(), CV_8UC1, Scalar(0));
+      for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+      {
+        if (silhouetteWeights.at<double>(i) > 0.1)
+        {
+//          double intensity = std::min(255.0, 1000 * silhouetteWeights.at<double>(i));
+ //         circle(weightsImage, projectedPointsVector[i], 0, Scalar(intensity));
+          circle(weightsImage, projectedPointsVector[i], 0, Scalar(255.0));
+        }
+      }
+      imshow("weights", weightsImage);
+#endif
+
       if (silhouetteWeights.empty())
       {
         return std::numeric_limits<float>::max();
@@ -928,10 +951,11 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     }
     //if(index != 1 )
 
+#endif
+
 #ifdef VISUALIZE
     displayProjection(projectedPoints, "points");
     displayProjection(projectedStableEdgels, "surface points");
-#endif
 #endif
     CvMat errCvMat = err;
     cvCopy( &errCvMat, _err);
