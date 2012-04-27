@@ -626,7 +626,8 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
     vector<Point2f> currentContourFloat(currentContourMat);
 
     vector<BasisMatch> bestMatches;
-    for (int iterationIndex = 0; iterationIndex < params.ghIterationCount; ++iterationIndex)
+    const int ghIterationCount = ceil(log(1.0 - params.ghSuccessProbability) / log(1.0 - params.ghObjectContourProportion * params.ghObjectContourProportion));
+    for (int iterationIndex = 0; iterationIndex < ghIterationCount; ++iterationIndex)
     {
       int firstIndex = rand() % currentContour.size();
       int secondIndex = rand() % currentContour.size();

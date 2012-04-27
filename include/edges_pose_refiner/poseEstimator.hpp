@@ -42,7 +42,13 @@ struct PoseEstimatorParams
   float ghGranularity;
   int ghBasisStep;
   float ghMinDistanceBetweenBasisPoints;
-  int ghIterationCount;
+
+  //length of the object contour relative to length of the whole extracted contour
+  float ghObjectContourProportion;
+
+  //probability to find a basis which belongs to the object
+  float ghSuccessProbability;
+
   int votesWindowSize;
   float votesConfidentSuppression;
   float basisConfidentSuppression;
@@ -75,9 +81,10 @@ struct PoseEstimatorParams
     ghBasisStep = 2;
     ghMinDistanceBetweenBasisPoints = 0.1f;
     ghGranularity = 0.04f;
-//    ghIterationCount = 200;
-//    ghIterationCount = 16;
-    ghIterationCount = 64;
+
+    ghObjectContourProportion = 0.1f;
+    ghSuccessProbability = 0.99f;
+
     votesWindowSize = 5;
     votesConfidentSuppression = 1.1f;
     basisConfidentSuppression = 1.5f;
