@@ -10,6 +10,10 @@ int main(int argc, char *argv[])
 {
   std::system("date");
 
+  srand(42);
+  RNG &rng = theRNG();
+  rng.state = 0xffffffff;
+
   CV_Assert(argc == 3);
   string baseFolder = argv[1];
   string testObjectName = argv[2];
@@ -22,19 +26,25 @@ int main(int argc, char *argv[])
   const string depthFilename = baseFolder + "/depth.xml.gz";
   const string pointCloudFilename = baseFolder + "/pointCloud.pcd";
 
-//  const vector<string> objectNames = {testObjectName};
+  const vector<string> objectNames = {testObjectName};
 //  const vector<string> objectNames = {"bank", "bottle", "glass", "sourCream", "wineglass"};
-  const vector<string> objectNames = {"bank", "bottle", "sourCream", "wineglass"};
+//  const vector<string> objectNames = {"bank", "bottle", "sourCream", "wineglass"};
 //  const vector<string> objectNames = {"bank", "bottle", "wineglass"};
 //  const vector<string> objectNames = {"bank", "wineglass"};
 //  const vector<string> objectNames = {"wineglass"};
 //, "bottle", "glass", "sourCream", "wineglass"};
 
   TransparentDetectorParams params;
-  params.glassSegmentationParams.closingIterations = 12;
-  params.glassSegmentationParams.openingIterations = 8;
+//  params.glassSegmentationParams.closingIterations = 12;
+//  params.glassSegmentationParams.openingIterations = 8;
 //  params.glassSegmentationParams.finalClosingIterations = 8;
-  params.glassSegmentationParams.finalClosingIterations = 12;
+ // params.glassSegmentationParams.finalClosingIterations = 12;
+
+  //good clutter
+  params.glassSegmentationParams.openingIterations = 15;
+  params.glassSegmentationParams.closingIterations = 12;
+  params.glassSegmentationParams.finalClosingIterations = 32;
+  params.glassSegmentationParams.grabCutErosionsIterations = 4;
 
   TODBaseImporter dataImporter(testFolder);
 
@@ -93,7 +103,8 @@ int main(int argc, char *argv[])
   imshow("detection", detectionResults);
   waitKey();
 */
-  cout << "number of detected poses" << poses_cam.size() << endl;
+  cout << "number of detected poses: " << poses_cam.size() << endl;
+  cout << "number of qualities: " << posesQualities.size() << endl;
 
   if (!posesQualities.empty())
   {

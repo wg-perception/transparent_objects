@@ -28,8 +28,7 @@ using std::stringstream;
 
 //#define VISUALIZE_TEST_DATA
 //#define VISUALIZE_POSE_REFINEMENT
-//#define VISUALIZE_INITIAL_POSE_REFINEMENT
-//#define WRITE_RESULTS
+//#define WRITE_ERRORS
 //#define PROFILE
 //#define WRITE_GLASS_SEGMENTATION
 
@@ -192,14 +191,19 @@ int main(int argc, char **argv)
 
   TransparentDetectorParams params;
 //  params.glassSegmentationParams.closingIterations = 8;
-//  params.glassSegmentationParams.openingIterations = 15;
-
-  params.glassSegmentationParams.closingIterations = 12;
-  params.glassSegmentationParams.openingIterations = 8;
+// bucket
+//  params.glassSegmentationParams.openingIterations = 8;
   //fixedOnTable
-  params.glassSegmentationParams.finalClosingIterations = 8;
+  //params.glassSegmentationParams.finalClosingIterations = 8;
+
+  //good clutter
+  params.glassSegmentationParams.openingIterations = 15;
+  params.glassSegmentationParams.closingIterations = 12;
+  params.glassSegmentationParams.finalClosingIterations = 32;
+  params.glassSegmentationParams.grabCutErosionsIterations = 4;
 
   //clutter
+  //bucket
   //params.glassSegmentationParams.finalClosingIterations = 12;
 
   TransparentDetector detector(kinectCamera, params);
@@ -226,6 +230,10 @@ int main(int argc, char **argv)
   vector<double> allRecognitionTimes;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
+    srand(42);
+    RNG &rng = theRNG();
+    rng.state = 0xffffffff;
+
 #if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("transparent experiments"));
 #endif
@@ -425,16 +433,18 @@ int main(int argc, char **argv)
       cout << "Best pose: " << currentPoseErrors[bestPoseIdx] << endl;
       bestPoses.push_back(currentPoseErrors[bestPoseIdx]);
 
-#ifdef WRITE_RESULTS
+#ifdef WRITE_ERRORS
       const float maxTrans = 0.02;
       if (currentPoseErrors[bestPoseIdx].getTranslationDifference() > maxTrans)
       {
+        Mat glassMask = debugInfo.glassMask;
         std::stringstream str;
         str << testImageIdx;
         Mat segmentation = drawSegmentation(kinectBgrImage, glassMask);
         imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_mask.png", segmentation);
 
-        Mat poseImage = displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[bestPoseIdx], kinectCamera, "final");
+        Mat poseImage = kinectBgrImage.clone();
+        detector.visualize(poses_cam, detectedObjectsNames, poseImage);
         imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_pose.png", poseImage);
 
         const float depthNormalizationFactor = 100;
