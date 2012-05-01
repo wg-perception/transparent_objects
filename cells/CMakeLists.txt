@@ -1,4 +1,4 @@
-set_ecto_install_package_name(transparent_objects)
+set_ecto_install_package_name(${PROJECT_NAME})
 
 ectomodule(transparent_objects_cells
     module.cpp

@@ -11,8 +11,6 @@ import transparent_objects_cells
 ########################################################################################################################
 
 class TransparentObjectsDetectionPipeline(DetectionPipeline):
-    import transparent_objects
-
     @classmethod
     def type_name(cls):
         return 'transparent_objects'

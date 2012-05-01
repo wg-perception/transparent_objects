@@ -1,4 +1,4 @@
-project(transparent_objects)
+project(object_recognition_transparent_objects)
 #this needs a stanza to prevent overwrite.
 if(NOT CMAKE_BUILD_TYPE)#Only do this the on the first run, if the build type hasn't been set prior
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
@@ -29,7 +29,7 @@ if (DO_BUILD_ECTO_CELLS)
     find_package(catkin REQUIRED)
 
     catkin_stack()
-    catkin_project(transparent_objects
+    catkin_project(object_recognition_transparent_objects
                    DEPENDS Eigen Boost OpenCV
                    INCLUDE_DIRS include
     )
@@ -38,7 +38,6 @@ if (DO_BUILD_ECTO_CELLS)
     catkin_python_setup()
 
     find_package(ecto REQUIRED)
-    set_ecto_install_package_name(transparent_objects)
 
     add_subdirectory(cells)
     add_subdirectory(python)
