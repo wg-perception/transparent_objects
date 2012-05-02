@@ -84,7 +84,7 @@ struct LocalPoseRefinerParams
     lmDownFactor = 1.0f;
     lmClosingIterationsCount = 10;
 //    lmInliersRatio = 0.8f;
-    lmInliersRatio = 0.6f;
+    lmInliersRatio = 0.65f;
 
     useViewDependentEdges = false;
     closingIterations = 3;
@@ -96,7 +96,7 @@ struct LocalPoseRefinerParams
     viewDependentEdgesWeight = 1.0 / 3.0;
     edgesWeight = 0.1f;
 
-    useAccurateSilhouettes = false;
+    useAccurateSilhouettes = true;
   }
 };
 

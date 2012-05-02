@@ -57,6 +57,8 @@ struct PoseEstimatorParams
   float maxTranslation3D;
   float confidentSuppresion3D;
 
+  float minScale;
+
   LocalPoseRefinerParams lmParams;
 
   PoseEstimatorParams()
@@ -92,6 +94,8 @@ struct PoseEstimatorParams
     maxRotation3D = 0.8f;
     maxTranslation3D = 0.15f;
     confidentSuppresion3D = 1.3f;
+
+    minScale = 0.2f;
   }
 
   void read(const cv::FileNode &fn);

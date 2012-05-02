@@ -71,12 +71,7 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
   if (tablePlane != 0)
   {
     refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
-
-    params.lmParams.useAccurateSilhouettes = true;
-    refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
-    params.lmParams.useAccurateSilhouettes = false;
   }
-
 }
 
 void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
@@ -367,6 +362,7 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
 {
   Point2f firstPoint = contour.at(testBasis.first);
   Point2f secondPoint= contour.at(testBasis.second);
+  const float testScale = norm(firstPoint - secondPoint);
 
   vector<Mat> votes(silhouettes.size());
   for (size_t i = 0; i < silhouettes.size(); ++i)
@@ -404,7 +400,6 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
   {
     Mat currentVotes;
     votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].size());
-    float testScale = norm(firstPoint - secondPoint);
     Mat currentScale = testScale * canonicScales[i];
     currentVotes /= currentScale;
 
@@ -417,6 +412,12 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
 
       BasisMatch match;
       match.confidence = currentVotes.at<float>(maxLoc.y, maxLoc.x);
+
+      if (currentScale.at<float>(maxLoc.y, maxLoc.x) < params.minScale)
+      {
+        continue;
+      }
+
       match.testBasis = testBasis;
       match.trainBasis = Basis(maxLoc.y, maxLoc.x);
       match.silhouetteIndex = i;
@@ -431,9 +432,9 @@ void PoseEstimator::suppressBasisMatches(const std::vector<BasisMatch> &matches,
   vector<float> errors(matches.size());
   for (size_t i = 0; i < matches.size(); ++i)
   {
-    const float eps = 1e-4;
-    CV_Assert(matches[i].confidence > eps);
-    errors[i] = 1.0 / matches[i].confidence;
+    const float eps = 1e-3;
+//    CV_Assert(matches[i].confidence > eps);
+    errors[i] = 1.0 / (matches[i].confidence + eps);
   }
 
   vector<bool> isSuppressed;
