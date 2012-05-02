@@ -180,7 +180,7 @@ struct EdgeModel
    *
    *  \param filename Name of the file to write the model
    */
-  void write(const std::string &filename);
+  void write(const std::string &filename) const;
 
   /** \brief Write a model to a file storage
    *

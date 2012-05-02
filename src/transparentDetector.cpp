@@ -51,11 +51,11 @@ void TransparentDetector::addObject(const std::string &name, const PoseEstimator
 {
   if (poseEstimators.empty())
   {
-    validTestImageSize = estimator.getValitTestImageSize();
+    validTestImageSize = estimator.getValidTestImageSize();
   }
   else
   {
-    CV_Assert(validTestImageSize == estimator.getValitTestImageSize());
+    CV_Assert(validTestImageSize == estimator.getValidTestImageSize());
   }
 
   poseEstimators.push_back(estimator);
@@ -197,7 +197,8 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 
   for (size_t i = 0; i < poses.size(); ++i)
   {
-    cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
+    //TODO: use randomization
+    cv::Scalar color(255, 0, 255);
     switch (i)
     {
       case 0:

@@ -563,7 +563,7 @@ void EdgeModel::visualize()
 #endif
 }
 
-void EdgeModel::write(const std::string &filename)
+void EdgeModel::write(const std::string &filename) const
 {
   FileStorage fs(filename, FileStorage::WRITE);
   write(fs);

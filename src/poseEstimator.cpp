@@ -56,7 +56,7 @@ void PoseEstimator::generateGeometricHashes()
 void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane, std::vector<cv::Mat> *initialSilhouettes) const
 {
   CV_Assert(kinectBgrImage.size() == glassMask.size());
-  CV_Assert(kinectBgrImage.size() == getValitTestImageSize());
+  CV_Assert(kinectBgrImage.size() == getValidTestImageSize());
 
   if (silhouettes.empty())
   {
@@ -1051,7 +1051,7 @@ void PoseEstimator::visualize(const PoseRT &pose, const boost::shared_ptr<pcl::v
 }
 #endif
 
-cv::Size PoseEstimator::getValitTestImageSize() const
+cv::Size PoseEstimator::getValidTestImageSize() const
 {
   return kinectCamera.imageSize;
 }
