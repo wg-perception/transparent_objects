@@ -31,7 +31,9 @@ using std::endl;
 
 LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_edgesImage, const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const cv::Mat &_extrinsicsRt, const LocalPoseRefinerParams &_params)
 {
+  verticalDirectionIndex = 2;
   dim = 3;
+
   params = _params;
   edgesImage = _edgesImage.clone();
   CV_Assert(!edgesImage.empty());
@@ -122,6 +124,7 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
   originalEdgeModel = _edgeModel;
   //TODO: remove copy operation
   rotatedEdgeModel = _edgeModel;
+  hasRotationSymmetry = rotatedEdgeModel.hasRotationSymmetry;
 
   setObjectCoordinateSystem(originalEdgeModel.Rt_obj2cam);
 
@@ -668,6 +671,97 @@ void LocalPoseRefiner::computeWeightsObjectJacobian(const vector<Point3f> &point
   }
 }
 
+
+void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette,
+       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam,
+       const cv::Mat &newTranslationBasis2old, const cv::Mat &rvecParams, const cv::Mat &tvecParams,
+       cv::Mat &rvecParams_cam, cv::Mat &tvecParams_cam, cv::Mat &RtParams_cam,
+       cv::Mat &J, cv::Mat &error)
+{
+  const vector<Point3f> &edgels = isSilhouette ? rotatedEdgeModel.points : rotatedEdgeModel.stableEdgels;
+  const Mat dt = isSilhouette ? silhouetteDtImage : dtImage;
+  const Mat dx = isSilhouette ? silhouetteDtDx : dtDx;
+  const Mat dy = isSilhouette ? silhouetteDtDy : dtDy;
+
+  Mat JaW(2 * edgels.size(), 2 * dim, CV_64F);
+  Mat Dpdrot = JaW.colRange(0, this->dim);
+  Mat Dpdt = JaW.colRange(this->dim, 2 * this->dim);
+  vector<Point2f> projectedPointsVector;
+  projectPoints_obj(Mat(edgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam, projectedPointsVector, &Dpdrot, &Dpdt);
+  Mat projectedPoints = Mat(projectedPointsVector);
+  Mat inliersMask;
+  computeResidualsWithInliersMask(projectedPoints, error, this->params.outlierDistance, this->params.outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
+  computeObjectJacobian(projectedPoints, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+  error.setTo(0, ~inliersMask);
+  for (int i = 0; i < J.cols; ++i)
+  {
+    Mat col = J.col(i);
+    col.setTo(0, ~inliersMask);
+  }
+
+  if (!newTranslationBasis2old.empty())
+  {
+    Mat newJ(J.rows, paramsCount, J.type());
+    if (!hasRotationSymmetry)
+    {
+      CV_Assert(verticalDirectionIndex < J.cols);
+      Mat rotationJ = J.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
+      Mat theFirstCol = newJ.col(0);
+      rotationJ.copyTo(theFirstCol);
+    }
+    Mat translationJ = J.colRange(dim, 2*dim) * newTranslationBasis2old;
+    Mat lastCols = newJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+    translationJ.copyTo(lastCols);
+    J = newJ;
+  }
+
+  if (isSilhouette)
+  {
+    Mat silhouetteWeights(edgels.size(), 1, CV_64FC1);
+    if (this->params.useAccurateSilhouettes)
+    {
+      computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
+    }
+    else
+    {
+      //TODO: compute precise Jacobian with this strategy
+      rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
+    }
+
+#ifdef VISUALIZE
+      Mat weightsImage(edgesImage.size(), CV_8UC1, Scalar(0));
+      for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+      {
+        if (silhouetteWeights.at<double>(i) > 0.1)
+        {
+//          double intensity = std::min(255.0, 1000 * silhouetteWeights.at<double>(i));
+ //         circle(weightsImage, projectedPointsVector[i], 0, Scalar(intensity));
+          circle(weightsImage, projectedPointsVector[i], 0, Scalar(255.0));
+        }
+      }
+      imshow("weights", weightsImage);
+#endif
+
+    if (silhouetteWeights.empty())
+    {
+        J = Mat();
+        error = Mat();
+        return;
+    }
+
+    for (int i = 0; i < J.cols; ++i)
+    {
+      Mat col = J.col(i);
+      Mat mulCol = silhouetteWeights.mul(col);
+      mulCol.copyTo(col);
+    }
+
+    CV_Assert(silhouetteWeights.type() == error.type());
+    Mat mulError = silhouetteWeights.mul(error);
+    error = mulError;
+  }
+}
+
 float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGuess, const cv::Vec4f &tablePlane, cv::Mat *finalJacobian)
 {
 #ifdef VERBOSE
@@ -679,9 +773,6 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     poseInit_cam = pose_cam;
     setInitialPose(pose_cam);
   }
-
-  bool hasRotationSymmetry = rotatedEdgeModel.hasRotationSymmetry;
-  const int verticalDirectionIndex = 2;
 
   bool useObjectCoordinateSystem = !Rt_obj2cam_cached.empty();
   if(!useObjectCoordinateSystem)
@@ -760,19 +851,16 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
   }
 
   //TODO: check TermCriteria from solvePnP
-  CvLevMarq solver(paramsCount, residualsCount);
+  CvLevMarq solver(paramsCount, residualsCount, this->params.termCriteria);
   CvMat paramsCvMat = params;
   cvCopy( &paramsCvMat, solver.param );
   //params and solver.params must use the same memory
 
-  vector<Point2f> projectedStableEdgelsVector, projectedPointsVector;
-  Mat projectedStableEdgels, projectedPoints;
   Mat err;
   int iter = 0;
   float startError = -1.f;
   float finishError = -1.f;
 
-  Mat silhouetteWeights(rotatedEdgeModel.points.size(), 1, CV_64FC1);
   //TODO: number of iterations is greater in 2 times than needed (empty iterations)
   for(;;)
   {
@@ -788,7 +876,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     if( !proceed || !_err )
         break;
 
-    Mat silhouetteErr, surfaceErr;
+    Mat surfaceJ, surfaceErr;
+    Mat silhouetteJ, silhouetteErr;
 //      if( matJ )
     {
       if (!newTranslationBasis2old.empty())
@@ -799,120 +888,18 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
         CV_Assert(tvecParams.cols == 1);
       }
 
-      //TODO: get rid of code duplication
-      Mat surfaceJaW(2 * originalEdgeModel.stableEdgels.size(), 2 * dim, CV_64F);
-      Mat surfaceDpdrot = surfaceJaW.colRange(0, this->dim);
-      Mat surfaceDpdt = surfaceJaW.colRange(this->dim, 2 * this->dim);
       Mat rvecParams_cam, tvecParams_cam, RtParams_cam;
-      projectPoints_obj(Mat(rotatedEdgeModel.stableEdgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam, projectedStableEdgelsVector, &surfaceDpdrot, &surfaceDpdt);
-      projectedStableEdgels = Mat(projectedStableEdgelsVector);
-      Mat surfaceInliersMask;
-      computeResidualsWithInliersMask(projectedStableEdgels, surfaceErr, this->params.outlierDistance, this->params.outlierError, dtImage, true, this->params.lmInliersRatio, surfaceInliersMask);
-      Mat surfaceJ;
-      computeObjectJacobian(projectedStableEdgels, surfaceJaW, dtImage, dtDx, dtDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, surfaceJ);
-      surfaceErr.setTo(0, ~surfaceInliersMask);
-      for (int i = 0; i < surfaceJ.cols; ++i)
-      {
-        Mat col = surfaceJ.col(i);
-        col.setTo(0, ~surfaceInliersMask);
-      }
+      computeLMIterationData(paramsCount, false, R_obj2cam, t_obj2cam,
+                             newTranslationBasis2old, rvecParams, tvecParams,
+                             rvecParams_cam, tvecParams_cam, RtParams_cam, surfaceJ, surfaceErr);
 
-      if (!newTranslationBasis2old.empty())
-      {
-        Mat newSurfaceJ(surfaceJ.rows, paramsCount, surfaceJ.type());
-        if (!hasRotationSymmetry)
-        {
-          Mat rotationJ = surfaceJ.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
-          Mat theFirstCol = newSurfaceJ.col(0);
-          rotationJ.copyTo(theFirstCol);
-        }
-        Mat translationJ = surfaceJ.colRange(dim, 2*dim) * newTranslationBasis2old;
-        Mat lastCols = newSurfaceJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
-        translationJ.copyTo(lastCols);
-        surfaceJ = newSurfaceJ;
-      }
+      computeLMIterationData(paramsCount, true, R_obj2cam, t_obj2cam,
+                             newTranslationBasis2old, rvecParams, tvecParams,
+                             rvecParams_cam, tvecParams_cam, RtParams_cam, silhouetteJ, silhouetteErr);
 
-      Mat silhouetteJaW(2 * originalEdgeModel.points.size(), 2 * dim, CV_64F);
-      Mat silhouetteDpdrot = silhouetteJaW.colRange(0, this->dim);
-      Mat silhouetteDpdt = silhouetteJaW.colRange(this->dim, 2 * this->dim);
-      projectPoints_obj(Mat(rotatedEdgeModel.points), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam, projectedPointsVector, &silhouetteDpdrot, &silhouetteDpdt);
-      projectedPoints = Mat(projectedPointsVector);
-      Mat silhouetteInliersMask;
-      computeResidualsWithInliersMask(projectedPoints, silhouetteErr, this->params.outlierDistance, this->params.outlierError, silhouetteDtImage, true, this->params.lmInliersRatio, silhouetteInliersMask);
-      Mat silhouetteJ;
-      computeObjectJacobian(projectedPoints, silhouetteJaW, silhouetteDtImage, silhouetteDtDx, silhouetteDtDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, silhouetteJ);
-      silhouetteErr.setTo(0, ~silhouetteInliersMask);
-      for (int i = 0; i < silhouetteJ.cols; ++i)
-      {
-        Mat col = silhouetteJ.col(i);
-        col.setTo(0, ~silhouetteInliersMask);
-      }
-
-      if (!newTranslationBasis2old.empty())
-      {
-        Mat newSilhouetteJ(silhouetteJ.rows, paramsCount, silhouetteJ.type());
-        if (!hasRotationSymmetry)
-        {
-          Mat rotationJ = silhouetteJ.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
-          Mat theFirstCol = newSilhouetteJ.col(0);
-          rotationJ.copyTo(theFirstCol);
-        }
-        Mat translationJ = silhouetteJ.colRange(dim, 2*dim) * newTranslationBasis2old;
-        Mat lastCols = newSilhouetteJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
-        translationJ.copyTo(lastCols);
-        silhouetteJ = newSilhouetteJ;
-      }
-
-      if (this->params.useAccurateSilhouettes)
-      {
-        computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
-      }
-      else
-      {
-        //TODO: compute precise Jacobian with this strategy
-        rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
-      }
-
-#ifdef VISUALIZE
-      Mat weightsImage(edgesImage.size(), CV_8UC1, Scalar(0));
-      for (size_t i = 0; i < projectedPointsVector.size(); ++i)
-      {
-        if (silhouetteWeights.at<double>(i) > 0.1)
-        {
-//          double intensity = std::min(255.0, 1000 * silhouetteWeights.at<double>(i));
- //         circle(weightsImage, projectedPointsVector[i], 0, Scalar(intensity));
-          circle(weightsImage, projectedPointsVector[i], 0, Scalar(255.0));
-        }
-      }
-      imshow("weights", weightsImage);
-#endif
-
-      if (silhouetteWeights.empty())
+      if (silhouetteErr.empty() || silhouetteJ.empty())
       {
         return std::numeric_limits<float>::max();
-      }
-
-      for (int i = 0; i < silhouetteJ.cols; ++i)
-      {
-        Mat col = silhouetteJ.col(i);
-        Mat mulCol = silhouetteWeights.mul(col);
-        mulCol.copyTo(col);
-      }
-
-      const bool isJacoianNumerical = false;
-
-      if (isJacoianNumerical)
-      {
-        Mat weightsJacobian;
-        computeWeightsObjectJacobian(rotatedEdgeModel.points, silhouetteEdges, PoseRT(rvecParams, tvecParams), weightsJacobian);
-        for (int i = 0; i < weightsJacobian.cols; ++i)
-        {
-          Mat col = weightsJacobian.col(i);
-          Mat mulCol = silhouetteErr.mul(col);
-          mulCol.copyTo(col);
-        }
-
-        silhouetteJ += weightsJacobian;
       }
 
       Mat J = surfaceJ.clone();
@@ -924,9 +911,7 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     }
 
     err = surfaceErr.clone();
-    CV_Assert(silhouetteWeights.type() == silhouetteErr.type());
-    Mat weightedSilhouetteErr = silhouetteWeights.mul(silhouetteErr);
-    err.push_back(weightedSilhouetteErr);
+    err.push_back(silhouetteErr);
 
 #ifdef VERBOSE
     cout << "Errors:" << endl;

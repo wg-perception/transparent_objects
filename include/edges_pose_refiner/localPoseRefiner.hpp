@@ -74,6 +74,8 @@ struct LocalPoseRefinerParams
 
   bool useAccurateSilhouettes;
 
+  cv::TermCriteria termCriteria;
+
   LocalPoseRefinerParams()
   {
 //    outlierDistance = 200.0f;
@@ -97,6 +99,8 @@ struct LocalPoseRefinerParams
     edgesWeight = 0.1f;
 
     useAccurateSilhouettes = true;
+
+    termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
   }
 };
 
@@ -179,6 +183,12 @@ private:
   void projectPoints_obj(const cv::Mat &points, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &rvec_cam, cv::Mat &tvec_cam, cv::Mat &Rt_cam, std::vector<cv::Point2f> &projectedPoints, cv::Mat *dpdrot = 0, cv::Mat *dpdt = 0) const;
   void object2cameraTransformation(const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &Rt_cam) const;
 
+  void computeLMIterationData(int paramsCount, bool isSilhouette,
+       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam,
+       const cv::Mat &newTranslationBasis2old, const cv::Mat &rvecParams, const cv::Mat &tvecParams,
+       cv::Mat &rvecParams_cam, cv::Mat &tvecParams_cam, cv::Mat &RtParams_cam,
+       cv::Mat &J, cv::Mat &error);
+
   EdgeModel originalEdgeModel;
   EdgeModel rotatedEdgeModel;
 
@@ -202,6 +212,8 @@ private:
 
   LocalPoseRefinerParams params;
   int dim;
+  bool hasRotationSymmetry;
+  int verticalDirectionIndex;
 
   friend class PoseQualityEstimator;
 };
