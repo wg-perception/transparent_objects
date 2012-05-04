@@ -850,7 +850,6 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     tvecParams = Mat::zeros(dim, 1, CV_64FC1);
   }
 
-  //TODO: check TermCriteria from solvePnP
   CvLevMarq solver(paramsCount, residualsCount, this->params.termCriteria);
   CvMat paramsCvMat = params;
   cvCopy( &paramsCvMat, solver.param );
@@ -858,14 +857,16 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 
   Mat err;
   int iter = 0;
-  float startError = -1.f;
   float finishError = -1.f;
+#ifdef VERBOSE
+  float startError = -1.f;
+#endif
 
   //TODO: number of iterations is greater in 2 times than needed (empty iterations)
   for(;;)
   {
     //cout << "Params: " << params << endl;
-    //cout << "Iteration N: " << iter++ << endl;
+    //cout << "Iteration: " << iter << endl;
 
     CvMat *matJ = 0, *_err = 0;
     const CvMat *__param = 0;
@@ -916,15 +917,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 #ifdef VERBOSE
     cout << "Errors:" << endl;
     cout << "  surface: " << getError(surfaceErr) << endl;
-    cout << "  silhouette: " << getError(weightedSilhouetteErr) << endl;
-#endif
+    cout << "  silhouette: " << getError(silhouetteErr) << endl;
 
-    if(iter == 0)
-    {
-      startError = getError(err);
-    }
-
-#ifdef VERBOSE
     if(iter % 2 == 0)
     {
       //cout << "Error[" << iter / 2 << "]: " << getError(err) << endl;

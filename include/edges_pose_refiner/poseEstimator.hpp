@@ -59,6 +59,11 @@ struct PoseEstimatorParams
 
   float minScale;
 
+  //suppresion after alignment to a table
+  float ratioToMinimum;
+  float neighborMaxRotation;
+  float neighborMaxTranslation;
+
   LocalPoseRefinerParams lmParams;
 
   PoseEstimatorParams()
@@ -96,6 +101,10 @@ struct PoseEstimatorParams
     confidentSuppresion3D = 1.3f;
 
     minScale = 0.2f;
+
+    ratioToMinimum = 2.0f;
+    neighborMaxRotation = 0.1f;
+    neighborMaxTranslation = 0.02f;
   }
 
   void read(const cv::FileNode &fn);
@@ -150,13 +159,16 @@ private:
   void suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformaitons_obj, std::vector<bool> &isSuppressed) const;
 
   void suppressBasisMatchesIn3D(std::vector<BasisMatch> &matches) const;
+  void filterOut3DPoses(const std::vector<float> &errors, const std::vector<PoseRT> &poses_cam,
+                        float ratioToMinimum, float neighborMaxRotation, float neighborMaxTranslation,
+                        std::vector<bool> &isFilteredOut) const;
 
   void generateGeometricHashes();
   void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;
   void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
   void getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const;
 
-  void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities) const;
+  void refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities, std::vector<cv::Mat> *jacobians = 0) const;
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
   void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
 

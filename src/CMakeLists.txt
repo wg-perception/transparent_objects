@@ -18,6 +18,7 @@ set(src
     transparentDetector.cpp
     utils.cpp
     chamfer_matching/chamfer_matching.cpp
+    nonMaximumSuppression.cpp
 #    glass_segmentation/geodesicActiveContour.cpp
 #    glass_segmentation/enhancedGlassSegmenter.cpp
 #    glass_segmentation/region.cpp
