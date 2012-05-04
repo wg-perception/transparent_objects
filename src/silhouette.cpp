@@ -242,17 +242,19 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
     PoseRT pose2d_cam(R, tvecMat);
 
     poseWithExtrinsics_cam = pose2d_cam * initialPose_cam;
-  //  pose_cam = camera.extrinsics.inv() * pose2d_cam * initialPose_cam;
+    pose_cam = camera.extrinsics.inv() * pose2d_cam * initialPose_cam;
   }
+  else
+  {
+    vector<Point2f> projectedObjectPoints;
+    camera.projectPoints(edgeModel.points, initialPose_cam, projectedObjectPoints);
 
-  vector<Point2f> projectedObjectPoints;
-  camera.projectPoints(edgeModel.points, initialPose_cam, projectedObjectPoints);
+    Mat transformedObjectPoints;
+    transform(Mat(projectedObjectPoints), transformedObjectPoints, affineTransformation);
 
-  Mat transformedObjectPoints;
-  transform(Mat(projectedObjectPoints), transformedObjectPoints, affineTransformation);
-
-  solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec, useClosedFormPnP);
-  pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
+    solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec, useClosedFormPnP);
+    pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
+  }
 }
 
 void Silhouette::visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color) const
