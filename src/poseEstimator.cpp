@@ -40,6 +40,12 @@ void PoseEstimator::setModel(const EdgeModel &_edgeModel)
   Ptr<const PinholeCamera> centralCameraPtr = new PinholeCamera(kinectCamera);
   edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
   generateGeometricHashes();
+
+  votes.resize(silhouettes.size());
+  for (size_t i = 0; i < silhouettes.size(); ++i)
+  {
+    votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1);
+  }
 }
 
 void PoseEstimator::generateGeometricHashes()
@@ -404,10 +410,9 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
   Point2f secondPoint= contour.at(testBasis.second);
   const float testScale = norm(firstPoint - secondPoint);
 
-  vector<Mat> votes(silhouettes.size());
   for (size_t i = 0; i < silhouettes.size(); ++i)
   {
-    votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1, Scalar(0));
+    votes[i] = Scalar(0);
   }
 
   Mat similarityTransformation;
@@ -653,10 +658,16 @@ void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, 
 
   for (size_t contourIndex = 0; contourIndex < allGlassContours.size(); ++contourIndex)
   {
-    vector<Point> &currentContour = allGlassContours[contourIndex];
-    if (currentContour.size() < params.minGlassContourLength || contourArea(currentContour) < params.minGlassContourArea)
+    vector<Point> &srcContour = allGlassContours[contourIndex];
+    if (srcContour.size() < params.minGlassContourLength || contourArea(srcContour) < params.minGlassContourArea)
     {
       continue;
+    }
+
+    vector<Point> currentContour;
+    for (size_t i = 0; i < srcContour.size(); i += params.ghTestBasisStep)
+    {
+      currentContour.push_back(srcContour[i]);
     }
 
     Mat currentContourMat = Mat(currentContour);

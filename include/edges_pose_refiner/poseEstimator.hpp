@@ -43,6 +43,8 @@ struct PoseEstimatorParams
   int ghBasisStep;
   float ghMinDistanceBetweenBasisPoints;
 
+  int ghTestBasisStep;
+
   //length of the object contour relative to length of the whole extracted contour
   float ghObjectContourProportion;
 
@@ -72,7 +74,7 @@ struct PoseEstimatorParams
     downFactor = 1.0f;
     closingIterationsCount = 10;
 
-    minGlassContourLength = 10;
+    minGlassContourLength = 20;
     minGlassContourArea = 64.0;
 
     cannyThreshold1 = 25;
@@ -88,6 +90,8 @@ struct PoseEstimatorParams
     ghBasisStep = 2;
     ghMinDistanceBetweenBasisPoints = 0.1f;
     ghGranularity = 0.04f;
+
+    ghTestBasisStep = 4;
 
     ghObjectContourProportion = 0.1f;
     ghSuccessProbability = 0.99f;
@@ -148,6 +152,7 @@ private:
 
   static void suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed, bool useNeighbors = true);
 
+  //it is not thread-safe
   void findBasisMatches(const std::vector<cv::Point2f> &contour, const Basis &testBasis, std::vector<BasisMatch> &basisMatches) const;
 
   void estimateSimilarityTransformations(const std::vector<cv::Point> &contour, std::vector<BasisMatch> &matches) const;
@@ -178,6 +183,7 @@ private:
   //TODO: remove mutable
   mutable GHTable ghTable;
   mutable PoseEstimatorParams params;
+  mutable std::vector<cv::Mat> votes;
 
   PinholeCamera kinectCamera;
 };
