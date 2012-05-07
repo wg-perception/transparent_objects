@@ -12,7 +12,8 @@ find_pcl_package()
 find_package(object_recognition_core REQUIRED)
 
 include_directories(SYSTEM
-    ${object_recognition_core_INCLUDE_DIRS}
+                    ${object_recognition_core_INCLUDE_DIRS}
+                    ${PCL_INCLUDE_DIRS}
 )
 
 link_ecto(transparent_objects_cells

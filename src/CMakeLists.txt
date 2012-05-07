@@ -18,6 +18,10 @@ set(src
     utils.cpp
 )
 
+include_directories(SYSTEM
+                    ${PCL_INCLUDE_DIRS}
+)
+
 #EAR: is there a reason to list headers in this target?
 add_library(edges_pose_refiner SHARED
     ${src}
@@ -37,9 +41,10 @@ add_library(edges_pose_refiner SHARED
 add_definitions(-Wno-deprecated)
 
 target_link_libraries(edges_pose_refiner
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBS}
-  )
+                      ${PCL_LIBRARIES}
+                      ${OpenCV_LIBS}
+                      ${OpenCV_LIBRARIES}
+)
 
 install(TARGETS edges_pose_refiner
   DESTINATION lib
