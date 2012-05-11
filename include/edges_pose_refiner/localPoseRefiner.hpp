@@ -167,7 +167,7 @@ private:
   double calcTrimmedError(cv::Mat &projectedPoints, bool useInterpolation, float h) const;
 
   void computeJacobian(const cv::Mat &projectedPoints, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, cv::Mat &J);
-  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J);
+  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J);
   void computeWeightsObjectJacobian(const std::vector<cv::Point3f> &points, const cv::Mat &silhouetteEdges, const PoseRT &pose_obj, cv::Mat &weightsJacobian) const;
   void computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double inlierMaxDistance, double outlierError, const cv::Mat &distanceTransform = cv::Mat(), const bool useInterpolation = true) const;
   void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double inlierMaxDistance, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;

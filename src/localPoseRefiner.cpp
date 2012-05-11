@@ -388,7 +388,7 @@ void LocalPoseRefiner::computeJacobian( const cv::Mat &projectedPoints, const cv
   }
 }
 
-void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J)
+void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J)
 {
   CV_Assert(JaW.rows == 2*projectedPoints.rows);
   CV_Assert(JaW.type() == CV_64FC1);
@@ -442,10 +442,16 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
     }
   }
 
-
-  //Rect imageRect(0, 0, distanceImage.cols, distanceImage.rows);
+  CV_Assert(inliersMask.type() == CV_8UC1);
   for(int i=0; i<projectedPoints.rows; i++)
   {
+    if (inliersMask.at<uchar>(i) == 0)
+    {
+      Mat row = J.row(i);
+      row.setTo(0);
+      continue;
+    }
+
     Point2f pt2f = projectedPoints.at<Vec2f>(i);
     if(isOutlier(pt2f))
     {
@@ -691,13 +697,8 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
   Mat projectedPoints = Mat(projectedPointsVector);
   Mat inliersMask;
   computeResidualsWithInliersMask(projectedPoints, error, this->params.outlierDistance, this->params.outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
-  computeObjectJacobian(projectedPoints, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+  computeObjectJacobian(projectedPoints, inliersMask, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
   error.setTo(0, ~inliersMask);
-  for (int i = 0; i < J.cols; ++i)
-  {
-    Mat col = J.col(i);
-    col.setTo(0, ~inliersMask);
-  }
 
   if (!newTranslationBasis2old.empty())
   {
