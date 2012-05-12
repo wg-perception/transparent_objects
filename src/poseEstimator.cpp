@@ -71,26 +71,26 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
     return;
   }
 
+  Mat testEdges, silhouetteEdges;
+  computeCentralEdges(kinectBgrImage, glassMask, testEdges, silhouetteEdges);
+
 //  getInitialPoses(glassMask, poses_cam, posesQualities);
   getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
 
 //  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
   {
-    refinePosesByTableOrientation(*tablePlane, kinectBgrImage, glassMask, poses_cam, posesQualities);
+    refinePosesByTableOrientation(*tablePlane, testEdges, silhouetteEdges, glassMask, poses_cam, posesQualities);
   }
 }
 
-void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralBgrImage, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
+void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
 {
   cout << "refine poses by table orientation" << endl;
   if (poses_cam.empty())
   {
     return;
   }
-
-  Mat centralEdges, silhouetteEdges;
-  computeCentralEdges(centralBgrImage, glassMask, centralEdges, silhouetteEdges);
 
   initPosesQualities.resize(poses_cam.size());
   vector<float> rotationAngles(poses_cam.size());
@@ -100,7 +100,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
   TermCriteria newCriteria = TermCriteria(CV_TERMCRIT_ITER, 5, 0.0);
   params.lmParams.termCriteria = newCriteria;
   vector<Mat> jacobians;
-  refineInitialPoses(centralBgrImage, glassMask, poses_cam, initPosesQualities, &jacobians);
+  refineInitialPoses(centralEdges, silhouetteEdges, poses_cam, initPosesQualities, &jacobians);
   params.lmParams.termCriteria = oldCriteria;
 
   for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
@@ -136,10 +136,10 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
   //TODO: move up
   newCriteria = TermCriteria(CV_TERMCRIT_ITER, 1, 0.0);
   params.lmParams.termCriteria = newCriteria;
+  LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+  localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
   for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
   {
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
-    localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     PoseRT &initialPose_cam = poses_cam[initPoseIdx];
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
 
@@ -151,6 +151,7 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
 #endif
   }
   params.lmParams.termCriteria = oldCriteria;
+  localPoseRefiner.setParams(params.lmParams);
 
   vector<bool> isPoseFilteredOut;
   filterOut3DPoses(initPosesQualities, poses_cam,
@@ -163,8 +164,6 @@ void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, c
 
   for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
   {
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
-    localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     PoseRT &initialPose_cam = poses_cam[initPoseIdx];
     initPosesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
 
@@ -968,7 +967,7 @@ void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT
 //  }
 }
 
-void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv::Mat &glassMask,
+void PoseEstimator::refineInitialPoses(const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                                        vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities,
                                        vector<cv::Mat> *jacobians) const
 {
@@ -978,19 +977,17 @@ void PoseEstimator::refineInitialPoses(const cv::Mat &centralBgrImage, const cv:
     return;
   }
 
-  Mat centralEdges, silhouetteEdges;
-  computeCentralEdges(centralBgrImage, glassMask, centralEdges, silhouetteEdges);
-
   initPosesQualities.resize(initPoses_cam.size());
   if (jacobians != 0)
   {
     jacobians->resize(initPoses_cam.size());
   }
+
+  LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+  localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
   for (size_t initPoseIdx = 0; initPoseIdx < initPoses_cam.size(); ++initPoseIdx)
   {
     //cout << "Pose idx: " << initPoseIdx << endl;
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
-    localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     PoseRT &initialPose_cam = initPoses_cam[initPoseIdx];
 
 #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT

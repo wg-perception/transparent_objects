@@ -121,6 +121,8 @@ public:
    */
   LocalPoseRefiner(const EdgeModel &edgeModel, const cv::Mat &edgesImage, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, const cv::Mat &extrinsicsRt, const LocalPoseRefinerParams &params = LocalPoseRefinerParams());
 
+  void setParams(const LocalPoseRefinerParams &params);
+
   /** \brief Set a mask of possible locations of the object centers
    * \param mask A mask of the center locations
    */

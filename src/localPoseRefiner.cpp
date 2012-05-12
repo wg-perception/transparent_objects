@@ -131,6 +131,11 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
   centerMask = Mat();
 }
 
+void LocalPoseRefiner::setParams(const LocalPoseRefinerParams &_params)
+{
+  params = _params;
+}
+
 void LocalPoseRefiner::setSilhouetteEdges(const cv::Mat &_silhouetteEdges)
 {
   silhouetteEdges = _silhouetteEdges;
