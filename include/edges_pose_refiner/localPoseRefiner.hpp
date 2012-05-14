@@ -186,7 +186,7 @@ private:
   void object2cameraTransformation(const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &Rt_cam) const;
 
   void computeLMIterationData(int paramsCount, bool isSilhouette,
-       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam,
+       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam, bool computeJacobian,
        const cv::Mat &newTranslationBasis2old, const cv::Mat &rvecParams, const cv::Mat &tvecParams,
        cv::Mat &rvecParams_cam, cv::Mat &tvecParams_cam, cv::Mat &RtParams_cam,
        cv::Mat &J, cv::Mat &error);

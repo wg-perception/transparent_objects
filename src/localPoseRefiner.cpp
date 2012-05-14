@@ -684,7 +684,7 @@ void LocalPoseRefiner::computeWeightsObjectJacobian(const vector<Point3f> &point
 
 
 void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette,
-       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam,
+       const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam, bool computeJacobian,
        const cv::Mat &newTranslationBasis2old, const cv::Mat &rvecParams, const cv::Mat &tvecParams,
        cv::Mat &rvecParams_cam, cv::Mat &tvecParams_cam, cv::Mat &RtParams_cam,
        cv::Mat &J, cv::Mat &error)
@@ -694,31 +694,44 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
   const Mat dx = isSilhouette ? silhouetteDtDx : dtDx;
   const Mat dy = isSilhouette ? silhouetteDtDy : dtDy;
 
-  Mat JaW(2 * edgels.size(), 2 * dim, CV_64F);
-  Mat Dpdrot = JaW.colRange(0, this->dim);
-  Mat Dpdt = JaW.colRange(this->dim, 2 * this->dim);
   vector<Point2f> projectedPointsVector;
-  projectPoints_obj(Mat(edgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam, projectedPointsVector, &Dpdrot, &Dpdt);
+  Mat JaW;
+  if (computeJacobian)
+  {
+    JaW.create(2 * edgels.size(), 2 * dim, CV_64F);
+    Mat Dpdrot = JaW.colRange(0, this->dim);
+    Mat Dpdt = JaW.colRange(this->dim, 2 * this->dim);
+    projectPoints_obj(Mat(edgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam,
+                      projectedPointsVector, &Dpdrot, &Dpdt);
+  }
+  else
+  {
+    projectPoints_obj(Mat(edgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam,
+                      projectedPointsVector);
+  }
   Mat projectedPoints = Mat(projectedPointsVector);
   Mat inliersMask;
   computeResidualsWithInliersMask(projectedPoints, error, this->params.outlierDistance, this->params.outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
-  computeObjectJacobian(projectedPoints, inliersMask, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
   error.setTo(0, ~inliersMask);
 
-  if (!newTranslationBasis2old.empty())
+  if (computeJacobian)
   {
-    Mat newJ(J.rows, paramsCount, J.type());
-    if (!hasRotationSymmetry)
+    computeObjectJacobian(projectedPoints, inliersMask, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+    if (!newTranslationBasis2old.empty())
     {
-      CV_Assert(verticalDirectionIndex < J.cols);
-      Mat rotationJ = J.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
-      Mat theFirstCol = newJ.col(0);
-      rotationJ.copyTo(theFirstCol);
+      Mat newJ(J.rows, paramsCount, J.type());
+      if (!hasRotationSymmetry)
+      {
+        CV_Assert(verticalDirectionIndex < J.cols);
+        Mat rotationJ = J.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
+        Mat theFirstCol = newJ.col(0);
+        rotationJ.copyTo(theFirstCol);
+      }
+      Mat translationJ = J.colRange(dim, 2*dim) * newTranslationBasis2old;
+      Mat lastCols = newJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+      translationJ.copyTo(lastCols);
+      J = newJ;
     }
-    Mat translationJ = J.colRange(dim, 2*dim) * newTranslationBasis2old;
-    Mat lastCols = newJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
-    translationJ.copyTo(lastCols);
-    J = newJ;
   }
 
   if (isSilhouette)
@@ -755,11 +768,14 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
         return;
     }
 
-    for (int i = 0; i < J.cols; ++i)
+    if (computeJacobian)
     {
-      Mat col = J.col(i);
-      Mat mulCol = silhouetteWeights.mul(col);
-      mulCol.copyTo(col);
+      for (int i = 0; i < J.cols; ++i)
+      {
+        Mat col = J.col(i);
+        Mat mulCol = silhouetteWeights.mul(col);
+        mulCol.copyTo(col);
+      }
     }
 
     CV_Assert(silhouetteWeights.type() == error.type());
@@ -869,7 +885,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 #endif
 
   //TODO: number of iterations is greater in 2 times than needed (empty iterations)
-  for(;;)
+  bool isDone = false;
+  while (!isDone)
   {
     //cout << "Params: " << params << endl;
     //cout << "Iteration: " << iter << endl;
@@ -880,35 +897,40 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     //if( iter != 1 )
       //proceed = solver.update( __param, matJ, _err );
     cvCopy( __param, &paramsCvMat );
-    if( !proceed || !_err )
+    isDone = !proceed || !_err;
+    if( isDone && !finalJacobian )
         break;
 
     Mat surfaceJ, surfaceErr;
     Mat silhouetteJ, silhouetteErr;
-//      if( matJ )
+
+    bool computeJacobian = (solver.state == CvLevMarq::CALC_J) || (isDone && (finalJacobian != 0));
+    CV_Assert((solver.state == CvLevMarq::CALC_J) == (matJ != 0));
+
+    if (!newTranslationBasis2old.empty())
     {
-      if (!newTranslationBasis2old.empty())
-      {
-        Mat translationPart = params.rowRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
-        tvecParams = newTranslationBasis2old * translationPart;
-        CV_Assert(tvecParams.rows == dim);
-        CV_Assert(tvecParams.cols == 1);
-      }
+      Mat translationPart = params.rowRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+      tvecParams = newTranslationBasis2old * translationPart;
+      CV_Assert(tvecParams.rows == dim);
+      CV_Assert(tvecParams.cols == 1);
+    }
 
-      Mat rvecParams_cam, tvecParams_cam, RtParams_cam;
-      computeLMIterationData(paramsCount, false, R_obj2cam, t_obj2cam,
-                             newTranslationBasis2old, rvecParams, tvecParams,
-                             rvecParams_cam, tvecParams_cam, RtParams_cam, surfaceJ, surfaceErr);
+    Mat rvecParams_cam, tvecParams_cam, RtParams_cam;
+    computeLMIterationData(paramsCount, false, R_obj2cam, t_obj2cam, computeJacobian,
+                           newTranslationBasis2old, rvecParams, tvecParams,
+                           rvecParams_cam, tvecParams_cam, RtParams_cam, surfaceJ, surfaceErr);
 
-      computeLMIterationData(paramsCount, true, R_obj2cam, t_obj2cam,
-                             newTranslationBasis2old, rvecParams, tvecParams,
-                             rvecParams_cam, tvecParams_cam, RtParams_cam, silhouetteJ, silhouetteErr);
+    computeLMIterationData(paramsCount, true, R_obj2cam, t_obj2cam, computeJacobian,
+                           newTranslationBasis2old, rvecParams, tvecParams,
+                           rvecParams_cam, tvecParams_cam, RtParams_cam, silhouetteJ, silhouetteErr);
 
-      if (silhouetteErr.empty() || silhouetteJ.empty())
-      {
-        return std::numeric_limits<float>::max();
-      }
+    if (silhouetteErr.empty())
+    {
+      return std::numeric_limits<float>::max();
+    }
 
+    if (computeJacobian)
+    {
       Mat J = surfaceJ.clone();
       J.push_back(silhouetteJ);
 
