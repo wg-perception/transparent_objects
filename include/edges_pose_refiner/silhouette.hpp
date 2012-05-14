@@ -33,6 +33,7 @@ namespace std
       public:
         size_t operator()(const GHKey &key) const
         {
+          //TODO: move up
           const int maxCoordinate = 100000;
           int keyNumber = key.first * maxCoordinate + key.second;
           std::tr1::hash<int> hasher;
@@ -49,9 +50,11 @@ public:
   Silhouette();
   void init(const cv::Mat &edgels, const PoseRT &initialPose_cam);
   void getEdgels(cv::Mat &edgels) const;
+  void getDownsampledEdgels(cv::Mat &edgels) const;
   void getInitialPose(PoseRT &pose_cam) const;
 
   int size() const;
+  int getDownsampledSize() const;
   void clear();
 
   void generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity, int hashBasisStep, float minDistanceBetweenPoints);
@@ -74,7 +77,7 @@ private:
 
   static void showNormalizedPoints(const cv::Mat &points, const std::string &title = "normalized points");
 
-  cv::Mat edgels;
+  cv::Mat edgels, downsampledEdgels;
   cv::Point2f silhouetteCenter;
   cv::Mat silhouette2normalized;
 

@@ -44,7 +44,7 @@ void PoseEstimator::setModel(const EdgeModel &_edgeModel)
   votes.resize(silhouettes.size());
   for (size_t i = 0; i < silhouettes.size(); ++i)
   {
-    votes[i] = Mat(silhouettes[i].size(), silhouettes[i].size(), CV_32SC1);
+    votes[i] = Mat(silhouettes[i].getDownsampledSize(), silhouettes[i].getDownsampledSize(), CV_32SC1);
   }
 }
 
@@ -472,7 +472,7 @@ void PoseEstimator::findBasisMatches(const std::vector<cv::Point2f> &contour, co
   for (size_t i = 0; i < votes.size(); ++i)
   {
     Mat currentVotes;
-    votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].size());
+    votes[i].convertTo(currentVotes, CV_32FC1, 1.0 / silhouettes[i].getDownsampledSize());
     Mat currentScale = testScale * canonicScales[i];
     currentVotes /= currentScale;
 
@@ -648,7 +648,7 @@ void PoseEstimator::estimateSimilarityTransformations(const std::vector<cv::Poin
     Mat testTransformation, trainTransformation;
     findSimilarityTransformation(contour[matches[i].testBasis.first], contour[matches[i].testBasis.second], testTransformation);
     Mat edgels;
-    silhouettes[matches[i].silhouetteIndex].getEdgels(edgels);
+    silhouettes[matches[i].silhouetteIndex].getDownsampledEdgels(edgels);
     vector<Point2f> edgelsVec = edgels;
     findSimilarityTransformation(edgelsVec[matches[i].trainBasis.first], edgelsVec[matches[i].trainBasis.second], trainTransformation);
 

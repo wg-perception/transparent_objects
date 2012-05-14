@@ -77,16 +77,16 @@ void findSimilarityTransformation(const cv::Point2f &pt1, const cv::Point2f &pt2
 void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels)
 {
   CV_Assert(firstIndex != secondIndex);
-  CV_Assert(edgels.type() == CV_32FC2);
+  CV_Assert(downsampledEdgels.type() == CV_32FC2);
 
-  vector<Point2f> edgelsVec = edgels;
+  vector<Point2f> edgelsVec = downsampledEdgels;
   CV_Assert(0 <= firstIndex && firstIndex < edgelsVec.size());
   CV_Assert(0 <= secondIndex && secondIndex < edgelsVec.size());
 
   Mat similarityTransformation;
   ::findSimilarityTransformation(edgelsVec[firstIndex], edgelsVec[secondIndex], similarityTransformation);
 
-  transform(edgels, transformedEdgels, similarityTransformation);
+  transform(downsampledEdgels, transformedEdgels, similarityTransformation);
 
   const Vec2f firstPoint(-0.5f, 0.0f);
   const Vec2f secondPoint(0.5f, 0.0f);
@@ -113,12 +113,19 @@ void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &
 void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity, int hashBasisStep, float minDistanceBetweenPoints)
 {
   vector<Point2f> edgelsVec = edgels;
-  canonicScale.create(edgels.rows, edgels.rows, CV_32FC1);
-  for (int i = 0; i < edgels.rows; ++i)
+  vector<Point2f> downsampledEdgelsVec;
+  for (int i = 0; i < edgels.rows; i += hashBasisStep)
   {
-    for (int j = i; j < edgels.rows; ++j)
+    downsampledEdgelsVec.push_back(edgelsVec[i]);
+  }
+  downsampledEdgels = Mat(downsampledEdgelsVec).clone();
+
+  canonicScale.create(downsampledEdgels.rows, downsampledEdgels.rows, CV_32FC1);
+  for (int i = 0; i < downsampledEdgels.rows; ++i)
+  {
+    for (int j = i; j < downsampledEdgels.rows; ++j)
     {
-      float dist = norm(edgelsVec[i] - edgelsVec[j]);
+      float dist = norm(downsampledEdgelsVec[i] - downsampledEdgelsVec[j]);
       float invDist = 1.0f;
       if (dist > minDistanceBetweenPoints)
       {
@@ -130,12 +137,12 @@ void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, 
     }
   }
 
-  for (int firstIndex = 0; firstIndex < edgels.rows; firstIndex += hashBasisStep)
+  for (int firstIndex = 0; firstIndex < downsampledEdgels.rows; ++firstIndex)
   {
     //TODO: use symmetry (i, j) and (j, i)
-    for (int secondIndex = 0; secondIndex < edgels.rows; secondIndex += hashBasisStep)
+    for (int secondIndex = 0; secondIndex < downsampledEdgels.rows; ++secondIndex)
     {
-      float dist = norm(edgelsVec[firstIndex] - edgelsVec[secondIndex]);
+      float dist = norm(downsampledEdgelsVec[firstIndex] - downsampledEdgelsVec[secondIndex]);
       if (dist < minDistanceBetweenPoints)
       {
         continue;
@@ -179,6 +186,11 @@ void Silhouette::getEdgels(cv::Mat &_edgels) const
   _edgels = edgels;
 }
 
+void Silhouette::getDownsampledEdgels(cv::Mat &_edgels) const
+{
+  _edgels = downsampledEdgels;
+}
+
 void Silhouette::getInitialPose(PoseRT &pose_cam) const
 {
   pose_cam = initialPose_cam;
@@ -186,7 +198,14 @@ void Silhouette::getInitialPose(PoseRT &pose_cam) const
 
 int Silhouette::size() const
 {
+  CV_Assert(!edgels.empty());
   return edgels.rows;
+}
+
+int Silhouette::getDownsampledSize() const
+{
+  CV_Assert(!downsampledEdgels.empty());
+  return downsampledEdgels.rows;
 }
 
 void Silhouette::clear()
