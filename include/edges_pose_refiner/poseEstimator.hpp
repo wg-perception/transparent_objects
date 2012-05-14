@@ -175,7 +175,9 @@ private:
 
   void refineInitialPoses(const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities, std::vector<cv::Mat> *jacobians = 0) const;
   void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
-  void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
+  void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
+  void refineFinalTablePoses(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+                    std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const;
 
   EdgeModel edgeModel;
   std::vector<Silhouette> silhouettes;

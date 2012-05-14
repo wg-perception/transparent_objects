@@ -598,7 +598,7 @@ void LocalPoseRefiner::computeWeights(const vector<Point2f> &projectedPointsVect
     float dist = isPointInside(footprintDT, pt) ? footprintDT.at<float>(pt) : params.outlierError;
     //cout << dist << endl;
 
-    weights.at<double>(i) = 2 * exp(-dist);
+    weights.at<double>(i) = 2 * exp(-dist / params.lmDownFactor);
     CV_Assert(!std::isnan(weights.at<double>(i)));
     //weights.at<double>(i) = 1 / (1 + footprintMatches[i].distance);
     //weights.at<double>(i) = 1;
@@ -885,8 +885,7 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 #endif
 
   //TODO: number of iterations is greater in 2 times than needed (empty iterations)
-  bool isDone = false;
-  while (!isDone)
+  while (true)
   {
     //cout << "Params: " << params << endl;
     //cout << "Iteration: " << iter << endl;
@@ -897,7 +896,7 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     //if( iter != 1 )
       //proceed = solver.update( __param, matJ, _err );
     cvCopy( __param, &paramsCvMat );
-    isDone = !proceed || !_err;
+    bool isDone = !proceed || !_err;
     if( isDone && !finalJacobian )
         break;
 
@@ -937,6 +936,11 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
       CvMat JcvMat = J;
       //cvCopy(&JcvMat, matJ);
       cvCopy(&JcvMat, solver.J);
+    }
+
+    if (isDone)
+    {
+      break;
     }
 
     err = surfaceErr.clone();

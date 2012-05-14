@@ -80,11 +80,40 @@ void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &g
 //  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
   if (tablePlane != 0)
   {
-    refinePosesByTableOrientation(*tablePlane, testEdges, silhouetteEdges, glassMask, poses_cam, posesQualities);
+    //TODO: move up
+    params.lmParams.lmDownFactor = 0.5f;
+    params.lmParams.lmClosingIterationsCount = 5;
+    refinePosesByTableOrientation(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+
+    params.lmParams.lmDownFactor = 1.0f;
+    params.lmParams.lmClosingIterationsCount = 10;
+    refineFinalTablePoses(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
   }
 }
 
-void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges, const cv::Mat &glassMask, vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
+void PoseEstimator::refineFinalTablePoses(const cv::Vec4f &tablePlane,
+                    const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+                    std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
+{
+  cout << "final refinement of poses by table orientation" << endl;
+  if (poses_cam.empty())
+  {
+    return;
+  }
+
+  posesQualities.resize(poses_cam.size());
+  LocalPoseRefiner localPoseRefiner(edgeModel, testEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+  localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
+  for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
+  {
+    PoseRT &initialPose_cam = poses_cam[initPoseIdx];
+    posesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
+  }
+}
+
+void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane,
+                    const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
+                    vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
 {
   cout << "refine poses by table orientation" << endl;
   if (poses_cam.empty())
