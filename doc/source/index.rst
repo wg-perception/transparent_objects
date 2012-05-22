@@ -1,3 +1,5 @@
+.. _transparent_objects:
+
 Transparent Objects
 ===================
 
