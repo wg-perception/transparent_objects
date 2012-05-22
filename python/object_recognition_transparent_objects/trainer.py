@@ -4,7 +4,7 @@ Module defining the transparent objects trainer
 """
 
 from object_recognition_core.db.dbtools import db_params_to_db
-from object_recognition_core.db.object_db import DbModels, Document, DbDocuments
+from object_recognition_core.db import Models, Document, Documents
 from object_recognition_core.db.models import Model, find_model_for_object
 from object_recognition_core.pipelines.training import TrainingPipeline
 from object_recognition_core.utils.json_helper import dict_to_cpp_json_str
@@ -44,7 +44,7 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
         object_id = kwargs.get('object_id', None)
         submethod = kwargs['submethod']
     
-        #db_models = DbModels(db_params, [ object_id ], method, submethod)
+        #db_models = Models(db_params, [ object_id ], method, submethod)
         if object_id:
             #TODO these should be loaded from the database?
             json_K = kwargs['pipeline_params']['K']
@@ -54,7 +54,7 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
 
             document_ids =  find_model_for_object(db_params_to_db(object_db.parameters()), object_id, model_type='mesh')
             print document_ids
-            db_models = DbDocuments(object_db, document_ids)
+            db_models = Documents(object_db, document_ids)
             print 'Found %d meshes:'%len(db_models)
         else:
             #TODO these should be loaded from the database?
