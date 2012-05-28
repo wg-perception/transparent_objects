@@ -356,9 +356,8 @@ void suppressNonMaximum(const cv::Mat &confidences, int windowSize, float absolu
 
   int halfWindowSize = windowSize / 2;
   maxLocations.clear();
-  Mat wideConfidences(confidences.rows + windowSize - 1, confidences.cols + windowSize - 1, confidences.type(), Scalar(0));
-  Mat roi = wideConfidences(Rect(halfWindowSize, halfWindowSize, confidences.cols, confidences.rows));
-  confidences.copyTo(roi);
+  Mat wideConfidences;
+  copyMakeBorder(confidences, wideConfidences, halfWindowSize, halfWindowSize, halfWindowSize, halfWindowSize, BORDER_CONSTANT, 0.0);
 
   Mat isSuppressed(wideConfidences.size(), CV_8UC1, Scalar(0));
 
