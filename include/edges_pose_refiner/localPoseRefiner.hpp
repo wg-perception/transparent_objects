@@ -17,17 +17,8 @@
 /** \brief Parameters of pose refinement by local optimization */
 struct LocalPoseRefinerParams
 {
-  /** \brief Threshold of outlier distance
-   *
-   *   If distance between a projected edgel of the model and the nearest test edgel is larger than outlierDistance then the point is outlier
-   */
-  float outlierDistance;
-
-  /** \brief error of outliers in cost function */
-  float outlierError;
-
-  /** \brief jacobian of outliers in Levenberg-Marquardt */
-  double outlierJacobian;
+  int distanceType;
+  int distanceMask;
 
   //Levenberg-Marquardt parameters
   /** \brief downsampling factor to use when computing silhouette edgels*/
@@ -39,71 +30,29 @@ struct LocalPoseRefinerParams
   /** \brief ratio of inliers when applying Levenberg-Marquardt*/
   float lmInliersRatio;
 
-  /** \brief Use only view-dependent edges or view-independent */
-  bool useViewDependentEdges;
-
-  /** \brief Number of closing operation iterations which are used to get view-dependent edges */
-  int closingIterations;
-
-  /** \brief Downsampling factor of a test image when projecting model points onto the image*/
-  float downFactor;
-
-  /** \brief Use orientation in chamfer matching or not */
-  bool useOrientedChamferMatching;
-
-  /** \brief Half of edgels count which are used to estimate orientation of an edgel on a test image
-   * 
-   *   Orientation of the edgel is computed by taking into account M edgels before and M edgels after.
-   */
-  int testM;
-  
-  /** \brief Half of edgels count which are used to estimate orientation of an edgel on a object contour
-   * 
-   *   Orientation of the edgel is computed by taking into account M edgels before and M edgels after.
-   */  
-  int objectM;  
-
-  /** \brief Weight of the view-dependent edges term in the chamfer matching cost function
-   *
-   *   Must be between 0 and 1. The weight of stable edges is (1 - viewDependentEdgesWeight).
-   */
-  float viewDependentEdgesWeight;
-
-  /** \brief Weight of the edges term in the oriented chamfer matching cost function */
-  float edgesWeight;
-
   bool useAccurateSilhouettes;
 
   cv::TermCriteria termCriteria;
 
   LocalPoseRefinerParams()
   {
-//    outlierDistance = 200.0f;
-    outlierDistance = std::numeric_limits<float>::max();
-    outlierError = 320.0f;
-    outlierJacobian = 0.0;
+    distanceType = CV_DIST_L2;
+    distanceMask = CV_DIST_MASK_PRECISE;
 
     lmDownFactor = 1.0f;
     lmClosingIterationsCount = 10;
 //    lmInliersRatio = 0.8f;
     lmInliersRatio = 0.65f;
 
-    useViewDependentEdges = false;
-    closingIterations = 3;
-    downFactor = 0.25f;
-
     useAccurateSilhouettes = true;
-
     termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
   }
 };
-
 
 /** \brief Pose refinement by local optimization */
 class LocalPoseRefiner
 {
 public:
-
   /** \brief Create a class instance which will refine poses of the specific object by local optimization
    *
    *  \param edgeModel The edge model of the object
@@ -117,25 +66,10 @@ public:
 
   void setParams(const LocalPoseRefinerParams &params);
 
-  /** \brief Set a mask of possible locations of the object centers
-   * \param mask A mask of the center locations
-   */
-  void setCenterMask(const cv::Mat &mask);
-
   /** \brief Set test edges for silhouette edgels
    * \param edges silhouette test edges
    */
   void setSilhouetteEdges(const cv::Mat &edges);
-
-  /** \brief Refine pose of the object
-   *
-   *  \param rvec The rotation vector of refined pose (in the test camera coordinate system)
-   *  \param tvec The translation vector of refined pose (in the test camera coordinate system)
-   *  \param usePoseGuess If true the function will use provided rvec and tvec as the initial
-approximations of the rotation and translation vectors, respectively, and will further optimize
-them. Else the function will use zero rotation and translation as initial guess.
-   */
-  void refine(cv::Mat &rvec, cv::Mat &tvec, bool usePoseGuess = false);
 
   /** \brief Refine pose of the object using silhouette edges also
    *
@@ -148,7 +82,8 @@ them. Else the function will use zero rotation and translation as initial guess.
    */
   float refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGuess = false, const cv::Vec4f &tablePlane = cv::Vec4f::all(0.0f), cv::Mat *finalJacobian = 0);
 private:
-  static void computeDistanceTransform(const cv::Mat &edges, cv::Mat &distanceImage, cv::Mat &dx, cv::Mat &dy);
+  static void computeDistanceTransform(const cv::Mat &edges, int distanceType, int distanceMask, cv::Mat &distanceImage, cv::Mat &dx, cv::Mat &dy);
+  static float estimateOutlierError(const cv::Mat &distanceImage, int distanceType);
 
   //rotate_cam model points
   void setInitialPose(const PoseRT &pose_cam);
@@ -157,21 +92,17 @@ private:
   void setObjectCoordinateSystem(const cv::Mat &Rt_obj2cam);
   void getObjectCoordinateSystem(cv::Mat &Rt_obj2cam) const;
 
-  void computeResidualsForTrimmedError(cv::Mat &projectedPoints, std::vector<float> &residuals) const;
-  //Attention! projectedPoints is not const for efficiency
-  double calcTrimmedError(cv::Mat &projectedPoints, bool useInterpolation, float h) const;
-
   void computeJacobian(const cv::Mat &projectedPoints, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, cv::Mat &J);
   void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J);
   void computeWeightsObjectJacobian(const std::vector<cv::Point3f> &points, const cv::Mat &silhouetteEdges, const PoseRT &pose_obj, cv::Mat &weightsJacobian) const;
-  void computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double inlierMaxDistance, double outlierError, const cv::Mat &distanceTransform = cv::Mat(), const bool useInterpolation = true) const;
-  void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double inlierMaxDistance, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
+  void computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform = cv::Mat(), const bool useInterpolation = true) const;
+  void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
   double getError(const cv::Mat &residuals) const;
 
   void computeWeights(const std::vector<cv::Point2f> &projectedPointsVector, const cv::Mat &silhouetteEdges, cv::Mat &weights) const;
 
   bool isOutlier(cv::Point2f pt) const;
-  double getFilteredDistance(cv::Point2f pt, bool useInterpolation, double inlierMaxDistance, double outlierError = 0., const cv::Mat &distanceTransform = cv::Mat()) const;
+  double getFilteredDistance(cv::Point2f pt, bool useInterpolation, double outlierError = 0., const cv::Mat &distanceTransform = cv::Mat()) const;
 
   void displayProjection(const cv::Mat &projectedPoints, const std::string &title ) const;
 
@@ -187,23 +118,20 @@ private:
   EdgeModel originalEdgeModel;
   EdgeModel rotatedEdgeModel;
 
-  cv::Mat edgesImage;
   cv::Mat cameraMatrix, distCoeffs;
   cv::Mat extrinsicsRt;
+
+  cv::Mat edgesImage;
+  cv::Mat dtImage;
+  cv::Mat dtDx, dtDy;
 
   cv::Mat silhouetteEdges;
   cv::Mat silhouetteDtImage;
   cv::Mat silhouetteDtDx, silhouetteDtDy;
 
-  cv::Mat dtImage;
-  cv::Mat dtDx, dtDy;
-
   cv::Mat Rt_obj2cam_cached, Rt_cam2obj_cached;
 
-  cv::Mat orientationImage;
   cv::Mat cameraMatrix64F;
-
-  cv::Mat centerMask, dtCenter;
 
   LocalPoseRefinerParams params;
   int dim;
