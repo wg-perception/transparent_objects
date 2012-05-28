@@ -92,12 +92,6 @@ struct LocalPoseRefinerParams
     closingIterations = 3;
     downFactor = 0.25f;
 
-    useOrientedChamferMatching = false;
-    testM = 5;
-    objectM = 10;
-    viewDependentEdgesWeight = 1.0 / 3.0;
-    edgesWeight = 0.1f;
-
     useAccurateSilhouettes = true;
 
     termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
@@ -163,7 +157,6 @@ private:
   void setObjectCoordinateSystem(const cv::Mat &Rt_obj2cam);
   void getObjectCoordinateSystem(cv::Mat &Rt_obj2cam) const;
 
-  double estimatePoseQuality(const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, float hTrimmedError, double *detOfCovarianceMatrix = 0) const;
   void computeResidualsForTrimmedError(cv::Mat &projectedPoints, std::vector<float> &residuals) const;
   //Attention! projectedPoints is not const for efficiency
   double calcTrimmedError(cv::Mat &projectedPoints, bool useInterpolation, float h) const;
@@ -218,46 +211,6 @@ private:
   int verticalDirectionIndex;
 
   friend class PoseQualityEstimator;
-};
-
-/** \brief Estimate pose quality */
-class PoseQualityEstimator
-{
-public:
-
-  /**
-   * \param hTrimmedError percentile of the partial directed Hausdorff function in the cost function
-   * \param poseRefiner Local pose refiner of the current test image and the object
-   */
-  PoseQualityEstimator(const cv::Ptr<LocalPoseRefiner> &poseRefiner, float hTrimmedError);
-
-  /** \brief Set initial pose of the object
-   *
-   *  Use the test camera coordinate system
-   *
-   *  \param pose_cam The object pose
-   */
-  void setInitialPose(const PoseRT &pose_cam);
-
-  /** \brief Estimate pose quality
-   *
-   *  \param point [rvec, tvec] as one vector in the object coordinate system
-   *  \return quality of pose
-   */
-  double evaluate(const std::vector<double> &point);
-
-  /** \brief Convert from the object coordinate system to the camera coordinate system
-   *
-   *  \param point_obj [rvec, tvec] as one vector in the object coordinate system
-   *  \param rvec_cam The corresponding rotation vector in the camera coordinate system
-   *  \param tvec_cam The corresponding translation vector in the camera coordinate system
-   */
-  void obj2cam(const std::vector<double> &point_obj, cv::Mat &rvec_cam, cv::Mat &tvec_cam) const;
-private:
-  cv::Ptr<LocalPoseRefiner> poseRefiner;
-  float hTrimmedError;
-  //cv::Mat rvecInit_cam, tvecInit_cam;
-  cv::Mat Rt_init_cam;
 };
 
 #endif /* LOCALPOSEREFINER_HPP_ */

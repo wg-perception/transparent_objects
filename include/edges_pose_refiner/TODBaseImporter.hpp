@@ -34,16 +34,7 @@ public:
 
   void exportTrainPointClouds(const std::string &outFolder) const;
 private:
-  void readTrainSamples();
   void readRegisteredClouds(const std::string &configFilename, std::vector<std::vector<cv::Point3f> > &registeredClouds) const;
-  void matchRegisteredClouds(const std::vector<std::vector<cv::Point3f> > &registeredClouds, EdgeModel &edgeModel) const;
-  void alignModel(EdgeModel &edgeModel) const;
-  void computeStableEdgels(EdgeModel &edgeModel) const;
-  void readRawEdgeModel(const std::string &filename, EdgeModel &edgeModel);
-  void createEdgeModel(EdgeModel &edgeModel);
-
-
-  std::vector<EdgeModelCreator::TrainSample> trainSamples;
 
   std::string trainFolder, testFolder;
   cv::Mat cameraMatrix, distCoeffs;

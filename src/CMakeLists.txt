@@ -4,20 +4,16 @@ find_ros_package(pcl)
 set(src 
     edgeModel.cpp
     glassDetector.cpp
-    kPartiteGraph.cpp
     localPoseRefiner.cpp
     pclProcessing.cpp
     pinholeCamera.cpp
     poseError.cpp
     poseEstimator.cpp
     poseRT.cpp
-    registerPointClouds.cpp
     silhouette.cpp
-    tangentVectorsEstimator.cpp
     TODBaseImporter.cpp
     transparentDetector.cpp
     utils.cpp
-    chamfer_matching/chamfer_matching.cpp
     nonMaximumSuppression.cpp
 #    glass_segmentation/geodesicActiveContour.cpp
 #    glass_segmentation/enhancedGlassSegmenter.cpp
@@ -48,7 +44,6 @@ add_definitions(-Wno-deprecated)
 target_link_libraries(edges_pose_refiner
   ${pcl_LIBRARIES}
   ${OpenCV_LIBS}
-  ${ITK_LIBRARIES}
   )
 
 install(TARGETS edges_pose_refiner

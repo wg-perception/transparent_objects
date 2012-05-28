@@ -106,8 +106,6 @@ void drawPoints(const std::vector<cv::Point_<T> > &points, cv::Mat &image, cv::S
   }
 }
 
-void computeEdgeOrientations(const cv::Mat &edges, cv::Mat &oreintations, int medianIndex);
-
 void saveToCache(const std::string &name, const cv::Mat &mat);
 cv::Mat getFromCache(const std::string &name);
 

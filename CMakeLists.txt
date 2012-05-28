@@ -10,9 +10,6 @@ find_package(ecto REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(object_recognition REQUIRED)
 
-find_package(ITK REQUIRED)
-include(${ITK_USE_FILE})
-
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -31,4 +28,3 @@ if(BUILD_TEST)
   enable_testing()
   add_subdirectory(test)
 endif()  
-
