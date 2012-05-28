@@ -15,10 +15,6 @@ set(src
     transparentDetector.cpp
     utils.cpp
     nonMaximumSuppression.cpp
-#    glass_segmentation/geodesicActiveContour.cpp
-#    glass_segmentation/enhancedGlassSegmenter.cpp
-#    glass_segmentation/region.cpp
-#    glass_segmentation/segmentedImage.cpp
 )
 
 #EAR: is there a reason to list headers in this target?
@@ -56,16 +52,6 @@ set_target_properties(transparentExperiments
   COMPILE_FLAGS "-std=c++0x"
   )
 target_link_libraries(transparentExperiments edges_pose_refiner)
-
-#add_executable(enhancedGlassSegmenter glass_segmentation/demo.cpp)
-#set_target_properties(enhancedGlassSegmenter PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
-#target_link_libraries(enhancedGlassSegmenter edges_pose_refiner)
-
-#add_executable(createSegmentedImage glass_segmentation/createSegmentedImage.cpp)
-#target_link_libraries(createSegmentedImage edges_pose_refiner)
-
-#add_executable(createSegmentation glass_segmentation/createSegmentation.cpp)
-#target_link_libraries(createSegmentation edges_pose_refiner)
 
 #add_executable(createObjectMask apps/createObjectMask.cpp)
 #target_link_libraries(createObjectMask edges_pose_refiner)
