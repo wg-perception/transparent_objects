@@ -8,7 +8,7 @@
 #include <edges_pose_refiner/glassDetector.hpp>
 #include <edges_pose_refiner/utils.hpp>
 #include <edges_pose_refiner/pclProcessing.hpp>
-#include <edges_pose_refiner/transparentDetector.hpp>
+#include <edges_pose_refiner/detector.hpp>
 #include "db_transparent_objects.hpp"
 
 #include <opencv2/highgui/highgui.hpp>
@@ -32,9 +32,9 @@ namespace transparent_objects
       std::cout << "detector: ParameterCallback" << std::endl;
       BOOST_FOREACH(const object_recognition::db::Document & document, db_documents)
           {
-            PoseEstimator currentPoseEstimator;
+            transpod::PoseEstimator currentPoseEstimator;
             // Load the detector for that class
-            document.get_attachment<PoseEstimator>("detector", currentPoseEstimator);
+            document.get_attachment<transpod::PoseEstimator>("detector", currentPoseEstimator);
 
             std::string object_id = document.get_value<ObjectId>("object_id");
             detector_->addObject(object_id, currentPoseEstimator);
@@ -67,7 +67,7 @@ namespace transparent_objects
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
       std::cout << "detector: configure" << std::endl;
-      detector_ = new TransparentDetector;
+      detector_ = new transpod::Detector;
       std::cout << "detector: leaving configure" << std::endl;
     }
 
@@ -170,7 +170,7 @@ namespace transparent_objects
     /** The DB parameters */
     ecto::spore<ObjectDbParameters> db_params_;
 
-    cv::Ptr<TransparentDetector> detector_;
+    cv::Ptr<transpod::Detector> detector_;
   };
 }
 

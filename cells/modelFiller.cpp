@@ -27,12 +27,12 @@ namespace transparent_objects
     int
     process(const ecto::tendrils& inputs, const ecto::tendrils& outputs)
     {
-      db_document_->set_attachment<PoseEstimator>("detector", **detector_);
+      db_document_->set_attachment<transpod::PoseEstimator>("detector", **detector_);
       return ecto::OK;
     }
 
   private:
-    ecto::spore<cv::Ptr<PoseEstimator> > detector_;
+    ecto::spore<cv::Ptr<transpod::PoseEstimator> > detector_;
     ecto::spore<Document> db_document_;
   };
 }

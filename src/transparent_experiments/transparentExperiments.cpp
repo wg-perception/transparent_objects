@@ -18,10 +18,11 @@
 #include "edges_pose_refiner/pclProcessing.hpp"
 #include <pcl/visualization/cloud_viewer.h>
 
-#include "edges_pose_refiner/transparentDetector.hpp"
+#include "edges_pose_refiner/detector.hpp"
 
 
 using namespace cv;
+using namespace transpod;
 using std::cout;
 using std::endl;
 using std::stringstream;
@@ -189,7 +190,7 @@ int main(int argc, char **argv)
 //  edgeModels[0].visualize();
 //#endif
 
-  TransparentDetectorParams params;
+  DetectorParams params;
 //  params.glassSegmentationParams.closingIterations = 8;
 // bucket
 //  params.glassSegmentationParams.openingIterations = 8;
@@ -206,7 +207,7 @@ int main(int argc, char **argv)
   //bucket
   //params.glassSegmentationParams.finalClosingIterations = 12;
 
-  TransparentDetector detector(kinectCamera, params);
+  Detector detector(kinectCamera, params);
 //  TransparentDetector detector(kinectCamera);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
@@ -314,7 +315,7 @@ int main(int argc, char **argv)
     TickMeter recognitionTime;
     recognitionTime.start();
 
-    TransparentDetector::DebugInfo debugInfo;
+    Detector::DebugInfo debugInfo;
     try
     {
       detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames, &debugInfo);

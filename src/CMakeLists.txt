@@ -12,7 +12,7 @@ set(src
     poseRT.cpp
     silhouette.cpp
     TODBaseImporter.cpp
-    transparentDetector.cpp
+    detector.cpp
     utils.cpp
     nonMaximumSuppression.cpp
 )

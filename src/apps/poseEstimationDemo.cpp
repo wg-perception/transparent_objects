@@ -1,8 +1,9 @@
 #include <opencv2/opencv.hpp>
-#include "edges_pose_refiner/transparentDetector.hpp"
+#include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
 using namespace cv;
+using namespace transpod;
 using std::cout;
 using std::endl;
 
@@ -34,7 +35,7 @@ int main(int argc, char *argv[])
 //  const vector<string> objectNames = {"wineglass"};
 //, "bottle", "glass", "sourCream", "wineglass"};
 
-  TransparentDetectorParams params;
+  DetectorParams params;
 //  params.glassSegmentationParams.closingIterations = 12;
 //  params.glassSegmentationParams.openingIterations = 8;
 //  params.glassSegmentationParams.finalClosingIterations = 8;
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
 
-  TransparentDetector detector(kinectCamera, params);
+  Detector detector(kinectCamera, params);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
     detector.addModel(objectNames[i], edgeModels[i]);
@@ -82,7 +83,7 @@ int main(int argc, char *argv[])
 
   TickMeter recognitionTime;
   recognitionTime.start();
-  TransparentDetector::DebugInfo debugInfo;
+  Detector::DebugInfo debugInfo;
   try
   {
     detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames, &debugInfo);

@@ -5,7 +5,7 @@
  *      Author: ilysenkov
  */
 
-#include "edges_pose_refiner/transparentDetector.hpp"
+#include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/utils.hpp"
 #include "edges_pose_refiner/glassDetector.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
@@ -22,24 +22,27 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
+namespace transpod
+{
+
+Detector::Detector(const PinholeCamera &_camera, const DetectorParams &_params)
 {
   initialize(_camera, _params);
 }
 
-void TransparentDetector::initialize(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
+void Detector::initialize(const PinholeCamera &_camera, const DetectorParams &_params)
 {
   srcCamera = _camera;
   params = _params;
 }
 
-void TransparentDetector::addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
+void Detector::addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel edgeModel(points, isModelUpsideDown, centralize);
   addModel(name, edgeModel);
 }
 
-void TransparentDetector::addModel(const std::string &name, const EdgeModel &edgeModel)
+void Detector::addModel(const std::string &name, const EdgeModel &edgeModel)
 {
   PoseEstimator estimator(srcCamera);
   estimator.setModel(edgeModel);
@@ -47,7 +50,7 @@ void TransparentDetector::addModel(const std::string &name, const EdgeModel &edg
   addObject(name, estimator);
 }
 
-void TransparentDetector::addObject(const std::string &name, const PoseEstimator &estimator)
+void Detector::addObject(const std::string &name, const PoseEstimator &estimator)
 {
   if (poseEstimators.empty())
   {
@@ -69,7 +72,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 }
 */
 
-void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, TransparentDetector::DebugInfo *debugInfo) const
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -179,7 +182,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
   }
 }
 
-int TransparentDetector::getObjectIndex(const std::string &name) const
+int Detector::getObjectIndex(const std::string &name) const
 {
   std::vector<std::string>::const_iterator it = std::find(objectNames.begin(), objectNames.end(), name);
   CV_Assert(it != objectNames.end());
@@ -187,7 +190,7 @@ int TransparentDetector::getObjectIndex(const std::string &name) const
   return std::distance(objectNames.begin(), it);
 }
 
-void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
 {
   CV_Assert(poses.size() == objectNames.size());
   if (image.size() != validTestImageSize)
@@ -217,7 +220,7 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
   }
 }
 
-void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
 #ifdef USE_3D_VISUALIZATION
   CV_Assert(poses.size() == objectNames.size());
@@ -241,7 +244,7 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 #endif
 }
 
-bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
+bool Detector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
   const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
@@ -343,3 +346,5 @@ bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera
 
   return true;
 }
+
+} //end of namespace transpod
