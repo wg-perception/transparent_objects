@@ -9,7 +9,7 @@
 #define TRANSPARENTDETECTOR_HPP_
 
 #include "edges_pose_refiner/poseEstimator.hpp"
-#include "edges_pose_refiner/glassDetector.hpp"
+#include "edges_pose_refiner/glassSegmentator.hpp"
 
 namespace transpod
 {
@@ -22,7 +22,7 @@ namespace transpod
     float clusterTolerance;
     cv::Point3f verticalDirection;
 
-    GlassSegmentationParams glassSegmentationParams;
+    GlassSegmentatorParams glassSegmentationParams;
 
     DetectorParams()
     {
@@ -31,39 +31,48 @@ namespace transpod
       distanceThreshold = 0.02f;
       clusterTolerance = 0.05f;
       verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f);
-      glassSegmentationParams = GlassSegmentationParams();
+      glassSegmentationParams = GlassSegmentatorParams();
     }
   };
 
   class Detector
   {
   public:
-    struct DebugInfo
-    {
-      cv::Mat glassMask;
-      std::vector<cv::Mat> initialSilhouettes;
-    };
+    struct DebugInfo;
 
     Detector(const PinholeCamera &camera = PinholeCamera(), const DetectorParams &params = DetectorParams());
     void initialize(const PinholeCamera &camera = PinholeCamera(), const DetectorParams &params = DetectorParams());
 
-    void addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize);
-    void addModel(const std::string &name, const EdgeModel &edgeModel);
-    void addObject(const std::string &name, const PoseEstimator &poseEstimator);
-    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames, DebugInfo *debugInfo = 0) const;
+    void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points,
+                        bool isModelUpsideDown, bool centralize);
+    void addTrainObject(const std::string &objectName, const EdgeModel &edgeModel);
+    void addTrainObject(const std::string &objectName, const PoseEstimator &poseEstimator);
 
-    void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const;
-    void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const;
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud,
+                std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
+                DebugInfo *debugInfo = 0) const;
 
-    int getObjectIndex(const std::string &name) const;
+    int getTrainObjectIndex(const std::string &name) const;
+
+    void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
+                   cv::Mat &image) const;
+    void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
+                   pcl::PointCloud<pcl::PointXYZ> &cloud) const;
   private:
-    bool tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, cv::Vec4f &tablePlane) const;
+    bool tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage,
+                                    cv::Vec4f &tablePlane) const;
 
     DetectorParams params;
     PinholeCamera srcCamera;
     std::vector<PoseEstimator> poseEstimators;
     std::vector<std::string> objectNames;
     cv::Size validTestImageSize;
+  };
+
+  struct Detector::DebugInfo
+  {
+      cv::Mat glassMask;
+      std::vector<cv::Mat> initialSilhouettes;
   };
 }
 

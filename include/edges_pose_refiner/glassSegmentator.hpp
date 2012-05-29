@@ -15,7 +15,7 @@
 
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
-struct GlassSegmentationParams
+struct GlassSegmentatorParams
 {
   /** \brief Number of closing iterations in morphology */
   int closingIterations;
@@ -42,7 +42,7 @@ struct GlassSegmentationParams
   /** \brief Refine a segmentation mask with convexity assumption or not */
   bool fillConvex;
 
-  GlassSegmentationParams()
+  GlassSegmentatorParams()
   {
     closingIterations = 12;
     openingIterations = 6;
@@ -60,7 +60,7 @@ struct GlassSegmentationParams
 class GlassSegmentator
 {
 public:
-  GlassSegmentator(const GlassSegmentationParams &params = GlassSegmentationParams());
+  GlassSegmentator(const GlassSegmentatorParams &params = GlassSegmentatorParams());
 
   /** \brief Segment glass on an image using a Kinect
    * \param bgrImage A color image returned by a Kinect
@@ -75,10 +75,10 @@ public:
   void segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera = 0, const cv::Vec4f *tablePlane = 0, const pcl::PointCloud<pcl::PointXYZ> *tableHull = 0);
 
 private:
-  GlassSegmentationParams params;
+  GlassSegmentatorParams params;
 };
 
 void showSegmentation(const cv::Mat &image, const cv::Mat &mask, const std::string &title = "glass segmentation");
-void refineSegmentationByGrabCut(const cv::Mat &bgrImage, const cv::Mat &rawMask, cv::Mat &refinedMask, const GlassSegmentationParams &params = GlassSegmentationParams());
+void refineSegmentationByGrabCut(const cv::Mat &bgrImage, const cv::Mat &rawMask, cv::Mat &refinedMask, const GlassSegmentatorParams &params = GlassSegmentatorParams());
 
 #endif

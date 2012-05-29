@@ -5,7 +5,7 @@
 #include <object_recognition/common/pose_result.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
-#include <edges_pose_refiner/glassDetector.hpp>
+#include <edges_pose_refiner/glassSegmentator.hpp>
 #include <edges_pose_refiner/utils.hpp>
 #include <edges_pose_refiner/pclProcessing.hpp>
 #include <edges_pose_refiner/detector.hpp>
@@ -37,7 +37,7 @@ namespace transparent_objects
             document.get_attachment<transpod::PoseEstimator>("detector", currentPoseEstimator);
 
             std::string object_id = document.get_value<ObjectId>("object_id");
-            detector_->addObject(object_id, currentPoseEstimator);
+            detector_->addTrainObject(object_id, currentPoseEstimator);
             printf("Loaded %s\n", object_id.c_str());
           }
     }

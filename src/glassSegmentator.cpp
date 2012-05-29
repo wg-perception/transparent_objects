@@ -1,7 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/legacy/legacy.hpp>
 
-#include "edges_pose_refiner/glassDetector.hpp"
+#include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/utils.hpp"
 
 using namespace cv;
@@ -14,7 +14,7 @@ using std::endl;
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 
-void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentationParams &params)
+void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params)
 {
 #ifdef VISUALIZE
   imshow("before grabcut", rawMask);
@@ -170,7 +170,7 @@ void readDepthImage(const string &filename, Mat &depthMat)
   fs.release();
 }
 
-GlassSegmentator::GlassSegmentator(const GlassSegmentationParams &_params)
+GlassSegmentator::GlassSegmentator(const GlassSegmentatorParams &_params)
 {
   params = _params;
 }

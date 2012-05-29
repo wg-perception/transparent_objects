@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
   Detector detector(kinectCamera, params);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
-    detector.addModel(objectNames[i], edgeModels[i]);
+    detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
 
   Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
   {
     std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
     int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
-    int detectedObjectIndex = detector.getObjectIndex(detectedObjectsNames[bestDetectionIndex]);
+    int detectedObjectIndex = detector.getTrainObjectIndex(detectedObjectsNames[bestDetectionIndex]);
     cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
 
     Mat detectionResults = kinectBgrImage.clone();

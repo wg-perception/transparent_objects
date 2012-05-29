@@ -3,7 +3,7 @@ find_ros_package(pcl)
 #TDS: dont glob together sources.
 set(src 
     edgeModel.cpp
-    glassDetector.cpp
+    glassSegmentator.cpp
     localPoseRefiner.cpp
     pclProcessing.cpp
     pinholeCamera.cpp

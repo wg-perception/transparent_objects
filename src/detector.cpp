@@ -7,7 +7,6 @@
 
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/utils.hpp"
-#include "edges_pose_refiner/glassDetector.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
 #ifdef USE_3D_VISUALIZATION
@@ -36,21 +35,21 @@ void Detector::initialize(const PinholeCamera &_camera, const DetectorParams &_p
   params = _params;
 }
 
-void Detector::addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
+void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel edgeModel(points, isModelUpsideDown, centralize);
-  addModel(name, edgeModel);
+  addTrainObject(objectName, edgeModel);
 }
 
-void Detector::addModel(const std::string &name, const EdgeModel &edgeModel)
+void Detector::addTrainObject(const std::string &objectName, const EdgeModel &edgeModel)
 {
   PoseEstimator estimator(srcCamera);
   estimator.setModel(edgeModel);
 
-  addObject(name, estimator);
+  addTrainObject(objectName, estimator);
 }
 
-void Detector::addObject(const std::string &name, const PoseEstimator &estimator)
+void Detector::addTrainObject(const std::string &objectName, const PoseEstimator &estimator)
 {
   if (poseEstimators.empty())
   {
@@ -62,7 +61,7 @@ void Detector::addObject(const std::string &name, const PoseEstimator &estimator
   }
 
   poseEstimators.push_back(estimator);
-  objectNames.push_back(name);
+  objectNames.push_back(objectName);
 }
 
 /*
@@ -182,7 +181,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   }
 }
 
-int Detector::getObjectIndex(const std::string &name) const
+int Detector::getTrainObjectIndex(const std::string &name) const
 {
   std::vector<std::string>::const_iterator it = std::find(objectNames.begin(), objectNames.end(), name);
   CV_Assert(it != objectNames.end());
@@ -215,7 +214,7 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
         break;
     }
 
-    int objectIndex = getObjectIndex(objectNames[i]);
+    int objectIndex = getTrainObjectIndex(objectNames[i]);
     poseEstimators[objectIndex].visualize(poses[i], image, color);
   }
 }
