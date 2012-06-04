@@ -1,0 +1,18 @@
+<stack>
+  <name>object_recognition_transparent_objects</name>
+  <version>0.2.3</version>
+  <description>A technique to recognize transparent objects</description>
+  <author>Ilya Lysenkov</author>
+  <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
+  <maintainer>Ilya Lysenkov</maintainer>
+  <maintainer email="vrabaud@willowgarage.com">Vincent Rabaud</maintainer>
+  <license>BSD</license>
+  <copyright>Willow Garage</copyright>
+  <url>http://ecto.willowgarage.com</url>
+
+  <build_depends>catkin</build_depends>
+  <build_depends>ecto</build_depends>
+  <build_depends>object_recognition_core</build_depends>
+  <depends>ecto</depends>
+  <depends>object_recognition_core</depends>
+</stack>
