@@ -1,5 +1,5 @@
 #include "edges_pose_refiner/edgeModel.hpp"
-#include "edges_pose_refiner/kPartiteGraph.hpp"
+#include "edges_pose_refiner/pclProcessing.hpp"
 #include <pcl/registration/icp_nl.h>
 #include <boost/make_shared.hpp>
 #include <opencv2/opencv.hpp>
@@ -8,6 +8,7 @@
 #ifdef USE_3D_VISUALIZATION
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
+#include <boost/thread/thread.hpp>
 #endif
 
 using namespace cv;
@@ -76,7 +77,7 @@ EdgeModel::EdgeModel()
 {
 }
 
-EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<cv::Point3f> &_normals, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
 {
   params = _params;
 
@@ -85,7 +86,9 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   inModel.hasRotationSymmetry = isAxisCorrect(_points, axis, params.neighborIndex, params.distanceFactor, params.rotationCount);
   inModel.upStraightDirection = axis;
   inModel.points = _points;
-  EdgeModelCreator::computeObjectSystem(inModel.points, inModel.Rt_obj2cam);
+  inModel.normals = _normals;
+
+  computeObjectSystem(inModel.points, inModel.Rt_obj2cam);
 
   Point3d objectCenter = inModel.getObjectCenter();
   Mat tvec;
@@ -126,6 +129,50 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
   }
 
   *this = outModel;
+  cout << "normals size: " << normals.size() << endl;
+}
+
+EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
+{
+  CV_Assert(false);
+  /*
+   * Estimate normals
+
+  pcl::PointCloud<pcl::PointXYZ> pclPoints;
+  cv2pcl(inModel.points, pclPoints);
+  pcl::PointCloud<pcl::Normal> pclNormals;
+
+  cout << "size: " << pclPoints.points.size() << endl;
+  estimateNormals(params.kSearch, pclPoints, pclNormals);
+  inModel.normals.resize(pclNormals.size());
+  for (size_t i = 0; i < pclNormals.points.size(); ++i)
+  {
+    Point3f currentNormal;
+    currentNormal.x = pclNormals.points[i].normal[0];
+    currentNormal.y = pclNormals.points[i].normal[1];
+    currentNormal.z = pclNormals.points[i].normal[2];
+    cout << pclNormals.points[i].curvature << endl;
+    inModel.normals[i] = currentNormal;
+  }
+  */
+
+/*
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+//    viewer->setBackgroundColor (0, 0, 0);
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> pointsColor(pclPoints.makeShared(), 0, 255, 0);
+  viewer->addPointCloud<pcl::PointXYZ>(pclPoints.makeShared(), pointsColor, "tmp");
+//    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
+//    viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (pclPoints.makeShared(), pclNormals, 10, 0.05, "normals");
+    viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (pclPoints.makeShared(), pclNormals.makeShared(), 10, 0.05, "normals");
+//    viewer->addCoordinateSystem (1.0);
+//    viewer->initCameraParameters ();
+
+    while (!viewer->wasStopped ())
+    {
+      viewer->spinOnce (100);
+//      boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+    }
+*/
 }
 
 EdgeModel::EdgeModel(const EdgeModel &edgeModel)
@@ -199,6 +246,53 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
     waitKey();
   }
 #endif
+}
+
+static void computeDots(const Mat &mat1, const Mat &mat2, Mat &dst)
+{
+  Mat m1 = mat1.reshape(1);
+  Mat m2 = mat2.reshape(1);
+  CV_Assert(m1.size() == m2.size());
+  CV_Assert(m1.type() == m2.type());
+
+  Mat products = m1.mul(m2);
+  reduce(products, dst, 1, CV_REDUCE_SUM);
+}
+
+static void computeNormalDots(const Mat &Rt, const EdgeModel &rotatedEdgeModel, Mat &dots)
+{
+  Mat R = Rt(Range(0, 3), Range(0, 3));
+  Mat t = Rt(Range(0, 3), Range(3, 4));
+
+  Mat vec;
+  Mat(t.t() * R).reshape(3).convertTo(vec, CV_32FC1);
+  Scalar scalar = Scalar(vec.at<Vec3f>(0));
+  Mat edgelsMat = Mat(rotatedEdgeModel.points) + scalar;
+
+  Mat norms;
+  computeDots(edgelsMat, edgelsMat, norms);
+  sqrt(norms, norms);
+
+  computeDots(edgelsMat, Mat(rotatedEdgeModel.normals), dots);
+  float epsf = 1e-4;
+  Scalar eps = Scalar::all(epsf);
+  dots /= (norms + epsf);
+}
+
+void EdgeModel::computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const
+{
+//  EdgeModel rotatedEdgeModel;
+//  rotate_cam(pose_cam, rotatedEdgeModel);
+
+  computeNormalDots(pose_cam.getProjectiveMatrix(), *this, weights);
+  Mat expWeights;
+  //TODO: move up
+  exp(-10.0 * abs(weights), expWeights);
+  weights = 2 * expWeights;
+
+  Mat doubleWeights;
+  weights.convertTo(doubleWeights, CV_64FC1);
+  weights = doubleWeights;
 }
 
 void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera, const PoseRT &pose_cam, Silhouette &silhouette, float downFactor, int closingIterationsCount) const
@@ -468,7 +562,7 @@ void EdgeModel::visualize()
 #endif
 }
 
-void EdgeModel::write(const std::string &filename)
+void EdgeModel::write(const std::string &filename) const
 {
   FileStorage fs(filename, FileStorage::WRITE);
   write(fs);
@@ -612,307 +706,7 @@ bool EdgeModel::isAxisCorrect(const std::vector<cv::Point3f> &points, cv::Point3
   return (largestDistance < distanceFactor * medianDistance);
 }
 
-bool EdgeModelCreator::TrainSample::isValid() const
-{
-  bool isInvalid = image.empty() || mask.empty() || rvec.empty() || tvec.empty() ||pointCloud.empty();
-  return !isInvalid;
-}
-
-EdgeModelCreator::EdgeModelCreator(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, bool _visualize,
-                                   const EdgeModelCreatorParams &_params)
-{
-  cameraMatrix = _cameraMatrix.clone();
-  distCoeffs = _distCoeffs.clone();
-
-  visualize = _visualize;
-  params = _params;
-}
-
-void EdgeModelCreator::getEdgePointClouds(const std::vector<TrainSample> &trainSamples, std::vector<std::vector<
-    cv::Point3f> > &edgePointClouds)
-{
-  edgePointClouds.resize(trainSamples.size());
-  for (size_t sampleIdx = 0; sampleIdx < trainSamples.size(); sampleIdx++)
-  {
-    const TrainSample &sample = trainSamples[sampleIdx];
-    CV_Assert(sample.isValid());
-
-    Mat objectEdges;
-    Canny(sample.image, objectEdges, params.cannyThreshold1, params.cannyThreshold2);
-    objectEdges = params.useOnlyEdges ? (sample.mask & objectEdges) : sample.mask;
-
-    Mat rvecZeros(Mat::zeros(3, 1, CV_64FC1));
-    Mat tvecZeros(Mat::zeros(3, 1, CV_64FC1));
-    vector<Point2f> projectedPointCloud;
-    projectPoints(Mat(sample.pointCloud), rvecZeros, tvecZeros, cameraMatrix, distCoeffs, projectedPointCloud);
-
-    vector<Point3f> filteredPointCloud;
-    for (size_t i = 0; i < projectedPointCloud.size(); i++)
-    {
-      Point pt = projectedPointCloud[i];
-      if (pt.x < 0 || pt.y < 0 || pt.x >= objectEdges.cols || pt.y >= objectEdges.rows)
-        continue;
-
-      //const uchar white = 255;
-      const uchar black = 0;
-      if (objectEdges.at<uchar> (pt) != black)
-      {
-        filteredPointCloud.push_back(sample.pointCloud[i]);
-      }
-    }
-
-    project3dPoints(filteredPointCloud, sample.rvec, sample.tvec, edgePointClouds[sampleIdx]);
-    CV_Assert(!edgePointClouds[sampleIdx].empty());
-  }
-}
-
-void EdgeModelCreator::alignModel(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, int numberOfICPs, int numberOfIterationsInICP)
-{
-  if (visualize)
-  {
-    namedWindow("Ready to publish original model");
-    waitKey();
-    publishPoints(edgeModel.points);
-    namedWindow("Done");
-    waitKey();
-  }
-
-  vector<vector<Point3f> > initialPointClouds;
-  getEdgePointClouds(trainSamples, initialPointClouds);
-  CV_Assert(initialPointClouds.size() == trainSamples.size());
-
-  if (visualize)
-  {
-    namedWindow("ready to publish initial point clouds");
-    waitKey();
-    publishPoints(initialPointClouds);
-    namedWindow("Done");
-    waitKey();
-  }
-
-  vector<pcl::PointCloud<pcl::PointXYZ> > pclInitialClouds(initialPointClouds.size());
-  for(size_t i=0; i<initialPointClouds.size(); i++)
-  {
-    cv2pcl(initialPointClouds[i], pclInitialClouds[i]);
-  }
-
-  if(edgeModel.Rt_obj2cam.empty())
-  {
-    computeObjectSystem(edgeModel.points, edgeModel.Rt_obj2cam);
-  }
-
-  for(int iter = 0; iter<numberOfICPs; iter++)
-  {
-    cout << "iter: " << iter << endl;
-    pcl::PointCloud<pcl::PointXYZ> pclModelEdgels;
-    cv2pcl(edgeModel.points, pclModelEdgels);
-
-
-    pcl::IterativeClosestPointNonLinear<pcl::PointXYZ, pcl::PointXYZ> icp;
-
-    Mat RT_sum;
-    for(size_t pcIdx=0; pcIdx < initialPointClouds.size(); pcIdx++)
-    {
-      pcl::PointCloud<pcl::PointXYZ>::Ptr targetPtr(boost::make_shared<pcl::PointCloud<pcl::PointXYZ> > (pclModelEdgels));
-
-      pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloudPtr(boost::make_shared<pcl::PointCloud<pcl::PointXYZ> > (pclInitialClouds[pcIdx]));
-
-      icp.setInputTarget(targetPtr);
-      icp.setInputCloud(inputCloudPtr);
-      icp.setMaximumIterations(numberOfIterationsInICP);
-
-      pcl::PointCloud<pcl::PointXYZ> pclRotatedPointCloud;
-      icp.align(pclRotatedPointCloud);
-
-      Eigen::Matrix4f eigenFinalTransformation = icp.getFinalTransformation();
-      Mat finalTransformation;
-      eigen2cv(eigenFinalTransformation, finalTransformation);
-      finalTransformation.convertTo(finalTransformation, CV_64FC1);
-
-      Mat invertedFinalTransformation = finalTransformation.inv(DECOMP_SVD);
-      Mat objectTransformation = edgeModel.Rt_obj2cam.inv(DECOMP_SVD) * invertedFinalTransformation * edgeModel.Rt_obj2cam;
-      //cout << objectTransformation << endl;
-
-      RT_sum = RT_sum.empty() ? objectTransformation : RT_sum + objectTransformation;
-    }
-
-    RT_sum /= initialPointClouds.size();
-    Mat R_obj, t_obj;
-    getRotationTranslation(RT_sum, R_obj, t_obj);
-
-    SVD svd;
-    Mat w, u, vt;
-    svd.compute(R_obj, w, u, vt, SVD::FULL_UV);
-    Mat R = u * vt;
-
-    Mat rvec_obj;
-    Rodrigues(R, rvec_obj);
-    EdgeModel rotatedEdgeModel;
-    edgeModel.rotate_obj(PoseRT(rvec_obj, t_obj), rotatedEdgeModel);
-    edgeModel = rotatedEdgeModel;
-  }
-
-  if (visualize)
-  {
-    namedWindow("Ready to publish aligned model");
-    waitKey();
-    publishPoints(edgeModel.points);
-    namedWindow("Done");
-    waitKey();
-  }
-}
-
-void EdgeModelCreator::matchPointClouds(const std::vector<std::vector<cv::Point3f> > &pointClouds, std::vector<cv::Point3f> &matchedPointCloud)
-{
-  matchedPointCloud.clear();
-  Ptr<KPartiteGraph> graph;
-  constructKNNG(params.knn, pointClouds, graph);
-
-  int edgesCount = cvRound(params.neighborsRatio * pointClouds.size());
-  int inliersCount = cvRound(params.inliersRatio * pointClouds.size());
-  graph->computeAllRepresentativites(edgesCount);
-
-  while (true)
-  {
-    Point3f centroid;
-    bool isNonEmpty = graph->getBestCentroid(params.cstepsCount, inliersCount, edgesCount, centroid);
-    if (!isNonEmpty)
-      break;
-
-    matchedPointCloud.push_back(centroid);
-  }
-
-  //remove the latest points -- they are likely to be outliers
-  size_t outliersCount = params.finalModelOutliersRatio * matchedPointCloud.size();
-  for (size_t i = 0; i < outliersCount; i++)
-  {
-    matchedPointCloud.pop_back();
-  }
-}
-
-void EdgeModelCreator::computeModelEdgels(const std::vector<TrainSample> &trainSamples,
-                                          std::vector<cv::Point3f> &edgels)
-{
-  edgels.clear();
-
-  vector<vector<Point3f> > initialPointClouds;
-  getEdgePointClouds(trainSamples, initialPointClouds);
-  CV_Assert(initialPointClouds.size() == trainSamples.size());
-
-  if (visualize)
-  {
-    namedWindow("ready to publish initial point clouds");
-    waitKey();
-    publishPoints(initialPointClouds);
-    namedWindow("Done");
-    waitKey();
-  }
-
-  vector<vector<Point3f> > alignedPointClouds;
-  MultiViewRegistrator registrator;
-  registrator.align(initialPointClouds, alignedPointClouds);
-  CV_Assert(alignedPointClouds.size() == trainSamples.size());
-
-  if (visualize)
-  {
-    namedWindow("ready to publish aligned point clouds");
-    waitKey();
-    publishPoints(alignedPointClouds);
-    namedWindow("Done");
-    waitKey();
-  }
-
-  matchPointClouds(alignedPointClouds, edgels);
-
-  if (visualize)
-  {
-    namedWindow("Ready to publish the full edge model");
-    waitKey();
-    publishPoints(edgels);
-    namedWindow("Done");
-    waitKey();
-  }
-
-}
-
-void EdgeModelCreator::downsamplePointCloud(const std::vector<cv::Point3f> &src, std::vector<cv::Point3f> &dst, std::vector<
-    int> &srcIndices)
-{
-  const int pointsCount = src.size() * params.downsamplingRatio;
-  dst.clear();
-  srcIndices.clear();
-
-  enum
-  {
-    RANDOM, DP
-  } method = DP;
-
-  switch (method)
-  {
-    case RANDOM:
-    {
-      Mat isUsed(1, src.size(), CV_8UC1, Scalar(0));
-      for (int i = 0; i < pointsCount; i++)
-      {
-        isUsed.at<uint16_t> (0, i) = 255;
-      }
-
-      randShuffle(isUsed);
-      for (size_t i = 0; i < src.size(); i++)
-      {
-        if (isUsed.at<uint16_t> (0, i))
-        {
-          dst.push_back(src[i]);
-        }
-      }
-      break;
-    }
-
-    case DP:
-    {
-      //TODO: optimize by exploiting symmetry in the distance matrix
-      Mat dists(src.size(), src.size(), CV_32FC1, Scalar(0));
-      for (size_t i = 0; i < src.size(); i++)
-      {
-        for (size_t j = i; j < src.size(); j++)
-        {
-          dists.at<float> (j, i) = dists.at<float> (i, j) = norm(src[i] - src[j]);
-        }
-      }
-      double maxVal;
-      Point maxLoc;
-      minMaxLoc(dists, 0, &maxVal, 0, &maxLoc);
-
-      dst.push_back(src.at(maxLoc.x));
-      dst.push_back(src.at(maxLoc.y));
-      srcIndices.push_back(maxLoc.x);
-      srcIndices.push_back(maxLoc.y);
-
-      Mat activedDists(0, dists.cols, dists.type());
-      Mat candidatePointsMask(1, dists.cols, CV_8UC1, Scalar(255));
-      activedDists.push_back(dists.row(maxLoc.y));
-      candidatePointsMask.at<uchar> (0, maxLoc.y) = 0;
-
-      for (int i = 3; i <= pointsCount; i++)
-      {
-        activedDists.push_back(dists.row(maxLoc.x));
-        candidatePointsMask.at<uchar> (0, maxLoc.x) = 0;
-
-        Mat minDists;
-        reduce(activedDists, minDists, 0, CV_REDUCE_MIN);
-        minMaxLoc(minDists, 0, &maxVal, 0, &maxLoc, candidatePointsMask);
-        dst.push_back(src.at(maxLoc.x));
-        srcIndices.push_back(maxLoc.x);
-      }
-
-      break;
-    }
-  }
-  CV_Assert(dst.size() == srcIndices.size())
-    ;
-}
-
-void EdgeModelCreator::computeObjectSystem(const std::vector<cv::Point3f> &points, cv::Mat &Rt_obj2cam)
+void computeObjectSystem(const std::vector<cv::Point3f> &points, cv::Mat &Rt_obj2cam)
 {
   PCA pca(Mat(points).reshape(1), Mat(), CV_PCA_DATA_AS_ROW);
 
@@ -923,153 +717,4 @@ void EdgeModelCreator::computeObjectSystem(const std::vector<cv::Point3f> &point
   CV_Assert(t_obj2cam.rows == 3 && t_obj2cam.cols == 1);
 
   createProjectiveMatrix(R_obj2cam, t_obj2cam, Rt_obj2cam);
-}
-
-void EdgeModelCreator::createEdgeModel(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel,
-                                       bool computeOrientations)
-{
-  if (computeOrientations)
-  {
-    CV_Error(CV_StsNotImplemented, "Edges orientation is not supported now");
-  }
-
-  vector<Point3f> edgels;
-  computeModelEdgels(trainSamples, edgels);
-  computeObjectSystem(edgels, edgeModel.Rt_obj2cam);
-  vector<int> indices;
-  downsamplePointCloud(edgels, edgeModel.points, indices);
-  //edgeModel.points = points;
-
-  if (visualize)
-  {
-    namedWindow("Ready to publish the downsampled edge model");
-    waitKey();
-    publishPoints(edgeModel.points);
-    namedWindow("Done");
-    waitKey();
-  }
-}
-
-void EdgeModelCreator::downsampleEdgeModel(EdgeModel &edgeModel, float ratio)
-{
-  vector<int> indices;
-  vector<Point3f> edgels;
-  downsamplePointCloud(edgeModel.points, edgels, indices);
-  std::swap(edgeModel.points, edgels);
-}
-
-void EdgeModelCreator::computeStableEdgels(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, int dilationsIterations, float maxDistanceToEdge, float minRepeatability)
-{
-  Mat allDistances(edgeModel.points.size(), trainSamples.size(), CV_32FC1);
-  for (size_t sampleIdx = 0; sampleIdx < trainSamples.size(); sampleIdx++)
-  {
-    const TrainSample &sample = trainSamples[sampleIdx];
-    CV_Assert(sample.isValid());
-
-    Mat objectEdges;
-    Canny(sample.image, objectEdges, params.cannyThreshold1, params.cannyThreshold2);
-    Mat mask;
-    dilate(sample.mask, mask, Mat(), Point(-1, -1), dilationsIterations);
-    objectEdges = mask & objectEdges;
-    Mat dt;
-    distanceTransform(~objectEdges, dt, CV_DIST_L2, CV_DIST_MASK_PRECISE);
-    CV_Assert(dt.type() == CV_32FC1);
-
-    Mat Rt_sample;
-    createProjectiveMatrix(sample.rvec, sample.tvec, Rt_sample);
-    Mat Rt_model2sample = Rt_sample.inv(DECOMP_SVD);
-    Mat rvec_model2sample, tvec_model2sample;
-    getRvecTvec(Rt_model2sample, rvec_model2sample, tvec_model2sample);
-
-    vector<Point2f> projectedModel;
-    projectPoints(Mat(edgeModel.points), rvec_model2sample, tvec_model2sample, cameraMatrix, distCoeffs, projectedModel);
-
-    for (size_t i = 0; i < projectedModel.size(); i++)
-    {
-      Point pt = projectedModel[i];
-      bool isOutside = (pt.x < 0 || pt.y < 0 || pt.x >= objectEdges.cols || pt.y >= objectEdges.rows);
-      allDistances.at<float>(i, sampleIdx) = isOutside ? std::numeric_limits<float>::max() : dt.at<float>(pt);
-    }
-
-#ifdef VISUALIZE_EDGE_MODEL_CREATION
-    Mat viz;
-    cvtColor(sample.image, viz, CV_GRAY2BGR);
-    for(size_t i=0; i<projectedModel.size(); i++)
-    {
-      Point pt = projectedModel[i];
-      if (pt.x < 0 || pt.y < 0 || pt.x >= objectEdges.cols || pt.y >= objectEdges.rows)
-      {
-        continue;
-      }
-      viz.at<Vec3b>(pt) = Vec3b(255, 0, 0);
-    }
-    imshow("viz", viz);
-    waitKey();
-#endif
-  }
-
-  vector<Point3f> stableEdgels;
-  for(size_t edgelIdx = 0; edgelIdx < edgeModel.points.size(); edgelIdx++)
-  {
-    int edgeCount = 0;
-    for(size_t sampleIdx = 0; sampleIdx < trainSamples.size(); sampleIdx++)
-    {
-      if(allDistances.at<float>(edgelIdx, sampleIdx) < maxDistanceToEdge)
-        edgeCount++;
-    }
-    if(edgeCount >= minRepeatability * trainSamples.size())
-    {
-      stableEdgels.push_back(edgeModel.points[edgelIdx]);
-    }
-  }
-
-  vector<int> indices;
-//  downsamplePointCloud(stableEdgels, edgeModel.stableEdgels, indices);
-  std::swap(stableEdgels, edgeModel.stableEdgels);
-
-
-//  edgeModel.stableEdgels.clear();
-
-
-//Add bottom edges
-/*
-  Point3d rotationAxis = edgeModel.rotationAxis * (1.0 / norm(edgeModel.rotationAxis));
-  rotationAxis *= -1; //direct z-axis upwards
-  Mat rvec, tvec;
-  getRvecTvec(edgeModel.Rt_obj2cam, rvec, tvec);
-  Point3d center_d = Point3d(tvec.reshape(1, 3));
-  Point3f center_f = center_d;
-
-  vector<float> projections(edgeModel.points.size());
-  for(size_t i=0; i<edgeModel.points.size(); i++)
-  {
-    projections[i] = (edgeModel.points[i] - center_f).dot(rotationAxis);
-  }
-
-  vector<float> srcProjections = projections;
-  const float lowPointsRatio = 0.01;
-  size_t lastIdx = lowPointsRatio * projections.size();
-  nth_element(projections.begin(), projections.begin() + lastIdx, projections.end());
-  float maxProjection = projections[lastIdx];
-
-  for(size_t i=0; i<srcProjections.size(); i++)
-  {
-    if(srcProjections[i] < maxProjection)
-    {
-      edgeModel.stableEdgels.push_back(edgeModel.points[i]);
-    }
-  }
-*/  
-
-  downsamplePointCloud(edgeModel.stableEdgels, stableEdgels, indices);
-  std::swap(stableEdgels, edgeModel.stableEdgels);
-
-
-  if (visualize)
-  {
-    publishPoints(edgeModel.stableEdgels, Scalar(0, 0, 0), "stable edgels");
-    namedWindow("stable edgels are published");
-    waitKey();
-    destroyWindow("stable edgels are published");
-  }
 }

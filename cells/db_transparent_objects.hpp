@@ -47,18 +47,18 @@ namespace object_recognition_core
     // Specializations for cv::FileNode
     template<>
     void
-    object_recognition_core::db::Document::get_attachment<PoseEstimator>(const AttachmentName &attachment_name,
-                                                                    PoseEstimator &value) const;
+    object_recognition_core::db::Document::get_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
+                                                                                   transpod::PoseEstimator &value) const;
 
     template<>
     void
-    object_recognition_core::db::Document::get_attachment_and_cache<PoseEstimator>(const AttachmentName &attachment_name,
-                                                                              PoseEstimator &value);
+    object_recognition_core::db::Document::get_attachment_and_cache<transpod::PoseEstimator>(const AttachmentName &attachment_name,
+                                                                                             transpod::PoseEstimator &value);
 
     template<>
     void
-    object_recognition_core::db::Document::set_attachment<PoseEstimator>(const AttachmentName &attachment_name,
-                                                                    const PoseEstimator &value);
+    object_recognition_core::db::Document::set_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
+                                                                                   const transpod::PoseEstimator &value);
   }
 }
 

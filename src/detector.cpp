@@ -5,9 +5,8 @@
  *      Author: ilysenkov
  */
 
-#include "edges_pose_refiner/transparentDetector.hpp"
+#include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/utils.hpp"
-#include "edges_pose_refiner/glassDetector.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
 #ifdef USE_3D_VISUALIZATION
@@ -22,44 +21,47 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-TransparentDetector::TransparentDetector(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
+namespace transpod
+{
+
+Detector::Detector(const PinholeCamera &_camera, const DetectorParams &_params)
 {
   initialize(_camera, _params);
 }
 
-void TransparentDetector::initialize(const PinholeCamera &_camera, const TransparentDetectorParams &_params)
+void Detector::initialize(const PinholeCamera &_camera, const DetectorParams &_params)
 {
   srcCamera = _camera;
   params = _params;
 }
 
-void TransparentDetector::addPoints(const std::string &name, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
+void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel edgeModel(points, isModelUpsideDown, centralize);
-  addModel(name, edgeModel);
+  addTrainObject(objectName, edgeModel);
 }
 
-void TransparentDetector::addModel(const std::string &name, const EdgeModel &edgeModel)
+void Detector::addTrainObject(const std::string &objectName, const EdgeModel &edgeModel)
 {
   PoseEstimator estimator(srcCamera);
   estimator.setModel(edgeModel);
 
-  addObject(name, estimator);
+  addTrainObject(objectName, estimator);
 }
 
-void TransparentDetector::addObject(const std::string &name, const PoseEstimator &estimator)
+void Detector::addTrainObject(const std::string &objectName, const PoseEstimator &estimator)
 {
   if (poseEstimators.empty())
   {
-    validTestImageSize = estimator.getValitTestImageSize();
+    validTestImageSize = estimator.getValidTestImageSize();
   }
   else
   {
-    CV_Assert(validTestImageSize == estimator.getValitTestImageSize());
+    CV_Assert(validTestImageSize == estimator.getValidTestImageSize());
   }
 
   poseEstimators.push_back(estimator);
-  objectNames.push_back(name);
+  objectNames.push_back(objectName);
 }
 
 /*
@@ -69,7 +71,7 @@ void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcD
 }
 */
 
-cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -110,7 +112,7 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
   if (!isEstimated)
   {
     std::cerr << "Cannot find a table plane" << std::endl;
-    return cv::Mat();
+    return;
   }
   else
   {
@@ -122,6 +124,10 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
   GlassSegmentator glassSegmentator(params.glassSegmentationParams);
   glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
 //  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
+  if (debugInfo != 0)
+  {
+    debugInfo->glassMask = glassMask;
+  }
   std::cout << "glass is segmented" << std::endl;
   if (numberOfComponents == 0)
   {
@@ -157,9 +163,15 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
     std::vector<PoseRT> currentPoses;
     std::vector<float> currentPosesQualities;
 
-    poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane);
+    vector<Mat> initialSilhouettes;
+    vector<Mat> *initialSilhouettesPtr = debugInfo == 0 ? 0 : &initialSilhouettes;
+    poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
     std::cout << "done." << std::endl;
     std::cout << "detected poses: " << currentPoses.size() << std::endl;
+    if (debugInfo != 0)
+    {
+      std::copy(initialSilhouettes.begin(), initialSilhouettes.end(), std::back_inserter(debugInfo->initialSilhouettes));
+    }
     if (!currentPoses.empty())
     {
       poses_cam.push_back(currentPoses[0]);
@@ -167,10 +179,9 @@ cv::Mat TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &s
       detectedObjectNames.push_back(objectNames[i]);
     }
   }
-  return glassMask;
 }
 
-int TransparentDetector::getObjectIndex(const std::string &name) const
+int Detector::getTrainObjectIndex(const std::string &name) const
 {
   std::vector<std::string>::const_iterator it = std::find(objectNames.begin(), objectNames.end(), name);
   CV_Assert(it != objectNames.end());
@@ -178,7 +189,7 @@ int TransparentDetector::getObjectIndex(const std::string &name) const
   return std::distance(objectNames.begin(), it);
 }
 
-void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
 {
   CV_Assert(poses.size() == objectNames.size());
   if (image.size() != validTestImageSize)
@@ -188,13 +199,27 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 
   for (size_t i = 0; i < poses.size(); ++i)
   {
-    cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
-    int objectIndex = getObjectIndex(objectNames[i]);
+    //TODO: use randomization
+    cv::Scalar color(255, 0, 255);
+    switch (i)
+    {
+      case 0:
+        color = cv::Scalar(255, 0, 0);
+        break;
+      case 1:
+        color = cv::Scalar(0, 0, 255);
+        break;
+      case 2:
+        color = cv::Scalar(0, 255, 0);
+        break;
+    }
+
+    int objectIndex = getTrainObjectIndex(objectNames[i]);
     poseEstimators[objectIndex].visualize(poses[i], image, color);
   }
 }
 
-void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
 {
 #ifdef USE_3D_VISUALIZATION
   CV_Assert(poses.size() == objectNames.size());
@@ -218,7 +243,7 @@ void TransparentDetector::visualize(const std::vector<PoseRT> &poses, const std:
 #endif
 }
 
-bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
+bool Detector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
   const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
@@ -320,3 +345,5 @@ bool TransparentDetector::tmpComputeTableOrientation(const PinholeCamera &camera
 
   return true;
 }
+
+} //end of namespace transpod

@@ -1,7 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/legacy/legacy.hpp>
 
-#include "edges_pose_refiner/glassDetector.hpp"
+#include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/utils.hpp"
 
 using namespace cv;
@@ -13,9 +13,8 @@ using std::endl;
 //#define VISUALIZE_TABLE
 
 void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
-void showSegmentation(const Mat &image, const Mat &mask, const string &title = "glass segmentation");
 
-void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentationParams &params)
+void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params)
 {
 #ifdef VISUALIZE
   imshow("before grabcut", rawMask);
@@ -67,8 +66,13 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     grabCut(bgrImage(fullRoi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
     curMask.copyTo(refinedMask, curMask);
   }
+
+  Mat prFgd = (refinedMask == GC_PR_FGD);
+  Mat fgd = (refinedMask == GC_FGD);
+  refinedMask = prFgd | fgd;
 #ifdef VISUALIZE
-  showGrabCutResults(commonMask, "initMask");
+  showGrabCutResults(commonMask, "init mask");
+  imshow("final mask", refinedMask);
 #endif
 }
 
@@ -166,7 +170,7 @@ void readDepthImage(const string &filename, Mat &depthMat)
   fs.release();
 }
 
-GlassSegmentator::GlassSegmentator(const GlassSegmentationParams &_params)
+GlassSegmentator::GlassSegmentator(const GlassSegmentatorParams &_params)
 {
   params = _params;
 }
@@ -205,22 +209,9 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
 
 void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
 {
-//  Mat srcMask = depthMat == 0;
-  Mat srcMask = (depthMat != depthMat);
-  //TODO: fix
-//  Mat srcMask = (depthMat >= std::numeric_limits<float>::infinity());
-
-  //fill borders
+  Mat srcMask = getInvalidDepthMask(depthMat, registrationMask);
 #ifdef VISUALIZE
-  imshow("mask with registration", srcMask);
-#endif
-
-  CV_Assert(!registrationMask.empty());
-  CV_Assert(registrationMask.size() == depthMat.size());
-  CV_Assert(registrationMask.type() == CV_8UC1);
-  srcMask.setTo(0, registrationMask);
-#ifdef VISUALIZE
-  imshow("mask without registration", srcMask);
+  imshow("mask without registration errors", srcMask);
 #endif
 
   if (camera != 0 && tablePlane != 0 && tableHull != 0)
@@ -292,13 +283,15 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
     }
   }
 
+
   if (params.useGrabCut)
   {
     Mat refinedGlassMask;
     refineSegmentationByGrabCut(bgrImage, glassMask, refinedGlassMask, params);
-    Mat prFgd = (refinedGlassMask == GC_PR_FGD);
-    Mat fgd = (refinedGlassMask == GC_FGD);
-    glassMask = prFgd | fgd;
+//    Mat prFgd = (refinedGlassMask == GC_PR_FGD);
+//    Mat fgd = (refinedGlassMask == GC_FGD);
+//    glassMask = prFgd | fgd;
+    glassMask = refinedGlassMask;
   }
 
 #ifdef VISUALIZE

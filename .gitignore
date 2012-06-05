@@ -2,6 +2,7 @@
 *~
 *.png
 *.jpg
+*.swp
 build_*/
 data
 .settings

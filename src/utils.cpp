@@ -493,22 +493,22 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
   CV_Assert(!blackBlobsObject.empty() && !whiteBlobsObject.empty());
 }
 
-cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, int thickness)
+cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar &color, int thickness)
 {
+  CV_Assert(!image.empty() && !mask.empty());
   Mat drawImage = image.clone();
   CV_Assert(drawImage.channels() == 3);
 
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;
   findContours(glassMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-  drawContours(drawImage, contours, -1, Scalar(0, 255, 0), thickness);
+  drawContours(drawImage, contours, -1, color, thickness);
   return drawImage;
 }
 
-vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
+vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
-                          const string &title,
                           cv::Scalar color)
 {
   vector<Mat> drawImages(images.size());
@@ -531,22 +531,39 @@ vector<Mat> displayEdgels(const std::vector<cv::Mat> &images, const vector<Point
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
       circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
-
-#ifdef VISUALIZE_POSE_REFINEMENT
-    std::stringstream titleStream;
-    titleStream << title << " " << i;
-    imshow(titleStream.str(), drawImages[i]);
-#endif
   }
 
   return drawImages;
 }
 
-Mat displayEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
+Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return displayEdgels(images, edgels3d, pose_cam, allCameras, title, color)[0];
+  return drawEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
+}
+
+vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
+                       const PoseRT &pose_cam,
+                       const std::vector<PinholeCamera> &cameras,
+                       const string &title,
+                       cv::Scalar color)
+{
+  vector<Mat> drawImages = drawEdgels(images, edgels3d, pose_cam, cameras, color);
+  for (size_t i = 0; i < images.size(); ++i)
+  {
+    std::stringstream titleStream;
+    titleStream << title << " " << i;
+    imshow(titleStream.str(), drawImages[i]);
+  }
+  return drawImages;
+}
+
+Mat showEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, const string &title, cv::Scalar color)
+{
+  Mat drawImage = drawEdgels(image, edgels3d, pose_cam, camera, color);
+  imshow(title, drawImage);
+  return drawImage;
 }
 
 /*
@@ -581,7 +598,10 @@ void readPointCloud(const string &filename, std::vector<cv::Point3f> &pointCloud
   if(normals != 0)
     normals->clear();
   std::ifstream file(filename.c_str());
-  CV_Assert(file.is_open());
+  if (!file.is_open())
+  {
+    CV_Error(CV_StsBadArg, "Cannot open the file " + filename);
+  }
 
   const int extSz = 3;
   string ext = filename.substr(filename.size() - extSz, extSz);
@@ -723,14 +743,34 @@ void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& 
   }
 }
 
-void drawPoints(const std::vector<cv::Point2f> &points, cv::Mat &image, Scalar color, int thickness)
+void saveToCache(const std::string &name, const cv::Mat &mat)
 {
-  CV_Assert(!image.empty());
-  for (size_t i = 0; i < points.size(); ++i)
-  {
-    Point2f pt = points[i];
-    CV_Assert(isPointInside(image, pt));
-    circle(image, pt, 1, color, thickness);
-  }
+  FileStorage fs(name + ".xml", FileStorage::WRITE);
+  fs << name << mat;
+  fs.release();
 }
 
+cv::Mat getFromCache(const std::string &name)
+{
+  Mat result;
+  /*
+  FileStorage fs(name + ".xml", FileStorage::READ);
+  if (fs.isOpened())
+  {
+    fs[name] >> result;
+    fs.release();
+  }
+  */
+
+  return result;
+}
+
+cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registrationMask)
+{
+  Mat invalidDepthMask = (depthMat != depthMat);
+  CV_Assert(!registrationMask.empty());
+  CV_Assert(registrationMask.size() == depthMat.size());
+  CV_Assert(registrationMask.type() == CV_8UC1);
+  invalidDepthMask.setTo(0, registrationMask);
+  return invalidDepthMask;
+}

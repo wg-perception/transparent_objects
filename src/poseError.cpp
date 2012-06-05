@@ -104,8 +104,10 @@ void PoseError::computeStats(const vector<PoseError> &poses, double cmThreshold,
       ++goodPoseCount;
     }
   }
-  CV_Assert(goodPoseCount != 0);
-  meanError /= goodPoseCount;
+  if (goodPoseCount != 0)
+  {
+    meanError /= goodPoseCount;
+  }
   CV_Assert(poses.size() != 0);
   successRate = static_cast<float>(goodPoseCount) / poses.size();
 }
@@ -159,9 +161,11 @@ void PoseError::evaluateErrors(const std::vector<PoseError> &poseErrors, double 
     meanTvecError += translationDistance;
     ++termsCount;
   }
-  CV_Assert(termsCount != 0);
-  meanRvecError /= termsCount;
-  meanTvecError /= termsCount;
+  if (termsCount != 0)
+  {
+    meanRvecError /= termsCount;
+    meanTvecError /= termsCount;
+  }
 
 //  cout << "norm(mean rvec): " << norm(meanPose.rvec) << endl;
 //  cout << "norm(mean tvec): " << norm(meanPose.tvec) << endl;

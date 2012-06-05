@@ -94,7 +94,10 @@ struct EdgeModel
   /** \brief Empty constructor */
   EdgeModel();
 
+  //TODO: remove this constructor
   EdgeModel(const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &params = EdgeModelCreationParams());
+
+  EdgeModel(const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &params = EdgeModelCreationParams());
 
   /** \brief Create deep copy of the edgeModel object */
   EdgeModel(const EdgeModel &edgeModel);
@@ -111,7 +114,9 @@ struct EdgeModel
    * \param closingIterationsCount number of closing operations in morphology 
    */
   static void computeFootprint(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, cv::Mat &footprintPoints, float downFactor, int closingIterationsCount);
-  
+
+  void computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const;
+
   //TODO: remove imageSize from parameters
   /** \brief Compute a mask (that is a filled footprint) of a point set
    * \param points point set
@@ -175,7 +180,7 @@ struct EdgeModel
    *
    *  \param filename Name of the file to write the model
    */
-  void write(const std::string &filename);
+  void write(const std::string &filename) const;
 
   /** \brief Write a model to a file storage
    *
@@ -206,173 +211,6 @@ private:
   static void setStableEdgels(EdgeModel &edgeModel, float stableEdgelsRatio);
 };
 
-/** \brief Parameters of the edge model creating */
-struct EdgeModelCreatorParams
-{
-  /** \brief Threshold 1 for Canny edge detector */
-  double cannyThreshold1;
-
-  /** \brief Threshold 2 for Canny edge detector */
-  double cannyThreshold2;
-
-  /** \brief k in k-Nearest Neighbors graph
-   *
-   * tested for knn = 1 only
-   */
-  int knn;
-
-  /** \brief This parameter is similar to h from Minimum Covariance Determinant estimator.
-   *
-   * We use partsCount*neighborsRatio vertices to get estimate for centroid and scatter.
-   * Decrease this parameter if you want to include instable edges to the model.
-   */
-  float neighborsRatio;
-
-  /**
-   * This parameter is used in removing of close adjacent vertices after centroid computing.
-   * Decreasing of this parameter will cause more aggressive vertices removal and the created model will have less points
-   */
-  float inliersRatio;
-
-  /** \brief This parameter is similar to c-steps count from Fast Minimum Covariance Determinant estimator.
-   *
-   * Decreasing of this parameter accelerates the edge model creating but it also may decrease accuracy.
-   */
-  size_t cstepsCount;
-
-  /** \brief assumed outliers ratio in the created edge model
-   *
-   *  We are removing finalModelOutliersRatio*|EdgeModel.stableEdgels| of the latest added centroids because they are likely to be outliers
-   */
-  float finalModelOutliersRatio;
-
-  /** \brief Ratio of points to keep after the model downsampling */
-  float downsamplingRatio;
-
-  /** \brief Create the edge model or the model of the whole object */
-  bool useOnlyEdges;
-
-  EdgeModelCreatorParams()
-  {
-    cannyThreshold1 = 180;
-    cannyThreshold2 = 100;
-
-    knn = 1;
-    neighborsRatio = 0.5f;
-    inliersRatio = 0.33f;
-    cstepsCount = 5;
-    finalModelOutliersRatio = 0.1f;
-    downsamplingRatio = 0.1f;
-
-    useOnlyEdges = true;
-  }
-};
-
-/** \brief The creator of the 3D edge model
- *
- * This class is used to create the edge model which is used for further pose refinement
- */
-class EdgeModelCreator
-{
-public:
-  /** \brief The data for one view of the object */
-  struct TrainSample
-  {
-    /** \brief A grayscale image of the object */
-    cv::Mat image;
-
-    /** \brief A mask of the object
-     *
-     * It is an image in which background pixels are colored by black
-     */
-    cv::Mat mask;
-
-    /** \brief A rotation vector of the transformation which brings pointCloud to the common frame */
-    cv::Mat rvec;
-
-    /** \brief A translation vector of the transformation which brings pointCloud to the common frame */
-    cv::Mat tvec;
-
-    /** \brief Point cloud of the scene */
-    std::vector<cv::Point3f> pointCloud;
-
-    bool isValid() const;
-  };
-
-  /**
-   * \param cameraMatrix intrinsic parameters of the train camera matrix
-   * \param distCoeffs distortion coefficients of the train camera matrix
-   * \param visualize pass true if you want to see visualization
-   * \param params Parameters of the edge model creating
-   */
-  EdgeModelCreator(const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, bool visualize = false, const EdgeModelCreatorParams &params =
-      EdgeModelCreatorParams());
-
-  /** \brief Set parameters of the edge model creating
-   *
-   * \param params Parameters of the edge model creating
-   */
-  void setParams(const EdgeModelCreatorParams &params);
-
-  /** \brief Create the edge model
-   *
-   * \param trainSamples data associated with several views of the object
-   * \param edgeModel the created edge model
-   * \param computeOrientations use or not edgels orientation in the model
-   */
-  void createEdgeModel(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, bool computeOrientations =
-      false);
-
-  /** \brief Align the edge model with the train data
-   *
-   * \param trainSamples data associated with several views of the object
-   * \param edgeModel the aligned edge model
-   * \param numberOfICPs number of ICPs to align edge model with train point clouds
-   * \param numberOfIterationsInICP maximum number of iterations in each ICP
-   */
-  void alignModel(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, int numberOfICPs = 10, int numberOfIterationsInICP = 100);
-
-  /** \brief Reduce number of points in the model 
-   *  
-   *  \param edgeModel the edge model to downsample
-   *  \param ratio ratio between a new number of points in the model and the old number
-   */ 
-  void downsampleEdgeModel(EdgeModel &edgeModel, float ratio);
-  
-  /** \brief Get all point clouds corresponding to edges
-   * 
-   *  \param trainSamples data associated with several views of the object
-   *  \param edgePointClouds point clouds corresponding to edges for each train sample
-   */
-  void getEdgePointClouds(const std::vector<TrainSample> &trainSamples,
-                          std::vector<std::vector<cv::Point3f> > &edgePointClouds);
-
-  /** \brief Run k-partite matching on input point clouds
-   * 
-   *  \param pointClouds Registered input point clouds
-   *  \param matchedPointCloud Output point cloud after k-partite matching applied to pointClouds
-   */
-  void matchPointClouds(const std::vector<std::vector<cv::Point3f> > &pointClouds, std::vector<cv::Point3f> &matchedPointCloud);
-
-  /** \brief Compute stable edgels of the model
-   * 
-   *  \param trainSamples data associated with several views of the object
-   *  \param edgeModel Edge model for which stable edgels will be computed by using its points
-   *  \param dilationsIterations Number of iterations to dilate samples' masks
-   *  \param maxDistanceToEdge If distance between a projected point and the nearest edge is less then this param then the point is considered as edgel
-   *  \param minRepeatability If a point is considered as edgel in (minRepeatability * number of train samples) cases then it is stable edgel
-   */
-  void computeStableEdgels(const std::vector<TrainSample> &trainSamples, EdgeModel &edgeModel, int dilationsIterations = 3, float maxDistanceToEdge = 3.99f, float minRepeatability = 0.8f);
-
-  static void computeObjectSystem(const std::vector<cv::Point3f> &points, cv::Mat &Rt_obj2cam);
-private:
-  void computeModelEdgels(const std::vector<TrainSample> &trainSamples, std::vector<cv::Point3f> &edgels);
-  void downsamplePointCloud(const std::vector<cv::Point3f> &pointCloud, std::vector<cv::Point3f> &downampledPointCloud,
-                            std::vector<int> &srcIndices);
-
-  cv::Mat cameraMatrix, distCoeffs;
-  EdgeModelCreatorParams params;
-  bool visualize;
-};
+void computeObjectSystem(const std::vector<cv::Point3f> &points, cv::Mat &Rt_obj2cam);
 
 #endif /* EDGEMODEL_HPP_ */

@@ -12,28 +12,29 @@
 #include "pcl/point_types.h"
 #include <numeric>
 
-#include "TODBaseImporter.hpp"
+#include "edges_pose_refiner/TODBaseImporter.hpp"
 #include "edges_pose_refiner/poseError.hpp"
 #include <iomanip>
 #include "edges_pose_refiner/pclProcessing.hpp"
 #include <pcl/visualization/cloud_viewer.h>
 
-#include "edges_pose_refiner/transparentDetector.hpp"
+#include "edges_pose_refiner/detector.hpp"
 
 
 using namespace cv;
+using namespace transpod;
 using std::cout;
 using std::endl;
 using std::stringstream;
 
+//#define VISUALIZE_TEST_DATA
 //#define VISUALIZE_POSE_REFINEMENT
-//#define VISUALIZE_INITIAL_POSE_REFINEMENT
-//#define WRITE_RESULTS
+//#define WRITE_ERRORS
 //#define PROFILE
 //#define WRITE_GLASS_SEGMENTATION
 
 
-#ifdef VISUALIZE_POSE_REFINEMENT
+#if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <boost/thread/thread.hpp>
@@ -153,14 +154,13 @@ int main(int argc, char **argv)
   //const string modelFilename = "finalModels/" + objectName + ".xml";
   const string modelsPath = "/media/2Tb/transparentBases/trainedModels/";
 
-  const string trainFolder ="/media/2Tb/transparentBases/base_with_ground_truth/base/wh_" + testObjectName + "/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
 
 //  const string camerasListFilename = baseFolder + "/cameras.txt";
   const string kinectCameraFilename = baseFolder + "/center.yml";
 //  const string visualizationPath = "visualized_results/";
   const string errorsVisualizationPath = "/home/ilysenkov/errors/";
-  //const vector<string> objectNames = {"bank", "bucket"};
+//  const vector<string> objectNames = {"bank", "bucket"};
 //  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
 
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 
 
 
-  TODBaseImporter dataImporter(trainFolder, testFolder);
+  TODBaseImporter dataImporter(testFolder);
 
   PinholeCamera kinectCamera;
   if(!kinectCameraFilename.empty())
@@ -185,20 +185,33 @@ int main(int argc, char **argv)
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
 
+
 //#ifdef VISUALIZE_POSE_REFINEMENT
 //  edgeModels[0].visualize();
 //#endif
 
-  TransparentDetectorParams params;
-  params.glassSegmentationParams.closingIterations = 8;
-  params.glassSegmentationParams.openingIterations = 15;
-  params.glassSegmentationParams.finalClosingIterations = 8;
+  DetectorParams params;
+//  params.glassSegmentationParams.closingIterations = 8;
+// bucket
+//  params.glassSegmentationParams.openingIterations = 8;
+  //fixedOnTable
+  //params.glassSegmentationParams.finalClosingIterations = 8;
 
-//  TransparentDetector detector(kinectCamera, params);
-  TransparentDetector detector(kinectCamera);
+  //good clutter
+  params.glassSegmentationParams.openingIterations = 15;
+  params.glassSegmentationParams.closingIterations = 12;
+  params.glassSegmentationParams.finalClosingIterations = 32;
+  params.glassSegmentationParams.grabCutErosionsIterations = 4;
+
+  //clutter
+  //bucket
+  //params.glassSegmentationParams.finalClosingIterations = 12;
+
+  Detector detector(kinectCamera, params);
+//  TransparentDetector detector(kinectCamera);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
-    detector.addModel(objectNames[i], edgeModels[i]);
+    detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
 
   vector<int> testIndices;
@@ -212,10 +225,17 @@ int main(int argc, char **argv)
   int segmentationFailuresCount = 0;
   int badSegmentationCount = 0;
 
+  vector<float> allChamferDistances;
+  vector<size_t> geometricHashingPoseCount;
   vector<int> indicesOfRecognizedObjects;
+  vector<double> allRecognitionTimes;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
-#ifdef VISUALIZE_POSE_REFINEMENT
+    srand(42);
+    RNG &rng = theRNG();
+    rng.state = 0xffffffff;
+
+#if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("transparent experiments"));
 #endif
     int testImageIdx = testIndices[ testIdx ];
@@ -252,7 +272,13 @@ int main(int argc, char **argv)
     pcl::PointCloud<pcl::PointXYZ> testPointCloud;
     dataImporter.importPointCloud(testImageIdx, testPointCloud);
 
+#ifdef VISUALIZE_TEST_DATA
+    imshow("rgb", kinectBgrImage);
+    imshow("depth", kinectDepth * 20);
+#endif
+
 #ifdef VISUALIZE_POSE_REFINEMENT
+#ifdef USE_3D_VISUALIZATION
     {
       vector<Point3f> cvTestPointCloud;
       pcl2cv(testPointCloud, cvTestPointCloud);
@@ -260,20 +286,24 @@ int main(int argc, char **argv)
       publishPoints(cvTestPointCloud, viewer, Scalar(0, 255, 0), "test point cloud");
     }
 
+    publishPoints(edgeModels[0].points, viewer, Scalar(0, 0, 255), "ground object", model2test_ground);
+#endif
+
     if(!kinectCameraFilename.empty())
     {
 //      displayEdgels(glassMask, edgeModels[0].points, model2test_ground, kinectCamera, "kinect");
-      displayEdgels(kinectBgrImage, edgeModels[0].points, model2test_ground, kinectCamera, "ground truth");
-      displayEdgels(kinectBgrImage, edgeModels[0].stableEdgels, model2test_ground, kinectCamera, "ground truth surface");
+      showEdgels(kinectBgrImage, edgeModels[0].points, model2test_ground, kinectCamera, "ground truth");
+      showEdgels(kinectBgrImage, edgeModels[0].stableEdgels, model2test_ground, kinectCamera, "ground truth surface");
     }
-    publishPoints(edgeModels[0].points, viewer, Scalar(0, 0, 255), "ground object", model2test_ground);
     namedWindow("ground truth");
+#ifdef USE_3D_VISUALIZATION
     while (!viewer->wasStopped ())
     {
       viewer->spinOnce (100);
       boost::this_thread::sleep (boost::posix_time::microseconds (100000));
     }
     viewer->resetStoppedFlag();
+#endif
     waitKey();
     destroyWindow("ground truth");
 #endif
@@ -285,21 +315,70 @@ int main(int argc, char **argv)
     TickMeter recognitionTime;
     recognitionTime.start();
 
-    Mat glassMask;
+    Detector::DebugInfo debugInfo;
     try
     {
-      glassMask = detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames);
+      detector.detect(kinectBgrImage, kinectDepth, registrationMask, testPointCloud, poses_cam, posesQualities, detectedObjectsNames, &debugInfo);
     }
     catch(const cv::Exception &)
     {
     }
+    recognitionTime.stop();
+#ifdef VISUALIZE_POSE_REFINEMENT
+    Mat glassMask = debugInfo.glassMask;
+    imshow("glassMask", glassMask);
+    showSegmentation(kinectBgrImage, glassMask, "segmentation");
+
+    Mat detectionResults = kinectBgrImage.clone();
+    detector.visualize(poses_cam, detectedObjectsNames, detectionResults);
+    imshow("detection", detectionResults);
+    waitKey();
+#endif
+
+
+    if (edgeModels.size() == 1)
+    {
+      vector<Point2f> groundEdgels;
+      kinectCamera.projectPoints(edgeModels[0].points, model2test_ground, groundEdgels);
+
+      vector<float> chamferDistances;
+      for (size_t silhouetteIndex = 0; silhouetteIndex < debugInfo.initialSilhouettes.size(); ++silhouetteIndex)
+      {
+        vector<Point2f> silhouette = debugInfo.initialSilhouettes[silhouetteIndex];
+
+        double silhoutteDistance = 0.0;
+        for (int i = 0; i < silhouette.size(); ++i)
+        {
+          float minDist = std::numeric_limits<float>::max();
+          for (int j = 0; j < groundEdgels.size(); ++j)
+          {
+            float currentDist = norm(silhouette[i] - groundEdgels[j]);
+            if (currentDist < minDist)
+            {
+              minDist = currentDist;
+            }
+          }
+          silhoutteDistance += minDist;
+        }
+        silhoutteDistance /= silhouette.size();
+        chamferDistances.push_back(silhoutteDistance);
+      }
+      std::sort(chamferDistances.begin(), chamferDistances.end());
+      if (chamferDistances.empty())
+      {
+        chamferDistances.push_back(std::numeric_limits<float>::max());
+      }
+      cout << "Best geometric hashing pose (px): " << chamferDistances[0] << endl;
+      cout << "Number of initial poses: " << chamferDistances.size() << endl;
+      allChamferDistances.push_back(chamferDistances[0]);
+      geometricHashingPoseCount.push_back(chamferDistances.size());
+    }
+
     if (poses_cam.size() == 0)
     {
       ++segmentationFailuresCount;
       continue;
     }
-
-    recognitionTime.stop();
 
     cout << poses_cam.size() << endl;
 
@@ -307,12 +386,13 @@ int main(int argc, char **argv)
     {
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
       int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
-      int detectedObjectIndex = detector.getObjectIndex(detectedObjectsNames[bestDetectionIndex]);
+      int detectedObjectIndex = detector.getTrainObjectIndex(detectedObjectsNames[bestDetectionIndex]);
       indicesOfRecognizedObjects.push_back(detectedObjectIndex);
       cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
     }
 
     cout << "Recognition time: " << recognitionTime.getTimeSec() << "s" << endl;
+    allRecognitionTimes.push_back(recognitionTime.getTimeSec());
 
     if (objectNames.size() == 1)
     {
@@ -330,20 +410,21 @@ int main(int argc, char **argv)
         namedWindow("pose is ready");
         waitKey();
         destroyWindow("pose is ready");
-#endif
-
-  #ifdef VISUALIZE_POSE_REFINEMENT
 //        displayEdgels(glassMask, edgeModels[objectIndex].points, initPoses_cam[objectIndex][i], kinectCamera, "initial");
+#ifdef USE_3D_VISUALIZATION
         publishPoints(edgeModels[objectIndex].points, viewer, Scalar(255, 0, 0), "final object", poses_cam[i]);
-        displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[i], kinectCamera, "final");
-        displayEdgels(kinectBgrImage, edgeModels[objectIndex].stableEdgels, poses_cam[i], kinectCamera, "final surface");
+#endif
+        showEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[i], kinectCamera, "final");
+        showEdgels(kinectBgrImage, edgeModels[objectIndex].stableEdgels, poses_cam[i], kinectCamera, "final surface");
         namedWindow("initial pose");
 
+#ifdef USE_3D_VISUALIZATION
         while (!viewer->wasStopped ())
         {
           viewer->spinOnce (100);
           boost::this_thread::sleep (boost::posix_time::microseconds (100000));
         }
+#endif
         waitKey();
         destroyWindow("initial pose");
   #endif
@@ -353,16 +434,18 @@ int main(int argc, char **argv)
       cout << "Best pose: " << currentPoseErrors[bestPoseIdx] << endl;
       bestPoses.push_back(currentPoseErrors[bestPoseIdx]);
 
-#ifdef WRITE_RESULTS
+#ifdef WRITE_ERRORS
       const float maxTrans = 0.02;
       if (currentPoseErrors[bestPoseIdx].getTranslationDifference() > maxTrans)
       {
+        Mat glassMask = debugInfo.glassMask;
         std::stringstream str;
         str << testImageIdx;
         Mat segmentation = drawSegmentation(kinectBgrImage, glassMask);
         imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_mask.png", segmentation);
 
-        Mat poseImage = displayEdgels(kinectBgrImage, edgeModels[objectIndex].points, poses_cam[bestPoseIdx], kinectCamera, "final");
+        Mat poseImage = kinectBgrImage.clone();
+        detector.visualize(poses_cam, detectedObjectsNames, poseImage);
         imwrite(errorsVisualizationPath + "/" + objectNames[0] + "_" + str.str() + "_pose.png", poseImage);
 
         const float depthNormalizationFactor = 100;
@@ -402,8 +485,40 @@ int main(int argc, char **argv)
     cout << "mean initial pose count: " << meanInitialPoseCount << endl;
 
     const double cmThreshold = 2.0;
+
+//    const double cmThreshold = 5.0;
     PoseError::evaluateErrors(bestPoses, cmThreshold);
   }
+
+  cout << "Evaluation of geometric hashing" << endl;
+  std::sort(allChamferDistances.begin(), allChamferDistances.end());
+  const float successfulChamferDistance = 5.0f;
+  int ghSuccessCount = 0;
+  double meanChamferDistance = 0.0;
+  for (size_t i = 0; i < allChamferDistances.size(); ++i)
+  {
+    cout << i << "\t: " << allChamferDistances[i] << endl;
+    if (allChamferDistances[i] < successfulChamferDistance)
+    {
+      ++ghSuccessCount;
+      meanChamferDistance += allChamferDistances[i];
+    }
+  }
+  if (ghSuccessCount != 0)
+  {
+    meanChamferDistance /= ghSuccessCount;
+  }
+  int posesSum = std::accumulate(geometricHashingPoseCount.begin(), geometricHashingPoseCount.end(), 0);
+  float meanInitialPoseCount = static_cast<float>(posesSum) / initialPoseCount.size();
+  cout << "Mean number of initial poses: " << meanInitialPoseCount << endl;
+
+  float ghSuccessRate = static_cast<float>(ghSuccessCount) / allChamferDistances.size();
+  cout << "Success rate: " << ghSuccessRate << endl;
+  cout << "Mean chamfer distance (px): " << meanChamferDistance << endl;
+
+  double timesSum = std::accumulate(allRecognitionTimes.begin(), allRecognitionTimes.end(), 0.0);
+  double meanRecognitionTime = timesSum / allRecognitionTimes.size();
+  cout << "Mean recognition time (s): " << meanRecognitionTime << endl;
 
   std::system("date");
   return 0;

@@ -16,7 +16,7 @@ using std::endl;
 
 //#define VISUALIZE_TRANSFORMS
 
-Mat affine2homography(const cv::Mat &transformationMatrix)
+cv::Mat affine2homography(const cv::Mat &transformationMatrix)
 {
   const Size affineTransformationSize(3, 2);
   const Size homographyTransformationSize(3, 3);
@@ -29,25 +29,154 @@ Mat affine2homography(const cv::Mat &transformationMatrix)
   return homography;
 }
 
-void composeAffineTransformations(const Mat &transformation1, const Mat &transformation2, Mat &composedTransformation)
+cv::Mat homography2affine(const cv::Mat &homography)
 {
-  CV_Assert(transformation1.type() == transformation2.type());
+  return homography.rowRange(0, 2).clone();
+}
 
-  Mat homography1 = affine2homography(transformation1);
-  Mat homography2 = affine2homography(transformation2);
-  Mat composedHomography = homography2 * homography1;
+void composeAffineTransformations(const Mat &firstTransformation, const Mat &secondTransformation, Mat &composedTransformation)
+{
+  CV_Assert(firstTransformation.type() == secondTransformation.type());
 
-  composedTransformation = composedHomography.rowRange(0, 2).clone();
+  Mat firstHomography = affine2homography(firstTransformation);
+  Mat secondHomography = affine2homography(secondTransformation);
+  Mat composedHomography = secondHomography * firstHomography;
+
+  composedTransformation = homography2affine(composedHomography);
 }
 
 Silhouette::Silhouette()
 {
 }
 
+void findSimilarityTransformation(const cv::Point2f &pt1, const cv::Point2f &pt2, cv::Mat &similarityTransformation)
+{
+//  cout << pt1 << " " << pt2 << endl;
+  Point2f diff = pt2 - pt1;
+  float distance = norm(diff);
+  const float eps = 1e-4;
+  CV_Assert(distance > eps);
+  float cosAngle = diff.x / distance;
+  float sinAngle = diff.y / distance;
+
+  float cosRotationAngle = cosAngle;
+  float sinRotationAngle = -sinAngle;
+  Mat rotationMatrix = (Mat_<float>(2, 3) << cosRotationAngle, -sinRotationAngle, 0.0,
+                                             sinRotationAngle, cosRotationAngle, 0.0);
+
+  Point2f translation = -0.5 * (pt1 + pt2);
+  Mat translationMatrix = (Mat_<float>(2, 3) << 1.0, 0.0, translation.x,
+                                                0.0, 1.0, translation.y);
+  Mat euclideanMatrix;
+  composeAffineTransformations(translationMatrix, rotationMatrix, euclideanMatrix);
+
+  float scale = 1.0 / distance;
+  similarityTransformation = scale * euclideanMatrix;
+}
+
+void Silhouette::generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels)
+{
+  CV_Assert(firstIndex != secondIndex);
+  CV_Assert(downsampledEdgels.type() == CV_32FC2);
+
+  vector<Point2f> edgelsVec = downsampledEdgels;
+  CV_Assert(0 <= firstIndex && firstIndex < edgelsVec.size());
+  CV_Assert(0 <= secondIndex && secondIndex < edgelsVec.size());
+
+  Mat similarityTransformation;
+  ::findSimilarityTransformation(edgelsVec[firstIndex], edgelsVec[secondIndex], similarityTransformation);
+
+  transform(downsampledEdgels, transformedEdgels, similarityTransformation);
+
+  const Vec2f firstPoint(-0.5f, 0.0f);
+  const Vec2f secondPoint(0.5f, 0.0f);
+  const float eps = 1e-4;
+  CV_Assert(norm(transformedEdgels.at<Vec2f>(firstIndex) - firstPoint) < eps);
+  CV_Assert(norm(transformedEdgels.at<Vec2f>(secondIndex) - secondPoint) < eps);
+
+//  Mat xChannel = transformedEdgels.reshape(1).col(0);
+//  Mat yChannel = transformedEdgels.reshape(1).col(1);
+//  double min_x, min_y, max_x, max_y;
+//  minMaxLoc(xChannel, &min_x, &max_x);
+//  minMaxLoc(yChannel, &min_y, &max_y);
+//  cout << min_x << " " << min_y << " " << max_x << " " << max_y << endl;
+
+/*
+  float granularity = 10.0;
+  for (int i = 0; i < transformedEdgels.size(); ++i)
+  {
+    Point pt = transformedEdgels[i] * granularity;
+  }
+*/
+}
+
+void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, cv::Mat &canonicScale, float granularity, int hashBasisStep, float minDistanceBetweenPoints)
+{
+  vector<Point2f> edgelsVec = edgels;
+  vector<Point2f> downsampledEdgelsVec;
+  for (int i = 0; i < edgels.rows; i += hashBasisStep)
+  {
+    downsampledEdgelsVec.push_back(edgelsVec[i]);
+  }
+  downsampledEdgels = Mat(downsampledEdgelsVec).clone();
+
+  canonicScale.create(downsampledEdgels.rows, downsampledEdgels.rows, CV_32FC1);
+  for (int i = 0; i < downsampledEdgels.rows; ++i)
+  {
+    for (int j = i; j < downsampledEdgels.rows; ++j)
+    {
+      float dist = norm(downsampledEdgelsVec[i] - downsampledEdgelsVec[j]);
+      float invDist = 1.0f;
+      if (dist > minDistanceBetweenPoints)
+      {
+        invDist = 1.0f / dist;
+      }
+
+      canonicScale.at<float>(i, j) = invDist;
+      canonicScale.at<float>(j, i) = invDist;
+    }
+  }
+
+  for (int firstIndex = 0; firstIndex < downsampledEdgels.rows; ++firstIndex)
+  {
+    //TODO: use symmetry (i, j) and (j, i)
+    for (int secondIndex = 0; secondIndex < downsampledEdgels.rows; ++secondIndex)
+    {
+      float dist = norm(downsampledEdgelsVec[firstIndex] - downsampledEdgelsVec[secondIndex]);
+      if (dist < minDistanceBetweenPoints)
+      {
+        continue;
+      }
+
+      GHValue basisIndices(silhouetteIndex, firstIndex, secondIndex);
+      Mat transformedEdgels;
+      generateHashForBasis(firstIndex, secondIndex, transformedEdgels);
+      vector<Point2f> transformedEdgelsVec = transformedEdgels;
+      for (int i = 0; i < transformedEdgelsVec.size(); ++i)
+      {
+        if (i == firstIndex || i == secondIndex)
+        {
+          continue;
+        }
+        float invertedGranularity = 1.0 / granularity;
+        Point pt = transformedEdgelsVec[i] * invertedGranularity;
+//        cout << pt << endl;
+        GHKey ptPair(pt.x, pt.y);
+        std::pair<GHKey, GHValue> value(ptPair, basisIndices);
+        hashTable.insert(value);
+      }
+    }
+  }
+}
+
 void Silhouette::init(const cv::Mat &_edgels, const PoseRT &_initialPose_cam)
 {
   edgels = _edgels;
   initialPose_cam = _initialPose_cam;
+
+  CV_Assert(edgels.channels() == 2);
+  Scalar center = mean(edgels);
+  silhouetteCenter = Point2f(center[0], center[1]);
 
   getNormalizationTransform(edgels, silhouette2normalized);
 }
@@ -57,9 +186,26 @@ void Silhouette::getEdgels(cv::Mat &_edgels) const
   _edgels = edgels;
 }
 
+void Silhouette::getDownsampledEdgels(cv::Mat &_edgels) const
+{
+  _edgels = downsampledEdgels;
+}
+
 void Silhouette::getInitialPose(PoseRT &pose_cam) const
 {
   pose_cam = initialPose_cam;
+}
+
+int Silhouette::size() const
+{
+  CV_Assert(!edgels.empty());
+  return edgels.rows;
+}
+
+int Silhouette::getDownsampledSize() const
+{
+  CV_Assert(!downsampledEdgels.empty());
+  return downsampledEdgels.rows;
 }
 
 void Silhouette::clear()
@@ -68,12 +214,21 @@ void Silhouette::clear()
   silhouette2normalized = Mat();
 }
 
+//TODO: undistort and scale the image
 void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &camera, const cv::Mat &affineTransformation, bool useClosedFormPnP, PoseRT &pose_cam) const
 {
   PoseRT poseWithExtrinsics_cam;
   if (useClosedFormPnP)
   {
     Mat homography = affine2homography(affineTransformation);
+    CV_Assert(camera.cameraMatrix.type() == CV_64FC1);
+    if (homography.type() != CV_64FC1)
+    {
+      Mat homographyDouble;
+      homography.convertTo(homographyDouble, CV_64FC1);
+      homography = homographyDouble;
+    }
+
     //TODO: which inversion method is better?
     Mat fullTransform = camera.cameraMatrix.inv() * homography * camera.cameraMatrix;
     const int dim = 3;
@@ -106,31 +261,36 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
     PoseRT pose2d_cam(R, tvecMat);
 
     poseWithExtrinsics_cam = pose2d_cam * initialPose_cam;
-  //  pose_cam = camera.extrinsics.inv() * pose2d_cam * initialPose_cam;
+    pose_cam = camera.extrinsics.inv() * pose2d_cam * initialPose_cam;
   }
+  else
+  {
+    vector<Point2f> projectedObjectPoints;
+    camera.projectPoints(edgeModel.points, initialPose_cam, projectedObjectPoints);
 
-  vector<Point2f> projectedObjectPoints;
-  camera.projectPoints(edgeModel.points, initialPose_cam, projectedObjectPoints);
+    Mat transformedObjectPoints;
+    transform(Mat(projectedObjectPoints), transformedObjectPoints, affineTransformation);
 
-  Mat transformedObjectPoints;
-  transform(Mat(projectedObjectPoints), transformedObjectPoints, affineTransformation);
+    solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec, useClosedFormPnP);
+    pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
+  }
+}
 
-  solvePnP(Mat(edgeModel.points), transformedObjectPoints, camera.cameraMatrix, camera.distCoeffs, poseWithExtrinsics_cam.rvec, poseWithExtrinsics_cam.tvec, useClosedFormPnP);
-  pose_cam = camera.extrinsics.inv() * poseWithExtrinsics_cam;
+void Silhouette::visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color) const
+{
+  Mat transformedEdgels;
+  transform(edgels, transformedEdgels, similarityTransformation);
+  vector<Point2f> transformedEdgelsVec = transformedEdgels;
+  drawPoints(transformedEdgelsVec, image, color);
 }
 
 void Silhouette::draw(cv::Mat &image, int thickness) const
 {
-  CV_Assert(image.type() == CV_8UC1);
+//  CV_Assert(image.type() == CV_8UC1);
   vector<Point2f> edgelsVec = edgels;
-  for (size_t i = 0; i < edgelsVec.size(); ++i)
-  {
-    Point pt = edgelsVec[i];
-    CV_Assert(isPointInside(image, pt));
-
-    circle(image, pt, 1, Scalar(255), thickness);
-  }
+  drawPoints(edgelsVec, image, Scalar::all(255), thickness);
 }
+
 
 void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform)
 {
@@ -325,4 +485,17 @@ void Silhouette::write(cv::FileStorage &fs) const
   fs << "silhouette2normalized" << silhouette2normalized;
 
   initialPose_cam.write(fs);
+}
+
+
+void Silhouette::camera2object(const cv::Mat &similarityTransformation_cam, cv::Mat &similarityTransformation_obj) const
+{
+  Mat similarity_cam = affine2homography(similarityTransformation_cam);
+  Mat cam2obj = Mat::eye(3, 3, similarityTransformation_cam.type());
+  CV_Assert(similarityTransformation_cam.type() == CV_32FC1);
+  cam2obj.at<float>(0, 2) = -silhouetteCenter.x;
+  cam2obj.at<float>(1, 2) = -silhouetteCenter.y;
+
+  Mat similarity_obj = cam2obj * similarity_cam * cam2obj.inv();
+  similarityTransformation_obj = homography2affine(similarity_obj);
 }
