@@ -74,6 +74,12 @@ namespace transparent_objects
     int
     process(const tendrils& inputs, const tendrils& outputs)
     {
+      if (*visualize_)
+      {
+          cv::imshow("rgb", *color_);
+          cv::imshow("depth", *depth_ * 100);
+          cv::waitKey(300);
+      }
       std::cout << "detector: process" << std::endl;
 #ifdef TRANSPARENT_DEBUG
       cv::FileStorage fs("input.xml", cv::FileStorage::READ);
@@ -110,9 +116,10 @@ namespace transparent_objects
       std::vector<std::string> detectedObjects;
 
       cv::Mat registrationMask = cv::imread(*registrationMaskFilename_, CV_LOAD_IMAGE_GRAYSCALE);
+      cv::Mat glassMask;
       try
       {
-        detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
+        glassMask = detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
       }
       catch(const cv::Exception &)
       {
@@ -122,6 +129,7 @@ namespace transparent_objects
       {
         cv::Mat visualization = color_->clone();
         detector_->visualize(poses, detectedObjects, visualization);
+        imshow("glass mask", glassMask);
         imshow("detection", visualization);
         cv::waitKey(300);
 #ifdef USE_3D_VISUALIZATION
