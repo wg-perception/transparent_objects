@@ -3,7 +3,7 @@
 Module defining the transparent objects trainer
 """
 
-#from object_recognition_core.db.dbtools import db_params_to_db
+from object_recognition_core.db.tools import db_params_to_db
 from object_recognition_core.db import Models, Document, Documents
 from object_recognition_core.db.models import Model, find_model_for_object
 from object_recognition_core.pipelines.training import TrainingPipeline
