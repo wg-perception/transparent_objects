@@ -95,6 +95,13 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
     registrationMask = srcRegistrationMask;
   }
 
+  if (bgrImage.size() != validTestImageSize)
+  {
+    std::stringstream error;
+    error << "RGB resolution is " << bgrImage.cols << "x" << bgrImage.rows;
+    error << ", but valid resolution is " << validTestImageSize.width << "x" << validTestImageSize.height;
+    CV_Error(CV_StsBadArg, error.str());
+  }
   CV_Assert(bgrImage.size() == validTestImageSize);
   CV_Assert(depth.size() == validTestImageSize);
   CV_Assert(registrationMask.size() == validTestImageSize);

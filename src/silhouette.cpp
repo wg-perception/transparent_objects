@@ -475,6 +475,12 @@ void Silhouette::read(const cv::FileNode &fn)
 {
   fn["edgels"] >> edgels;
   fn["silhouette2normalized"] >> silhouette2normalized;
+  fn["downsampledEdgels"] >> downsampledEdgels;
+
+  Mat silhouetteCenterMat;
+  fn["silhouetteCenter"] >> silhouetteCenterMat;
+  CV_Assert(!silhouetteCenterMat.empty());
+  silhouetteCenter = Point2f(silhouetteCenterMat);
 
   initialPose_cam.read(fn);
 }
@@ -483,6 +489,8 @@ void Silhouette::write(cv::FileStorage &fs) const
 {
   fs << "edgels" << edgels;
   fs << "silhouette2normalized" << silhouette2normalized;
+  fs << "downsampledEdgels" << downsampledEdgels;
+  fs << "silhouetteCenter" << Mat(silhouetteCenter);
 
   initialPose_cam.write(fs);
 }

@@ -116,9 +116,10 @@ namespace transparent_objects
       std::vector<std::string> detectedObjects;
 
       cv::Mat registrationMask = cv::imread(*registrationMaskFilename_, CV_LOAD_IMAGE_GRAYSCALE);
+      transpod::Detector::DebugInfo debugInfo;
       try
       {
-        detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects);
+        detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects, &debugInfo);
       }
       catch(const cv::Exception &)
       {
@@ -126,9 +127,9 @@ namespace transparent_objects
 
       if (*visualize_)
       {
+        imshow("glass mask", debugInfo.glassMask);
         cv::Mat visualization = color_->clone();
         detector_->visualize(poses, detectedObjects, visualization);
-        //imshow("glass mask", glassMask);
         imshow("detection", visualization);
         cv::waitKey(300);
 #ifdef USE_3D_VISUALIZATION

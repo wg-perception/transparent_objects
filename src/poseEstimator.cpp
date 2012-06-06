@@ -1061,14 +1061,46 @@ namespace transpod
     edgeModel.read(fn);
 
     silhouettes.clear();
-    cv::FileNode silhouettesFN = fn["silhouettes"];
-    cv::FileNodeIterator it = silhouettesFN.begin(), it_end = silhouettesFN.end();
-    for ( ; it != it_end; ++it)
+    const cv::FileNode silhouettesFN = fn["silhouettes"];
+    for (cv::FileNodeIterator it = silhouettesFN.begin(); it != silhouettesFN.end(); ++it)
     {
       Silhouette currentSilhouette;
       currentSilhouette.read(*it);
       silhouettes.push_back(currentSilhouette);
     }
+
+    canonicScales.clear();
+    const cv::FileNode canonicScalesFN = fn["canonicScales"];
+    for (cv::FileNodeIterator it = canonicScalesFN.begin(); it != canonicScalesFN.end(); ++it)
+    {
+      Mat currentScale;
+      (*it) >> currentScale;
+      canonicScales.push_back(currentScale);
+    }
+
+    votes.clear();
+    const cv::FileNode votesFN = fn["votes"];
+    for (cv::FileNodeIterator it = votesFN.begin(); it != votesFN.end(); ++it)
+    {
+      Mat currentVote;
+      (*it) >> currentVote;
+      votes.push_back(currentVote);
+    }
+
+    ghTable.clear();
+    cout << "Starting to read the hash table...   " << std::flush;
+    Mat hashTable;
+    fn["hash_table"] >> hashTable;
+    cout << hashTable.rows << " elements to read... ";
+    for (int elementIndex = 0; elementIndex < hashTable.rows; ++elementIndex)
+    {
+      Mat row = hashTable.row(elementIndex);
+      std::pair<GHKey, GHValue> tableElement(std::make_pair(row.at<int>(0), row.at<int>(1)),
+                                             GHValue(row.at<int>(2), row.at<int>(3), row.at<int>(4)));
+      ghTable.insert(tableElement);
+    }
+
+    cout << " Done" << endl;
   }
 
   void PoseEstimator::write(const std::string &filename) const
@@ -1092,6 +1124,34 @@ namespace transpod
       fs << "}";
     }
     fs << "]";
+
+    fs << "canonicScales" << "[";
+    for (size_t i = 0; i < canonicScales.size(); ++i)
+    {
+      fs << canonicScales[i];
+    }
+    fs << "]";
+
+    fs << "votes" << "[";
+    for (size_t i = 0; i < votes.size(); ++i)
+    {
+      fs << votes[i];
+    }
+    fs << "]";
+
+    Mat hash_table(ghTable.size(), GH_KEY_DIMENSION + GHValue::channels, CV_32SC1);
+    CV_Assert(GHValue::depth == CV_32S);
+    int elementIndex = 0;
+    for (GHTable::iterator it = ghTable.begin(); it != ghTable.end(); ++it, ++elementIndex)
+    {
+      hash_table.at<int>(elementIndex, 0) = it->first.first;
+      hash_table.at<int>(elementIndex, 1) = it->first.second;
+      for (int ch = 0; ch < it->second.channels; ++ch)
+      {
+        hash_table.at<int>(elementIndex, GH_KEY_DIMENSION + ch) = it->second[ch];
+      }
+    }
+    fs << "hash_table" << hash_table;
   }
 
   void PoseEstimatorParams::read(const FileNode &fileNode)

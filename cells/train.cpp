@@ -100,7 +100,7 @@ namespace transparent_objects
       //TODO: use the ply reader from PCL when a new version will be available in ROS
       readPointCloud(file_name, points, colors, normals);
 
-      EdgeModel edgeModel(points, false, false);
+      EdgeModel edgeModel(points, std::vector<cv::Point3f>(), false, false);
       assert(!poseEstimator_->empty());
       (*poseEstimator_)->setModel(edgeModel);
       std::cout << "done." << std::endl;

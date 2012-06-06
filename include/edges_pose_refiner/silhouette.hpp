@@ -18,6 +18,7 @@
 class EdgeModel;
 
 typedef std::pair<int, int> GHKey;
+const int GH_KEY_DIMENSION = 2;
 typedef cv::Vec3i GHValue;
 //TODO: experiment with different structures: unordered map, distance transform, FLANN
 //typedef std::multimap<GHKey, GHValue> GHTable;

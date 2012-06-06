@@ -15,7 +15,15 @@ using std::endl;
 
 PinholeCamera::PinholeCamera(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const PoseRT &_extrinsics, const cv::Size &_imageSize)
 {
-  cameraMatrix = _cameraMatrix;
+  if (_cameraMatrix.type() == CV_64FC1)
+  {
+    cameraMatrix = _cameraMatrix;
+  }
+  else
+  {
+    _cameraMatrix.convertTo(cameraMatrix, CV_64FC1);
+  }
+
   if (_distCoeffs.empty())
   {
     const int distCoeffsCount = 5;
