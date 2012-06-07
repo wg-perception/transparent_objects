@@ -175,7 +175,6 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
   cout << "inliers: " << inliers->indices.size () << endl;
 
   const int coeffsCount = 4;
-  //TODO: move up
   Point3f tableNormal(coefficients->values[0],
                       coefficients->values[1],
                       coefficients->values[2]);

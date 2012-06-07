@@ -30,31 +30,34 @@ namespace transpod
      */
     float clusterTolerance;
 
+    /** \brief vertical direction of a scene
+     *
+     * It is used to turn a normal of a segmented table to a camera
+     */
+    cv::Point3f verticalDirection;
+
     PlaneSegmentationParams()
     {
       downLeafSize = 0.002f;
       kSearch = 10;
       distanceThreshold = 0.02f;
       clusterTolerance = 0.05f;
+      verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f);
     }
   };
 
   struct DetectorParams
   {
-
     /** \brief parameters to segment a plane in a test scene */
     PlaneSegmentationParams planeSegmentationParams;
 
     /** \brief parameters to segment glass */
     GlassSegmentatorParams glassSegmentationParams;
 
-    cv::Point3f verticalDirection;
-
     DetectorParams()
     {
       planeSegmentationParams = PlaneSegmentationParams();
       glassSegmentationParams = GlassSegmentatorParams();
-      verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f);
     }
   };
 

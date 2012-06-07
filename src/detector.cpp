@@ -111,7 +111,9 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
-  bool isEstimated = computeTableOrientation(params.planeSegmentationParams.downLeafSize, params.planeSegmentationParams.kSearch, params.planeSegmentationParams.distanceThreshold, sceneCloud, tablePlane, &tableHull, params.planeSegmentationParams.clusterTolerance, params.verticalDirection);
+  bool isEstimated = computeTableOrientation(params.planeSegmentationParams.downLeafSize,
+                       params.planeSegmentationParams.kSearch, params.planeSegmentationParams.distanceThreshold,
+                       sceneCloud, tablePlane, &tableHull, params.planeSegmentationParams.clusterTolerance, params.planeSegmentationParams.verticalDirection);
 //  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
   if (!isEstimated)
   {
