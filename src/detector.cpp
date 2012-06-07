@@ -60,16 +60,13 @@ void Detector::addTrainObject(const std::string &objectName, const PoseEstimator
     CV_Assert(validTestImageSize == estimator.getValidTestImageSize());
   }
 
-  poseEstimators.push_back(estimator);
-  objectNames.push_back(objectName);
+  std::pair<std::map<string, PoseEstimator>::iterator, bool> result;
+  result = poseEstimators.insert(std::make_pair(objectName, estimator));
+  if (!result.second)
+  {
+    CV_Error(CV_StsBadArg, "Object name '" + objectName + "' is not unique");
+  }
 }
-
-/*
-void TransparentDetector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames) const
-{
-  detect(srcBgrImage, srcDepth, srcRegistrationMask, sceneCloud, poses_cam, posesQualities, objectNames);
-}
-*/
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
@@ -164,7 +161,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   poses_cam.clear();
   detectedObjectNames.clear();
   posesQualities.clear();
-  for (size_t i = 0; i < poseEstimators.size(); ++i)
+  for (std::map<std::string, PoseEstimator>::const_iterator it = poseEstimators.begin(); it != poseEstimators.end(); ++it)
   {
     std::cout << "starting to estimate pose..." << std::endl;
     std::vector<PoseRT> currentPoses;
@@ -172,7 +169,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 
     vector<Mat> initialSilhouettes;
     vector<Mat> *initialSilhouettesPtr = debugInfo == 0 ? 0 : &initialSilhouettes;
-    poseEstimators[i].estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
+    it->second.estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
     std::cout << "done." << std::endl;
     std::cout << "detected poses: " << currentPoses.size() << std::endl;
     if (debugInfo != 0)
@@ -183,17 +180,9 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
     {
       poses_cam.push_back(currentPoses[0]);
       posesQualities.push_back(currentPosesQualities[0]);
-      detectedObjectNames.push_back(objectNames[i]);
+      detectedObjectNames.push_back(it->first);
     }
   }
-}
-
-int Detector::getTrainObjectIndex(const std::string &name) const
-{
-  std::vector<std::string>::const_iterator it = std::find(objectNames.begin(), objectNames.end(), name);
-  CV_Assert(it != objectNames.end());
-
-  return std::distance(objectNames.begin(), it);
 }
 
 void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
@@ -221,8 +210,7 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
         break;
     }
 
-    int objectIndex = getTrainObjectIndex(objectNames[i]);
-    poseEstimators[objectIndex].visualize(poses[i], image, color);
+    poseEstimators.find(objectNames[i])->second.visualize(poses[i], image, color);
   }
 }
 
@@ -238,8 +226,7 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
   for (size_t i = 0; i < poses.size(); ++i)
   {
     cv::Scalar color(128 + rand() % 128, 128 + rand() % 128, 128 + rand() % 128);
-    int objectIndex = getObjectIndex(objectNames[i]);
-    poseEstimators[objectIndex].visualize(poses[i], viewer, color, objectNames[i]);
+    poseEstimators.find(objectNames[i])->second.visualize(poses[i], viewer, color, objectNames[i]);
   }
 
   while (!viewer->wasStopped ())

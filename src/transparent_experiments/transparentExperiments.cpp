@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 //  const string camerasListFilename = baseFolder + "/cameras.txt";
   const string kinectCameraFilename = baseFolder + "/center.yml";
 //  const string visualizationPath = "visualized_results/";
-  const string errorsVisualizationPath = "/home/ilysenkov/errors/";
+//  const string errorsVisualizationPath = "/home/ilysenkov/errors/";
 //  const vector<string> objectNames = {"bank", "bucket"};
 //  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
@@ -227,7 +227,7 @@ int main(int argc, char **argv)
 
   vector<float> allChamferDistances;
   vector<size_t> geometricHashingPoseCount;
-  vector<int> indicesOfRecognizedObjects;
+//  vector<int> indicesOfRecognizedObjects;
   vector<double> allRecognitionTimes;
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
   {
@@ -386,8 +386,8 @@ int main(int argc, char **argv)
     {
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
       int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
-      int detectedObjectIndex = detector.getTrainObjectIndex(detectedObjectsNames[bestDetectionIndex]);
-      indicesOfRecognizedObjects.push_back(detectedObjectIndex);
+//      int detectedObjectIndex = detector.getTrainObjectIndex(detectedObjectsNames[bestDetectionIndex]);
+//      indicesOfRecognizedObjects.push_back(detectedObjectIndex);
       cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
     }
 
@@ -463,6 +463,7 @@ int main(int argc, char **argv)
   cout << "Segmentation failures: " << static_cast<float>(segmentationFailuresCount) / testIndices.size() << endl;
   cout << "Bad segmentation rate: " << static_cast<float>(badSegmentationCount) / testIndices.size() << endl;
 
+/*
   cout << "Recognition statistics:" << endl;
   for (size_t i = 0; i < objectNames.size(); ++i)
   {
@@ -475,7 +476,7 @@ int main(int argc, char **argv)
     cout << countNonZero(Mat(indicesOfRecognizedObjects) == i) / static_cast<float>(indicesOfRecognizedObjects.size())  << " ";
   }
   cout << endl;
-
+*/
 
   if (objectNames.size() == 1)
   {

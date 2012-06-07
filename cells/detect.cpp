@@ -74,12 +74,6 @@ namespace transparent_objects
     int
     process(const tendrils& inputs, const tendrils& outputs)
     {
-      if (*visualize_)
-      {
-          cv::imshow("rgb", *color_);
-          cv::imshow("depth", *depth_ * 100);
-          cv::waitKey(300);
-      }
       std::cout << "detector: process" << std::endl;
 #ifdef TRANSPARENT_DEBUG
       cv::FileStorage fs("input.xml", cv::FileStorage::READ);
@@ -130,7 +124,7 @@ namespace transparent_objects
         imshow("glass mask", debugInfo.glassMask);
         cv::Mat visualization = color_->clone();
         detector_->visualize(poses, detectedObjects, visualization);
-        imshow("detection", visualization);
+        imshow("all detected objects", visualization);
         cv::waitKey(300);
 #ifdef USE_3D_VISUALIZATION
         detector_->visualize(poses, detectedObjects, pclCloud);
@@ -149,6 +143,14 @@ namespace transparent_objects
         pose_result.set_T(poses[bestDetectionIndex].getTvec());
         pose_result.set_object_id(*object_db_, detectedObjects[bestDetectionIndex]);
         pose_results_->push_back(pose_result);
+        if (*visualize_)
+        {
+          cv::Mat visualization = color_->clone();
+          detector_->visualize(std::vector<PoseRT>(1, poses[bestDetectionIndex]),
+                               std::vector<std::string>(1, detectedObjects[bestDetectionIndex]), visualization);
+          imshow("the best object", visualization);
+          cv::waitKey(300);
+        }
       }
 
 //      {

@@ -512,7 +512,6 @@ namespace transpod
 
     vector<bool> isSuppressed;
     filterOutLowValues(errors, 1.0 / params.basisConfidentSuppression, isSuppressed);
-
     filterValues(matches, isSuppressed);
   }
 
