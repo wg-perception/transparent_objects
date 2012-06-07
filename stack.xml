@@ -1,10 +1,10 @@
 <stack>
   <name>object_recognition_transparent_objects</name>
   <version>0.2.3</version>
-  <description>A technique to recognize transparent objects</description>
-  <author>Ilya Lysenkov</author>
+  <description>A technique to recognize and estimate poses of transparent objects</description>
+  <author email="ilya.lysenkov@itseez.com">Ilya Lysenkov</author>
   <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
-  <maintainer>Ilya Lysenkov</maintainer>
+  <maintainer email="ilya.lysenkov@itseez.com">Ilya Lysenkov</maintainer>
   <maintainer email="vrabaud@willowgarage.com">Vincent Rabaud</maintainer>
   <license>BSD</license>
   <copyright>Willow Garage</copyright>
