@@ -203,7 +203,6 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
   canonicalEdgeModel.rotateToCanonicalPose(*pinholeCamera, model2canonicalPose);
 
   silhouettes.clear();
-  const float eps = 1e-4;
   CV_Assert(silhouetteCount > 1);
   const int dim = 3;
 

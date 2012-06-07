@@ -61,6 +61,7 @@ namespace transpod
     }
   };
 
+  /** \brief The main class to detect transparent objects and estimate their poses */
   class Detector
   {
   public:

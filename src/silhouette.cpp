@@ -220,8 +220,12 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
   PoseRT poseWithExtrinsics_cam;
   if (useClosedFormPnP)
   {
-    Mat homography = affine2homography(affineTransformation);
     CV_Assert(camera.cameraMatrix.type() == CV_64FC1);
+    const float eps = 1e-6;
+    CV_Assert(fabs(camera.cameraMatrix.at<double>(0, 0) - camera.cameraMatrix.at<double>(1, 1)) < eps);
+    CV_Assert(norm(camera.distCoeffs) < eps);
+
+    Mat homography = affine2homography(affineTransformation);
     if (homography.type() != CV_64FC1)
     {
       Mat homographyDouble;
@@ -236,7 +240,6 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
     CV_Assert(fullTransform.type() == CV_64FC1);
     Mat rotationalComponentWithScale = fullTransform(Range(0, 2), Range(0, 2));
     double det = determinant(rotationalComponentWithScale);
-    const float eps = 1e-6;
     CV_Assert(det > eps);
     double scale = 1.0 / sqrt(det);
 

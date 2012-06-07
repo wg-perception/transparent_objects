@@ -29,9 +29,9 @@ using std::endl;
 
 namespace transpod
 {
-  PoseEstimator::PoseEstimator(const PinholeCamera &_kinectCamera, const PoseEstimatorParams &_params)
+  PoseEstimator::PoseEstimator(const PinholeCamera &_camera, const PoseEstimatorParams &_params)
   {
-    kinectCamera = _kinectCamera;
+    kinectCamera = _camera;
     params = _params;
   }
 
@@ -771,6 +771,7 @@ namespace transpod
     }
   }
 
+/*
   void PoseEstimator::getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const
   {
     cout << "get initial poses..." << endl;
@@ -920,6 +921,7 @@ namespace transpod
   //    initialPosesQualities = candidateQualities[bestContourIndex];
   //  }
   }
+  */
 
   void PoseEstimator::refineInitialPoses(const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                                          vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities,
@@ -1085,7 +1087,7 @@ namespace transpod
     cannyThreshold2 = fn["cannyThreshold2"];
     dilationsForEdgesRemovalCount = fn["dilationsForEdgesRemovalCount"];
 
-    confidentDomination = fn["confidentDomination"];
+ //   confidentDomination = fn["confidentDomination"];
   }
 
   void PoseEstimatorParams::write(cv::FileStorage &fs) const
@@ -1099,7 +1101,7 @@ namespace transpod
     fs << "cannyThreshold2" << cannyThreshold2;
     fs << "dilationsForEdgesRemovalCount" << dilationsForEdgesRemovalCount;
 
-    fs << "confidentDomination" << confidentDomination;
+//    fs << "confidentDomination" << confidentDomination;
     fs << "}";
   }
 

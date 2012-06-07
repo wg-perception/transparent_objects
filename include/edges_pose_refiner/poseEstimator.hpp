@@ -23,50 +23,97 @@ namespace transpod
 {
   struct PoseEstimatorParams
   {
-    //training parameters
+    /** \brief number of silhouettes to use in training */
     int silhouetteCount;
+
+    /** \brief factor by which to reduce resolution when generating silhouettes */
     float downFactor;
+
+    /** \brief number of iterations in morphology closing to generate silhouettes */
     int closingIterationsCount;
 
-    //edge detection parameters
+    /** \brief the first Canny threshold to find edges on a test scene */
     double cannyThreshold1;
+
+    /** \brief the second Canny threshold to find edges on a test scene */
     double cannyThreshold2;
+
+    /** \brief number of iterations in morhology dilation to suppress Canny edges
+     *
+     * Mask of segmented glass is dilated and Canny edges which are not in the dilated mask are removed
+     */
     int dilationsForEdgesRemovalCount;
 
+    /** \brief minimum number of points in a contour of a glass mask
+     *
+     * If a contour has less points than this number then it is skipped and initial poses are not generated for this contour.
+     */
     size_t minGlassContourLength;
+
+    /** \brief minimum area of a contour of a glass mask
+     *
+     * If a contour has area less than this number then it is skipped and initial poses are not generated for this contour.
+     */
     double minGlassContourArea;
 
-    float confidentDomination;
-    int icp2dIterationsCount;
-    float min2dScaleChange;
+    /** \brief minimum area of a contour of a glass mask
+     *
+     * If a contour has area less than this number then it is skipped and initial poses are not generated for this contour.
+     */
+
+//    float confidentDomination;
+//    int icp2dIterationsCount;
+//    float min2dScaleChange;
+
+    /** \brief use the closed form solution to get 3D pose from 2D correspondences */
     bool useClosedFormPnP;
 
+    /** \brief granularity of a hash table in geometric hashing */
     float ghGranularity;
+
+    /** \brief step with which train silhouettes will be sampled */
     int ghBasisStep;
+
+    /** \brief minimum distance between basis points to be used in hashing */
     float ghMinDistanceBetweenBasisPoints;
 
+    /** \brief step with which test silhouettes will be sampled */
     int ghTestBasisStep;
 
-    //length of the object contour relative to length of the whole extracted contour
+    /** \brief length of the object contour relative to length of the whole extracted contour */
     float ghObjectContourProportion;
 
-    //probability to find a basis which belongs to the object
+    /** \brief probability to find a basis which belongs to the object */
     float ghSuccessProbability;
 
+    /** \brief size of a window to be used in suppression of geometric hashing votes */
     int votesWindowSize;
+
+    /** \brief ratio between maximum vote and current vote to suppress it */
     float votesConfidentSuppression;
+
+    /** \brief ratio between maximum confidence and current confidence to suppress it */
     float basisConfidentSuppression;
 
+    /** \brief angular distance between 3D poses which are considered as neighbors in suppression */
     float maxRotation3D;
+
+    /** \brief translational distance between 3D poses which are considered as neighbors in suppression */
     float maxTranslation3D;
 
+    /** \brief minimum scale of the object on a test scene */
     float minScale;
 
-    //suppresion after alignment to a table
+    /** \brief ratio between maximum confidence and current confidence to suppress it after alignment to a table */
     float ratioToMinimum;
+
+    /** \brief angular distance between 3D poses which are considered as neighbors in suppression after alignment to a table */
     float neighborMaxRotation;
+
+    /** \brief translational distance between 3D poses which are considered as neighbors in suppression after alignment to a table */
     float neighborMaxTranslation;
 
+    /** \brief parameters to refine poses */
     LocalPoseRefinerParams lmParams;
 
     PoseEstimatorParams()
@@ -82,9 +129,9 @@ namespace transpod
       cannyThreshold2 = 50;
       dilationsForEdgesRemovalCount = 10;
 
-      confidentDomination = 1.5f;
-      icp2dIterationsCount = 50;
-      min2dScaleChange = 0.001f;
+//      confidentDomination = 1.5f;
+//      icp2dIterationsCount = 50;
+//      min2dScaleChange = 0.001f;
 
       useClosedFormPnP = true;
 
@@ -115,22 +162,83 @@ namespace transpod
     void write(cv::FileStorage &fs) const;
   };
 
+  /** \brief The class to estimate pose of one transparent object */
   class PoseEstimator
   {
   public:
-    PoseEstimator(const PinholeCamera &kinectCamera = PinholeCamera(), const PoseEstimatorParams &params = PoseEstimatorParams());
+    /** \brief The constructor
+     *
+     * \param camera test camera
+     * \param params parameters of the pose estimator
+     */
+    PoseEstimator(const PinholeCamera &camera = PinholeCamera(), const PoseEstimatorParams &params = PoseEstimatorParams());
+
+    /** \brief Sets the edge model of a transparent object
+     *
+     * \param edgeModel edge model of a transparent object for which you want to estimate poses
+     */
     void setModel(const EdgeModel &edgeModel);
-    void estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities, const cv::Vec4f *tablePlane = 0, std::vector<cv::Mat> *initialSilhouettes = 0) const;
 
+    /** \brief Estimates pose of a transparent object
+     *
+     * \param edgeModel edge model of a transparent object for which you want to estimate poses
+     * \param bgrImage BGR image of a test scene
+     * \param glassMask mask of segmented glass
+     * \param poses_cam estimated poses of the object
+     * \param poseQualities qualities of the corresponding estimated poses (less is better)
+     * \param tablePlane equation of a table plane if the object is known to stay on this plane
+     * \param initialSilhouettes silhouettes of initial poses (used for debugging)
+     */
+    void estimatePose(const cv::Mat &bgrImage, const cv::Mat &glassMask,
+                      std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities,
+                      const cv::Vec4f *tablePlane = 0, std::vector<cv::Mat> *initialSilhouettes = 0) const;
+
+    /** \brief Reads a pose estimator from a file
+     *
+     * \param filename Name of a file where a pose estimator is stored
+     */
     void read(const std::string &filename);
-    void read(const cv::FileNode& fn);
-    void write(const std::string &filename) const;
-    void write(cv::FileStorage& fs) const;
 
+    /** \brief Reads a pose estimator from a file node
+     *
+     * \param fn file node where a pose estimator is stored
+     */
+    void read(const cv::FileNode &fn);
+
+    /** \brief Writes a pose estimator to a file
+     *
+     * \param filename Name of a file where a pose estimator will be stored
+     */
+    void write(const std::string &filename) const;
+
+    /** \brief Writes a pose estimator to a file storage
+     *
+     * \param fs file storage where a pose estimator will be stored
+     */
+    void write(cv::FileStorage &fs) const;
+
+    /** \brief Get size of a test image
+     *
+     * \return size of a test image which is valid for this pose estimator
+     */
     cv::Size getValidTestImageSize() const;
 
+    /** \brief Visualizes an estimated pose
+     *
+     * \param pose pose to visualize
+     * \param image image where pose will be visualized
+     * \param color color of the object in visualization
+     */
     void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255)) const;
+
   #ifdef USE_3D_VISUALIZATION
+    /** \brief Visualizes an estimated pose in 3D
+     *
+     * \param pose pose to visualize
+     * \param viewer viewer to visualize the object
+     * \param color color of the object in visualization
+     * \param title title of a point cloud of the object
+     */
     void visualize(const PoseRT &pose, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "object") const;
   #endif
   private:

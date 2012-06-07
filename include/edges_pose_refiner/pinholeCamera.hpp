@@ -34,4 +34,3 @@ struct PinholeCamera
 };
 
 #endif /* PINHOLECAMERA_HPP_ */
-

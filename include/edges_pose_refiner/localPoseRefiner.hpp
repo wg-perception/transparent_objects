@@ -17,21 +17,26 @@
 /** \brief Parameters of pose refinement by local optimization */
 struct LocalPoseRefinerParams
 {
+  /** \brief distance type in distance transorm of an edges map */
   int distanceType;
+
+  /** \brief distance mask in distance transorm of an edges map */
   int distanceMask;
 
   //Levenberg-Marquardt parameters
-  /** \brief downsampling factor to use when computing silhouette edgels*/
+  /** \brief downsampling factor to use when computing silhouette edgels */
   float lmDownFactor;
 
-  /** \brief number of closing operations when computing silhouette edges*/
+  /** \brief number of closing operations when computing silhouette edges */
   int lmClosingIterationsCount;
 
-  /** \brief ratio of inliers when applying Levenberg-Marquardt*/
+  /** \brief ratio of inliers when applying Levenberg-Marquardt */
   float lmInliersRatio;
 
+  /** \brief compute silhouettes by morhology (true) or by using normals (false) */
   bool useAccurateSilhouettes;
 
+  /** \brief termination criteria of Levenberg-Marquardt in pose refinement */
   cv::TermCriteria termCriteria;
 
   LocalPoseRefinerParams()
@@ -64,6 +69,10 @@ public:
    */
   LocalPoseRefiner(const EdgeModel &edgeModel, const cv::Mat &edgesImage, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, const cv::Mat &extrinsicsRt, const LocalPoseRefinerParams &params = LocalPoseRefinerParams());
 
+  /** \brief Sets paremeters of pose refinement
+   *
+   *  \param params parameters of pose refinement
+   */
   void setParams(const LocalPoseRefinerParams &params);
 
   /** \brief Set test edges for silhouette edgels
