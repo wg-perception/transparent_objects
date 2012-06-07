@@ -41,15 +41,20 @@ namespace transpod
 
   struct DetectorParams
   {
+
     /** \brief parameters to segment a plane in a test scene */
     PlaneSegmentationParams planeSegmentationParams;
 
     /** \brief parameters to segment glass */
     GlassSegmentatorParams glassSegmentationParams;
 
+    cv::Point3f verticalDirection;
+
     DetectorParams()
     {
+      planeSegmentationParams = PlaneSegmentationParams();
       glassSegmentationParams = GlassSegmentatorParams();
+      verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f);
     }
   };
 
