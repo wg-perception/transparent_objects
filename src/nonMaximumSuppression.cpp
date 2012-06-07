@@ -9,6 +9,12 @@ using std::endl;
 void filterOutLowValues(const std::vector<float> &values, float ratioToMaximum,
                         std::vector<bool> &isFilteredOut)
 {
+  if (values.empty())
+  {
+    isFilteredOut.clear();
+    return;
+  }
+
 //  CV_Assert(ratioToMaximum < 1.0f);
 
   if (isFilteredOut.empty())
@@ -43,6 +49,12 @@ void filterOutHighValues(const std::vector<float> &values, float ratioToMinimum,
 void filterOutNonMaxima(const std::vector<float> &values, const std::vector<std::vector<int> > &neighbors,
                         std::vector<bool> &isFilteredOut)
 {
+  if (values.empty())
+  {
+    isFilteredOut.clear();
+    return;
+  }
+
   CV_Assert(values.size() == neighbors.size());
   if (isFilteredOut.empty())
   {

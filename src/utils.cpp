@@ -481,7 +481,10 @@ void hcat(const Mat &A, const Mat &B, Mat &result)
 void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobsObject, Mat &allBlobsObject)
 {
   FileStorage fiducialFS(filename, FileStorage::READ);
-  CV_Assert(fiducialFS.isOpened());
+  if (!fiducialFS.isOpened())
+  {
+    CV_Error(CV_StsBadArg, "Cannot read fiducials from " + filename);
+  }
   fiducialFS["fiducial"]["templates"][0] >> whiteBlobsObject;
   fiducialFS["fiducial"]["templates"][1] >> blackBlobsObject;
   fiducialFS.release();

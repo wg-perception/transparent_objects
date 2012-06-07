@@ -59,7 +59,6 @@ namespace transpod
 
     float maxRotation3D;
     float maxTranslation3D;
-    float confidentSuppresion3D;
 
     float minScale;
 
@@ -100,11 +99,10 @@ namespace transpod
 
       votesWindowSize = 5;
       votesConfidentSuppression = 1.1f;
-      basisConfidentSuppression = 1.5f;
+      basisConfidentSuppression = 1.3f;
 
       maxRotation3D = 0.8f;
       maxTranslation3D = 0.15f;
-      confidentSuppresion3D = 1.3f;
 
       minScale = 0.2f;
 
@@ -162,13 +160,12 @@ namespace transpod
     void estimatePoses(std::vector<BasisMatch> &matches) const;
 
 
-    void suppressBasisMatches(const std::vector<BasisMatch> &matches, std::vector<BasisMatch> &filteredMatches) const;
-    void suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformaitons_obj, std::vector<bool> &isSuppressed) const;
+    void suppressBasisMatches(std::vector<BasisMatch> &matches) const;
 
     void suppressBasisMatchesIn3D(std::vector<BasisMatch> &matches) const;
-    void filterOut3DPoses(const std::vector<float> &errors, const std::vector<PoseRT> &poses_cam,
-                          float ratioToMinimum, float neighborMaxRotation, float neighborMaxTranslation,
-                          std::vector<bool> &isFilteredOut) const;
+    void suppress3DPoses(const std::vector<float> &errors, const std::vector<PoseRT> &poses_cam,
+                         float neighborMaxRotation, float neighborMaxTranslation,
+                         std::vector<bool> &isFilteredOut) const;
 
     void generateGeometricHashes();
     void computeCentralEdges(const cv::Mat &centralBgrImage, const cv::Mat &glassMask, cv::Mat &centralEdges, cv::Mat &silhouetteEdges) const;

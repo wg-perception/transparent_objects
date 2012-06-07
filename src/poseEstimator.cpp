@@ -185,9 +185,10 @@ namespace transpod
     localPoseRefiner.setParams(params.lmParams);
 
     vector<bool> isPoseFilteredOut;
-    filterOut3DPoses(initPosesQualities, poses_cam,
-                     params.ratioToMinimum, params.neighborMaxRotation, params.neighborMaxTranslation,
-                     isPoseFilteredOut);
+    filterOutHighValues(initPosesQualities, params.ratioToMinimum, isPoseFilteredOut);
+    suppress3DPoses(initPosesQualities, poses_cam,
+                    params.neighborMaxRotation, params.neighborMaxTranslation,
+                    isPoseFilteredOut);
 
     filterValues(poses_cam, isPoseFilteredOut);
     initPosesQualities.resize(poses_cam.size());
@@ -501,98 +502,34 @@ namespace transpod
     }
   }
 
-  void PoseEstimator::suppressBasisMatches(const std::vector<BasisMatch> &matches, std::vector<BasisMatch> &filteredMatches) const
+  void PoseEstimator::suppressBasisMatches(std::vector<BasisMatch> &matches) const
   {
     vector<float> errors(matches.size());
     for (size_t i = 0; i < matches.size(); ++i)
     {
-      const float eps = 1e-3;
-  //    CV_Assert(matches[i].confidence > eps);
-      errors[i] = 1.0 / (matches[i].confidence + eps);
+      errors[i] = matches[i].confidence;
     }
 
     vector<bool> isSuppressed;
-    bool useNeighbors = false;
-    suppressNonMinimum(errors, params.basisConfidentSuppression, isSuppressed, useNeighbors);
+    filterOutLowValues(errors, 1.0 / params.basisConfidentSuppression, isSuppressed);
 
-    filteredMatches.clear();
-    for (size_t i = 0; i < matches.size(); ++i)
-    {
-      if (!isSuppressed[i])
-      {
-        filteredMatches.push_back(matches[i]);
-      }
-    }
+    filterValues(matches, isSuppressed);
   }
 
-  void PoseEstimator::suppressSimilarityTransformations(const std::vector<BasisMatch> &matches, const std::vector<cv::Mat> &similarityTransformations_obj, std::vector<bool> &isSuppressed) const
-  {
-    //TODO: move up
-    const float maxTranslationDiff = 10.0f;
-    const float minRotationCosDiff = 0.95f;
-    const float maxScaleChange = 1.2f;
-    const int maxSilhouetteNeighbor = 1;
-    const float finalConfidentDomination = 1.5f;
-
-    vector<vector<int> > neighbors(matches.size());
-    for (size_t i = 0; i < matches.size(); ++i)
-    {
-      for (size_t j = i+1; j < matches.size(); ++j)
-      {
-        int silhouettesCount = static_cast<int>(silhouettes.size());
-        //TODO: compare with
-        //if (abs(matches[i].silhouetteIndex - matches[j].silhouetteIndex) > maxSilhouetteNeighbor)
-        if ((silhouettesCount + matches[i].silhouetteIndex - matches[j].silhouetteIndex) % silhouettesCount > maxSilhouetteNeighbor)
-        {
-          continue;
-        }
-
-        float translationDiff, rotationCosDiff, scaleChange;
-        compareSimilarityTransformations(similarityTransformations_obj[i], similarityTransformations_obj[j], translationDiff, rotationCosDiff, scaleChange);
-
-        if (translationDiff < maxTranslationDiff && rotationCosDiff > minRotationCosDiff && std::max(scaleChange, 1.0f / scaleChange) < maxScaleChange)
-        {
-          neighbors[i].push_back(j);
-          neighbors[j].push_back(i);
-        }
-      }
-    }
-
-    float maxVotes = 0.0f;
-    for (size_t i = 0; i < matches.size(); ++i)
-    {
-      if (matches[i].confidence > maxVotes)
-      {
-        maxVotes = matches[i].confidence;
-      }
-    }
-
-    isSuppressed.resize(matches.size(), false);
-    for (size_t i = 0; i < matches.size(); ++i)
-    {
-      if (matches[i].confidence * finalConfidentDomination < maxVotes)
-      {
-        isSuppressed[i] = true;
-        continue;
-      }
-
-      for (size_t j = 0; j < neighbors[i].size(); ++j)
-      {
-        if (matches[i].confidence > matches[neighbors[i][j]].confidence)
-        {
-          isSuppressed[neighbors[i][j]] = true;
-        }
-      }
-    }
-  }
-
-  void PoseEstimator::filterOut3DPoses(const std::vector<float> &errors, const std::vector<PoseRT> &poses_cam,
-                                       float ratioToMinimum, float neighborMaxRotation, float neighborMaxTranslation,
-                                       std::vector<bool> &isFilteredOut) const
+  void PoseEstimator::suppress3DPoses(const std::vector<float> &errors, const std::vector<PoseRT> &poses_cam,
+                                      float neighborMaxRotation, float neighborMaxTranslation,
+                                      std::vector<bool> &isFilteredOut) const
   {
     CV_Assert(errors.size() == poses_cam.size());
 
-    filterOutHighValues(errors, ratioToMinimum, isFilteredOut);
+    if (isFilteredOut.empty())
+    {
+      isFilteredOut.resize(errors.size(), false);
+    }
+    else
+    {
+      CV_Assert(isFilteredOut.size() == errors.size());
+    }
 
     vector<vector<int> > neighbors(poses_cam.size());
     for (size_t i = 0; i < poses_cam.size(); ++i)
@@ -636,7 +573,7 @@ namespace transpod
 
     vector<bool> isFilteredOut;
     //TODO: change the parameter to 1.0/p
-    filterOut3DPoses(errors, poses_cam, 1.0 / params.confidentSuppresion3D,
+    suppress3DPoses(errors, poses_cam,
                      params.maxRotation3D, params.maxTranslation3D, isFilteredOut);
     filterValues(matches, isFilteredOut);
   }
@@ -670,7 +607,6 @@ namespace transpod
     }
   }
 
-  //TODO: suppress poses in 3D
   //TODO: refine estimate similarities by using all corresponding points
   void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
   {
@@ -704,7 +640,7 @@ namespace transpod
       currentContourMat.convertTo(currentContourFloatMat, CV_32FC2);
       vector<Point2f> currentContourFloat(currentContourMat);
 
-      vector<BasisMatch> bestMatches;
+      vector<BasisMatch> basisMatches;
       const int ghIterationCount = ceil(log(1.0 - params.ghSuccessProbability) / log(1.0 - params.ghObjectContourProportion * params.ghObjectContourProportion));
       for (int iterationIndex = 0; iterationIndex < ghIterationCount; ++iterationIndex)
       {
@@ -717,28 +653,21 @@ namespace transpod
         Basis testBasis(firstIndex, secondIndex);
         vector<BasisMatch> currentMatches;
         findBasisMatches(currentContourFloat, testBasis, currentMatches);
-        std::copy(currentMatches.begin(), currentMatches.end(), std::back_inserter(bestMatches));
+        std::copy(currentMatches.begin(), currentMatches.end(), std::back_inserter(basisMatches));
       }
 
-      vector<BasisMatch> filteredCorrespondences;
-      suppressBasisMatches(bestMatches, filteredCorrespondences);
+      suppressBasisMatches(basisMatches);
+      estimateSimilarityTransformations(currentContour, basisMatches);
+      estimatePoses(basisMatches);
 
-      estimateSimilarityTransformations(currentContour, filteredCorrespondences);
-      estimatePoses(filteredCorrespondences);
+      cout << "before 3d: " << basisMatches.size() << endl;
+      suppressBasisMatchesIn3D(basisMatches);
+      cout << "after 3d: " << basisMatches.size() << endl;
 
-      cout << "before 3d: " << filteredCorrespondences.size() << endl;
-      suppressBasisMatchesIn3D(filteredCorrespondences);
-      cout << "after 3d: " << filteredCorrespondences.size() << endl;
-
-
-  //    vector<bool> isSimilaritySuppressed;
-  //    suppressSimilarityTransformations(filteredCorrespondences, similarityTransformations_obj, isSimilaritySuppressed);
-
-
-      cout << "best correspondences size: " << bestMatches.size() << endl;
-      cout << "filtered correspondences size: " << filteredCorrespondences.size() << endl;
+      cout << "best correspondences size: " << basisMatches.size() << endl;
+      cout << "filtered correspondences size: " << basisMatches.size() << endl;
       int remainedCorrespondences = 0;
-      for (size_t i = 0; i < filteredCorrespondences.size(); ++i)
+      for (size_t i = 0; i < basisMatches.size(); ++i)
       {
   //      if (isSimilaritySuppressed[i])
   //      {
@@ -747,33 +676,33 @@ namespace transpod
         ++remainedCorrespondences;
 
   //      PoseRT pose;
-  //      silhouettes[filteredCorrespondences[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
+  //      silhouettes[basisMatches[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
   //      initialPoses.push_back(pose);
-  //      initialPosesQualities.push_back(-filteredCorrespondences[i].confidence);
+  //      initialPosesQualities.push_back(-basisMatches[i].confidence);
 
-        initialPoses.push_back(filteredCorrespondences[i].pose);
-        initialPosesQualities.push_back(-filteredCorrespondences[i].confidence);
+        initialPoses.push_back(basisMatches[i].pose);
+        initialPosesQualities.push_back(-basisMatches[i].confidence);
 
         if (initialSilhouettes != 0)
         {
           Mat edgels;
-          silhouettes[filteredCorrespondences[i].silhouetteIndex].getEdgels(edgels);
+          silhouettes[basisMatches[i].silhouetteIndex].getEdgels(edgels);
           Mat transformedEdgels;
-          transform(edgels, transformedEdgels, filteredCorrespondences[i].similarityTransformation_cam);
+          transform(edgels, transformedEdgels, basisMatches[i].similarityTransformation_cam);
           initialSilhouettes->push_back(transformedEdgels);
         }
 
   #ifdef VISUALIZE_GEOMETRIC_HASHING
-        if (filteredCorrespondences[i].silhouetteIndex != 0)
+        if (basisMatches[i].silhouetteIndex != 0)
         {
   //        continue;
         }
         Mat visualization = glassMask.clone();
-        silhouettes[filteredCorrespondences[i].silhouetteIndex].visualizeSimilarityTransformation(filteredCorrespondences[i].similarityTransformation_cam, visualization, Scalar(255, 0, 0));
+        silhouettes[basisMatches[i].silhouetteIndex].visualizeSimilarityTransformation(basisMatches[i].similarityTransformation_cam, visualization, Scalar(255, 0, 0));
         imshow("transformation by geometric hashing", visualization);
 
-        cout << "votes: " << filteredCorrespondences[i].confidence << endl;
-        cout << "idx: " << filteredCorrespondences[i].silhouetteIndex << endl;
+        cout << "votes: " << basisMatches[i].confidence << endl;
+        cout << "idx: " << basisMatches[i].silhouetteIndex << endl;
         cout << "i: " << i << endl;
 
   /*
@@ -813,23 +742,19 @@ namespace transpod
   void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed, bool useNeighbors)
   {
     isSuppressed.resize(errors.size(), false);
+    float minError = *std::min_element(errors.begin(), errors.end());
+
     for (size_t i = 0; i < errors.size(); ++i)
     {
-      for (size_t j = 0; j < errors.size(); ++j)
+      if (minError * absoluteSuppressionFactor < errors[i])
       {
-        if (i == j)
-        {
-          continue;
-        }
-
-        if (errors[j] * absoluteSuppressionFactor < errors[i])
-        {
-          isSuppressed[i] = true;
-          break;
-        }
+        isSuppressed[i] = true;
       }
+    }
 
-      if (useNeighbors)
+    if (useNeighbors)
+    {
+      for (size_t i = 0; i < errors.size(); ++i)
       {
         if (isSuppressed[i])
         {
@@ -1088,10 +1013,8 @@ namespace transpod
     }
 
     ghTable.clear();
-    cout << "Starting to read the hash table...   " << std::flush;
     Mat hashTable;
     fn["hash_table"] >> hashTable;
-    cout << hashTable.rows << " elements to read... ";
     for (int elementIndex = 0; elementIndex < hashTable.rows; ++elementIndex)
     {
       Mat row = hashTable.row(elementIndex);
@@ -1099,8 +1022,6 @@ namespace transpod
                                              GHValue(row.at<int>(2), row.at<int>(3), row.at<int>(4)));
       ghTable.insert(tableElement);
     }
-
-    cout << " Done" << endl;
   }
 
   void PoseEstimator::write(const std::string &filename) const
