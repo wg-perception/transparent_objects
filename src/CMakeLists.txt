@@ -1,5 +1,3 @@
-find_pcl_package()
-
 #TDS: dont glob together sources.
 set(src 
     edgeModel.cpp
@@ -33,8 +31,8 @@ add_definitions(-Wno-deprecated)
 
 target_link_libraries(edges_pose_refiner
                       #FIXME: the dirty line due to problems with linking PCL under Ubuntu 12.04
-                      /usr/lib/libboost_python.so;/usr/lib/libboost_thread-mt.so;/usr/lib/libboost_system-mt.so;/usr/lib/libboost_filesystem-mt.so;/usr/lib/libboost_date_time-mt.so;/usr/lib/libboost_iostreams-mt.so;/opt/ros/fuerte/lib/libpcl_common.so;/opt/ros/fuerte/lib/libflann_cpp_s.a;/opt/ros/fuerte/lib/libflann_cpp_s-gd.a;/opt/ros/fuerte/lib/libpcl_kdtree.so;/opt/ros/fuerte/lib/libpcl_octree.so;/opt/ros/fuerte/lib/libpcl_search.so;/opt/ros/fuerte/lib/libpcl_sample_consensus.so;/opt/ros/fuerte/lib/libpcl_filters.so;/opt/ros/fuerte/lib/libpcl_tracking.so;/usr/lib/libOpenNI.so;vtkCommon;vtkRendering;vtkHybrid;/opt/ros/fuerte/lib/libpcl_io.so;/opt/ros/fuerte/lib/libpcl_features.so;/opt/ros/fuerte/lib/libpcl_registration.so;/opt/ros/fuerte/lib/libpcl_segmentation.so;/usr/lib/libqhull.so;/opt/ros/fuerte/lib/libpcl_surface.so;/opt/ros/fuerte/lib/libpcl_visualization.so;/opt/ros/fuerte/lib/libpcl_keypoints.so
-#                      ${PCL_LIBRARIES}
+#                      /usr/lib/libboost_python.so;/usr/lib/libboost_thread-mt.so;/usr/lib/libboost_system-mt.so;/usr/lib/libboost_filesystem-mt.so;/usr/lib/libboost_date_time-mt.so;/usr/lib/libboost_iostreams-mt.so;/opt/ros/fuerte/lib/libpcl_common.so;/opt/ros/fuerte/lib/libflann_cpp_s.a;/opt/ros/fuerte/lib/libflann_cpp_s-gd.a;/opt/ros/fuerte/lib/libpcl_kdtree.so;/opt/ros/fuerte/lib/libpcl_octree.so;/opt/ros/fuerte/lib/libpcl_search.so;/opt/ros/fuerte/lib/libpcl_sample_consensus.so;/opt/ros/fuerte/lib/libpcl_filters.so;/opt/ros/fuerte/lib/libpcl_tracking.so;/usr/lib/libOpenNI.so;vtkCommon;vtkRendering;vtkHybrid;/opt/ros/fuerte/lib/libpcl_io.so;/opt/ros/fuerte/lib/libpcl_features.so;/opt/ros/fuerte/lib/libpcl_registration.so;/opt/ros/fuerte/lib/libpcl_segmentation.so;/usr/lib/libqhull.so;/opt/ros/fuerte/lib/libpcl_surface.so;/opt/ros/fuerte/lib/libpcl_visualization.so;/opt/ros/fuerte/lib/libpcl_keypoints.so
+                      ${PCL_LIBRARIES}
                       ${OpenCV_LIBS}
                       ${OpenCV_LIBRARIES}
 )

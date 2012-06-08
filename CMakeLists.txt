@@ -1,15 +1,26 @@
 project(object_recognition_transparent_objects)
+find_package(catkin QUIET)
+if (catkin_FOUND)
+    catkin_stack()
+    catkin_project(object_recognition_transparent_objects
+                   DEPENDS Eigen Boost OpenCV
+                   INCLUDE_DIRS include
+    )
+    #install targets for all things python
+    catkin_python_setup()
+
+    find_package(ecto REQUIRED)
+    find_pcl_package()
+    find_package(object_recognition_core REQUIRED)
+else()
+    find_package(PCL)
+endif()
+
 #this needs a stanza to prevent overwrite.
 if(NOT CMAKE_BUILD_TYPE)#Only do this the on the first run, if the build type hasn't been set prior
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
     "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
   FORCE)
-endif()
-
-find_package(object_recognition_core QUIET)
-find_package(ecto QUIET)
-if (${ecto_FOUND} AND ${object_recognition_core_FOUND})
-    set(DO_BUILD_ECTO_CELLS True)
 endif()
 
 find_package(OpenCV REQUIRED)
@@ -22,21 +33,7 @@ include_directories(SYSTEM ${object_recognition_core_INCLUDE_DIRS})
 
 add_subdirectory(src)
 
-# Make sure we can build transparent_objects without ecto or the core
-if (DO_BUILD_ECTO_CELLS)
-    find_package(catkin REQUIRED)
-
-    catkin_stack()
-    catkin_project(object_recognition_transparent_objects
-                   DEPENDS Eigen Boost OpenCV
-                   INCLUDE_DIRS include
-    )
-
-    #install targets for all things python
-    catkin_python_setup()
-
-    find_package(ecto REQUIRED)
-
+if (${ecto_FOUND} AND ${object_recognition_core_FOUND})    
     add_subdirectory(cells)
     add_subdirectory(python)
 endif()

@@ -13,8 +13,10 @@
   <build_depends>catkin</build_depends>
   <build_depends>ecto</build_depends>
   <build_depends>object_recognition_core</build_depends>
+  <build_depends>openni-dev</build_depends>
   <build_depends>pcl</build_depends>
   <depends>ecto</depends>
   <depends>object_recognition_core</depends>
+  <depends>openni-dev</depends>
   <depends>pcl</depends>
 </stack>
