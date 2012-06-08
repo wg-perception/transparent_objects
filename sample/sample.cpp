@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 {
   if (argc != 2)
   {
-    std::cout << argv[0] << " <path_to_demo_data>" << std::endl;
+    std::cout << argv[0] << " <path_to_sample_data>" << std::endl;
     return -1;
   }
 
