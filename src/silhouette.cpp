@@ -222,7 +222,7 @@ void Silhouette::affine2poseRT(const EdgeModel &edgeModel, const PinholeCamera &
   {
     CV_Assert(camera.cameraMatrix.type() == CV_64FC1);
     const float eps = 1e-6;
-    CV_Assert(fabs(camera.cameraMatrix.at<double>(0, 0) - camera.cameraMatrix.at<double>(1, 1)) < eps);
+//    CV_Assert(fabs(camera.cameraMatrix.at<double>(0, 0) - camera.cameraMatrix.at<double>(1, 1)) < eps);
     CV_Assert(norm(camera.distCoeffs) < eps);
 
     Mat homography = affine2homography(affineTransformation);

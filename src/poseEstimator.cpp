@@ -33,6 +33,7 @@ namespace transpod
   {
     kinectCamera = _camera;
     params = _params;
+    ghTable = 0;
   }
 
   void PoseEstimator::setModel(const EdgeModel &_edgeModel)
@@ -52,14 +53,15 @@ namespace transpod
 
   void PoseEstimator::generateGeometricHashes()
   {
-    ghTable.clear();
+    ghTable = new GHTable();
+
     canonicScales.resize(silhouettes.size());
 #ifdef VERBOSE
     cout << "number of train silhouettes: " << silhouettes.size() << endl;
 #endif
     for (size_t i = 0; i < silhouettes.size(); ++i)
     {
-      silhouettes[i].generateGeometricHash(i, ghTable, canonicScales[i], params.ghGranularity, params.ghBasisStep, params.ghMinDistanceBetweenBasisPoints);
+      silhouettes[i].generateGeometricHash(i, *ghTable, canonicScales[i], params.ghGranularity, params.ghBasisStep, params.ghMinDistanceBetweenBasisPoints);
     }
   }
 
@@ -472,7 +474,7 @@ namespace transpod
       Point pt = transformedContourVec[i] * invertedGranularity;
       GHKey key(pt.x, pt.y);
 
-      std::pair<GHTable::iterator, GHTable::iterator> range = ghTable.equal_range(key);
+      std::pair<GHTable::iterator, GHTable::iterator> range = ghTable->equal_range(key);
   //        std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable.equal_range(key);
       for(GHTable::iterator it = range.first; it != range.second; ++it)
       {
@@ -1029,7 +1031,7 @@ namespace transpod
       votes.push_back(currentVote);
     }
 
-    ghTable.clear();
+    ghTable = new GHTable();
     Mat hashTable;
     fn["hash_table"] >> hashTable;
     for (int elementIndex = 0; elementIndex < hashTable.rows; ++elementIndex)
@@ -1037,7 +1039,7 @@ namespace transpod
       Mat row = hashTable.row(elementIndex);
       std::pair<GHKey, GHValue> tableElement(std::make_pair(row.at<int>(0), row.at<int>(1)),
                                              GHValue(row.at<int>(2), row.at<int>(3), row.at<int>(4)));
-      ghTable.insert(tableElement);
+      ghTable->insert(tableElement);
     }
   }
 
@@ -1077,10 +1079,10 @@ namespace transpod
     }
     fs << "]";
 
-    Mat hash_table(ghTable.size(), GH_KEY_DIMENSION + GHValue::channels, CV_32SC1);
+    Mat hash_table(ghTable->size(), GH_KEY_DIMENSION + GHValue::channels, CV_32SC1);
     CV_Assert(GHValue::depth == CV_32S);
     int elementIndex = 0;
-    for (GHTable::iterator it = ghTable.begin(); it != ghTable.end(); ++it, ++elementIndex)
+    for (GHTable::iterator it = ghTable->begin(); it != ghTable->end(); ++it, ++elementIndex)
     {
       hash_table.at<int>(elementIndex, 0) = it->first.first;
       hash_table.at<int>(elementIndex, 1) = it->first.second;

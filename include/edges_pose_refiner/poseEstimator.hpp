@@ -290,7 +290,7 @@ namespace transpod
     std::vector<Silhouette> silhouettes;
     std::vector<cv::Mat> canonicScales;
     //TODO: remove mutable
-    mutable GHTable ghTable;
+    mutable cv::Ptr<GHTable> ghTable;
     mutable PoseEstimatorParams params;
     mutable std::vector<cv::Mat> votes;
 
