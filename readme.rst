@@ -8,11 +8,11 @@ The module is a part of the Recognition Kitchen so all you need to do is to inst
 
 Using
 ^^^^^
-For a sample how to use the algorithm see the `sample/sample.cpp` file. This sample is compiled into the `bin` directory. You can run it by passing the path to the `sample` directory as the command line parameter, for example:
+For a sample how to use the algorithm see the ``sample/sample.cpp`` file. This sample is compiled into the ``bin`` directory. You can run it by passing the path to the ``sample`` directory as the command line parameter, for example:
 
 ::
 
-  `./bin/sample ../or-transparent-objects/sample`
+  ./bin/sample ../or-transparent-objects/sample/
 
 Getting help
 ^^^^^^^^^^^^
