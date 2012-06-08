@@ -42,8 +42,8 @@ install(TARGETS edges_pose_refiner
   DESTINATION lib
   )
 
-add_executable(demo ../demo/demo.cpp)
-target_link_libraries(demo edges_pose_refiner)
+add_executable(sample ../sample/sample.cpp)
+target_link_libraries(sample edges_pose_refiner)
 
 #add_executable(transparentExperiments transparent_experiments/transparentExperiments.cpp)
 #set_target_properties(transparentExperiments
