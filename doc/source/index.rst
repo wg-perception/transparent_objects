@@ -21,7 +21,7 @@ After a while you should see the input data:
 
 and the results of the algorithm working similar to this:
 
-.. figure:: estimatedPoses.jpg
-
 .. figure:: glassSegmentation.jpg
+
+.. figure:: estimatedPoses.jpg
 
