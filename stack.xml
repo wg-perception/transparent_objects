@@ -1,6 +1,6 @@
 <stack>
   <name>object_recognition_transparent_objects</name>
-  <version>0.2.3</version>
+  <version>0.2.4</version>
   <description>A technique to recognize and estimate poses of transparent objects</description>
   <author email="ilya.lysenkov@itseez.com">Ilya Lysenkov</author>
   <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
@@ -13,6 +13,8 @@
   <build_depends>catkin</build_depends>
   <build_depends>ecto</build_depends>
   <build_depends>object_recognition_core</build_depends>
+  <build_depends>pcl</build_depends>
   <depends>ecto</depends>
   <depends>object_recognition_core</depends>
+  <depends>pcl</depends>
 </stack>
