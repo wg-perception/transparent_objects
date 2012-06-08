@@ -89,7 +89,7 @@ namespace transpod
      * \param centralize true if the object is needed to be transformed to the origin of the coordinate system
      */
     void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points,
-                        bool isModelUpsideDown, bool centralize);
+                        bool isModelUpsideDown = false, bool centralize = true);
 
     /** \brief Add a new train object to the detector which will be searched at the test stage
      *
@@ -120,6 +120,10 @@ namespace transpod
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
 
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const cv::Mat &sceneCloud,
+                std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
+                DebugInfo *debugInfo = 0) const;
+
     /** \brief Visualize detected poses
      *
      * \param poses detected poses to be visualized
@@ -128,6 +132,16 @@ namespace transpod
      */
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
                    cv::Mat &image) const;
+
+    /** \brief Visualize and show detected poses
+     *
+     * \param poses detected poses to be visualized
+     * \param objectNamens names of corresponding detected objects
+     * \param image image to draw visualized poses
+     * \param title title of an OpenCV window to show visualization
+     */
+    void showResults(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
+                     const cv::Mat &image, const std::string title = "estimated poses") const;
 
     /** \brief Visualize detected poses in 3D
      *

@@ -225,3 +225,23 @@ void TODBaseImporter::importPointCloud(int testImageIdx, pcl::PointCloud<pcl::Po
   pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
   importPointCloud(pointCloudFilename.str(), cloud);
 }
+
+void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud)
+{
+  FileStorage fs(filename, FileStorage::READ);
+  CV_Assert(fs.isOpened());
+  fs["cloud"] >> cloud;
+  fs.release();
+  CV_Assert(!cloud.empty());
+}
+
+void TODBaseImporter::importRegistrationMask(const std::string &filename, cv::Mat &registrationMask)
+{
+  registrationMask = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
+  CV_Assert(!registrationMask.empty());
+}
+
+void TODBaseImporter::importCamera(const std::string &filename, PinholeCamera &camera)
+{
+  camera.read(filename);
+}

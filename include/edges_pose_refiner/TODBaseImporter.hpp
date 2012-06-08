@@ -22,15 +22,21 @@ public:
   void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true);
   void readMultiCameraParams(const std::string &camerasListFilename, std::vector<PinholeCamera> &allCameras, std::vector<bool> &camerasMask);
 
+  static void importCamera(const std::string &filename, PinholeCamera &camera);
   void importEdgeModel(const std::string &modelsPath, const std::string &objectName, EdgeModel &edgeModel) const;
   void importTestIndices(std::vector<int> &testIndices) const;
+  void importGroundTruth(int testImageIdx, PoseRT &model2test) const;
+  static void importRegistrationMask(const std::string &filename, cv::Mat &registrationMask);
+
   void importDepth(int testImageIdx, cv::Mat &depth) const;
   static void importDepth(const std::string &filename, cv::Mat &depth);
+
   void importBGRImage(int testImageIdx, cv::Mat &bgrImage) const;
   static void importBGRImage(const std::string &filename, cv::Mat &depth);
-  void importGroundTruth(int testImageIdx, PoseRT &model2test) const;
+
   void importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const;
   static void importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud);
+  static void importPointCloud(const std::string &filename, cv::Mat &cloud);
 
   void exportTrainPointClouds(const std::string &outFolder) const;
 private:

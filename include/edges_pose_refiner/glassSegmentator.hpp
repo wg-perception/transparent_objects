@@ -78,7 +78,7 @@ private:
   GlassSegmentatorParams params;
 };
 
-void showSegmentation(const cv::Mat &image, const cv::Mat &mask, const std::string &title = "glass segmentation");
+void showSegmentation(const cv::Mat &mask, const cv::Mat &image, const std::string &title = "glass segmentation");
 void refineSegmentationByGrabCut(const cv::Mat &bgrImage, const cv::Mat &rawMask, cv::Mat &refinedMask, const GlassSegmentatorParams &params = GlassSegmentatorParams());
 
 #endif

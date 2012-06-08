@@ -68,6 +68,13 @@ void Detector::addTrainObject(const std::string &objectName, const PoseEstimator
   }
 }
 
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
+{
+  pcl::PointCloud<pcl::PointXYZ> pclCloud;
+  cv2pcl(sceneCloud, pclCloud);
+  detect(srcBgrImage, srcDepth, srcRegistrationMask, pclCloud, poses_cam, posesQualities, detectedObjectNames, debugInfo);
+}
+
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
@@ -214,6 +221,14 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
 
     poseEstimators.find(objectNames[i])->second.visualize(poses[i], image, color);
   }
+}
+
+void Detector::showResults(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
+                           const cv::Mat &image, const std::string title) const
+{
+  Mat visualization = image.clone();
+  visualize(poses, objectNames, visualization);
+  imshow(title, visualization);
 }
 
 void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
