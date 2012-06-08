@@ -40,7 +40,11 @@ install(TARGETS edges_pose_refiner
   )
 
 add_executable(sample ../sample/sample.cpp)
-target_link_libraries(sample edges_pose_refiner)
+# not sure why but we need Python on Lucid
+find_package(PythonLibs)
+target_link_libraries(sample edges_pose_refiner
+                             ${PYTHON_LIBRARIES}
+)
 
 #add_executable(transparentExperiments transparent_experiments/transparentExperiments.cpp)
 #set_target_properties(transparentExperiments
