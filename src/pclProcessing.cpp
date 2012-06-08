@@ -109,6 +109,8 @@ void projectInliersOnTable(const pcl::PointCloud<pcl::PointXYZ> &cloud, const pc
 void reconstructConvexHull(const pcl::PointCloud<pcl::PointXYZ> &projectedInliers, pcl::PointCloud<pcl::PointXYZ> &tableHull)
 {
   pcl::ConvexHull<pcl::PointXYZ> hullReconstruntor;
+  const int dim = 2;
+  hullReconstruntor.setDimension(dim);
   hullReconstruntor.setInputCloud(projectedInliers.makeShared());
   hullReconstruntor.reconstruct(tableHull);
 }
@@ -151,19 +153,17 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
 
 bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
 {
-  cout << "all points: " << fullSceneCloud.points.size() << endl;
-
+#ifdef VERBOSE
+  cout << "Estimating table plane...  " << std::flush;
+#endif
   pcl::PointCloud<pcl::PointXYZ> withoutNaNsCloud;
   filterNaNs(fullSceneCloud, withoutNaNsCloud);
-  cout << "filtered points: " << withoutNaNsCloud.points.size() << endl;
 
   pcl::PointCloud<pcl::PointXYZ> sceneCloud;
   downsample(downLeafSize, withoutNaNsCloud, sceneCloud);
-  cout << "down points: " << sceneCloud.points.size() << endl;
 
   pcl::PointCloud<pcl::Normal> sceneNormals;
   estimateNormals(kSearch, sceneCloud, sceneNormals);
-  cout << "normals: " << sceneNormals.points.size() << endl;
 
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -172,7 +172,6 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
   {
     return false;
   }
-  cout << "inliers: " << inliers->indices.size () << endl;
 
   const int coeffsCount = 4;
   Point3f tableNormal(coefficients->values[0],
@@ -223,6 +222,9 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
 
     reconstructConvexHull(table, *tableHull);
   }
+#ifdef VERBOSE
+  cout << "Done." << endl;
+#endif
 
 
 #ifdef VISUALIZE_TABLE_ESTIMATION

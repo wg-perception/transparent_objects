@@ -54,10 +54,11 @@ namespace transpod
   {
     ghTable.clear();
     canonicScales.resize(silhouettes.size());
+#ifdef VERBOSE
     cout << "number of train silhouettes: " << silhouettes.size() << endl;
+#endif
     for (size_t i = 0; i < silhouettes.size(); ++i)
     {
-      cout << "generating hashes for silhouette #" << i << endl;
       silhouettes[i].generateGeometricHash(i, ghTable, canonicScales[i], params.ghGranularity, params.ghBasisStep, params.ghMinDistanceBetweenBasisPoints);
     }
   }
@@ -97,7 +98,9 @@ namespace transpod
                       const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
                       std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
   {
+#ifdef VERBOSE
     cout << "final refinement of poses by table orientation" << endl;
+#endif
     if (poses_cam.empty())
     {
       return;
@@ -117,7 +120,9 @@ namespace transpod
                       const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                       vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
   {
+#ifdef VERBOSE
     cout << "refine poses by table orientation" << endl;
+#endif
     if (poses_cam.empty())
     {
       return;
@@ -192,7 +197,10 @@ namespace transpod
 
     filterValues(poses_cam, isPoseFilteredOut);
     initPosesQualities.resize(poses_cam.size());
-    cout << "suppression: " << isPoseFilteredOut.size() << " -> " << poses_cam.size() << endl;
+#ifdef VERBOSE
+    cout << "table suppression: " << isPoseFilteredOut.size() << " -> " << poses_cam.size() << endl;
+#endif
+
 
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -214,7 +222,9 @@ namespace transpod
 
     PoseRT bestPose = poses_cam[bestPoseIdx];
     float bestPoseQuality = initPosesQualities[bestPoseIdx];
+#ifdef VERBOSE
     cout << "best quality: " << bestPoseQuality << endl;
+#endif
     poses_cam.clear();
     poses_cam.push_back(bestPose);
     initPosesQualities.clear();
@@ -609,7 +619,9 @@ namespace transpod
   //TODO: refine estimate similarities by using all corresponding points
   void PoseEstimator::getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const
   {
+#ifdef VERBOSE
     cout << "get initial poses by geometric hashing..." << endl;
+#endif
     initialPoses.clear();
     initialPosesQualities.clear();
 
@@ -617,8 +629,9 @@ namespace transpod
     vector<vector<Point> > allGlassContours;
     findContours(maskClone, allGlassContours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 
+#ifdef VERBOSE
     cout << "Number of glass contours: " << allGlassContours.size() << endl;
-    cout << "Silhouettes size: " << silhouettes.size() << endl;
+#endif
 
     for (size_t contourIndex = 0; contourIndex < allGlassContours.size(); ++contourIndex)
     {
@@ -655,25 +668,26 @@ namespace transpod
         std::copy(currentMatches.begin(), currentMatches.end(), std::back_inserter(basisMatches));
       }
 
+#ifdef VERBOSE
+      cout << "before suppression: " << basisMatches.size() << endl;
+#endif
       suppressBasisMatches(basisMatches);
+#ifdef VERBOSE
+      cout << "after suppression: " << basisMatches.size() << endl;
+#endif
       estimateSimilarityTransformations(currentContour, basisMatches);
       estimatePoses(basisMatches);
 
+#ifdef VERBOSE
       cout << "before 3d: " << basisMatches.size() << endl;
+#endif
       suppressBasisMatchesIn3D(basisMatches);
+#ifdef VERBOSE
       cout << "after 3d: " << basisMatches.size() << endl;
+#endif
 
-      cout << "best correspondences size: " << basisMatches.size() << endl;
-      cout << "filtered correspondences size: " << basisMatches.size() << endl;
-      int remainedCorrespondences = 0;
       for (size_t i = 0; i < basisMatches.size(); ++i)
       {
-  //      if (isSimilaritySuppressed[i])
-  //      {
-  //        continue;
-  //      }
-        ++remainedCorrespondences;
-
   //      PoseRT pose;
   //      silhouettes[basisMatches[i].silhouetteIndex].affine2poseRT(edgeModel, kinectCamera, similarityTransformations_cam[i], params.useClosedFormPnP, pose);
   //      initialPoses.push_back(pose);
@@ -732,10 +746,10 @@ namespace transpod
         waitKey();
   #endif
       }
-      cout << "remained correspondences: " << remainedCorrespondences << endl;
-
     }
+#ifdef VERBOSE
     cout << "Initial pose count: " << initialPoses.size() << endl;
+#endif
   }
 
   void PoseEstimator::suppressNonMinimum(std::vector<float> errors, float absoluteSuppressionFactor, std::vector<bool> &isSuppressed, bool useNeighbors)
@@ -927,7 +941,9 @@ namespace transpod
                                          vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities,
                                          vector<cv::Mat> *jacobians) const
   {
+#ifdef VERBOSE
     cout << "refine initial poses" << endl;
+#endif
     if (initPoses_cam.empty())
     {
       return;

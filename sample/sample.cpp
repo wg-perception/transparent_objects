@@ -21,11 +21,14 @@ int main(int argc, char *argv[])
   const string objectName_2 = "middle_cup";
 
   // 1. Get the data
+  std::cout << "Reading data...  " << std::flush;
   PinholeCamera camera;
   Mat objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud;
   readData(pathToDemoData, camera, objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud);
+  std::cout << "done." << std::endl;
 
   // 2. Initialize the detector
+  std::cout << "Training...  " << std::flush;
   //    A. set morphology parameters of glass segmentation
   DetectorParams params;
   params.glassSegmentationParams.closingIterations = 6;
@@ -34,14 +37,17 @@ int main(int argc, char *argv[])
   Detector detector(camera, params);
   detector.addTrainObject(objectName_1, objectPointCloud_1);
   detector.addTrainObject(objectName_2, objectPointCloud_2);
+  std::cout << "done." << std::endl;
 
   // 3. Detect transparent objects
+  std::cout << "Detecting...  " << std::flush;
   vector<PoseRT> poses;
   vector<float> errors;
   vector<string> detectedObjectsNames;
   Detector::DebugInfo debugInfo;
   detector.detect(image, depth, registrationMask, testPointCloud,
                   poses, errors, detectedObjectsNames, &debugInfo);
+  std::cout << "done." << std::endl;
 
   // 4. Visualize results
   imshow("input rgb image", image);

@@ -129,7 +129,6 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<
   }
 
   *this = outModel;
-  cout << "normals size: " << normals.size() << endl;
 }
 
 EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
@@ -468,7 +467,6 @@ void EdgeModel::rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model
   rotate_cam(PoseRT(rvec_cam, tvec_cam), rotatedEdgeModel);
   PoseRT firstPose(rvec_cam, tvec_cam);
   model2canonicalPose_cam = firstPose;
-  cout << model2canonicalPose_cam << endl;
 
   *this = rotatedEdgeModel;
 
@@ -488,7 +486,6 @@ void EdgeModel::rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model
   point2col(originalYAxis, originalYAxisMat);
 
 
-
   Mat R, t;
   getRotationTranslation(Rt_obj2cam, R, t);
   tvec_cam = (-t + originalOriginMat);
@@ -497,10 +494,8 @@ void EdgeModel::rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model
   PoseRT secondPose(rvec_cam, tvec_cam);
   rotate_cam(secondPose, rotatedEdgeModel);
   model2canonicalPose_cam = secondPose * model2canonicalPose_cam;
-  cout << model2canonicalPose_cam << endl;
 
   *this = rotatedEdgeModel;
-
 
 //  Mat oldRt_obj2cam = Rt_obj2cam.clone();
 
@@ -514,9 +509,6 @@ void EdgeModel::rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model
   point2col(originalXAsis, originalXAxisMat);
   col = Rt_obj2cam(Range(0, 3), Range(0, 1));
   originalXAxisMat.copyTo(col);
-
-
-  cout << "canonical Rt_obj2cam: " << Rt_obj2cam << endl;
 
 //  Mat thirdRt = Rt_obj2cam * oldRt_obj2cam.inv(DECOMP_SVD);
 //  PoseRT thirdPose(thirdRt);

@@ -124,13 +124,12 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 //  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
   if (!isEstimated)
   {
-    std::cerr << "Cannot find a table plane" << std::endl;
-    return;
+    CV_Error(CV_StsOk, "Cannot find a table plane");
   }
-  else
-  {
-    std::cout << "table plane is estimated" << std::endl;
-  }
+
+#ifdef VERBOSE
+  std::cout << "table plane is estimated" << std::endl;
+#endif
 
   int numberOfComponents;
   cv::Mat glassMask;
@@ -141,7 +140,9 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   {
     debugInfo->glassMask = glassMask;
   }
+#ifdef VERBOSE
   std::cout << "glass is segmented" << std::endl;
+#endif
   if (numberOfComponents == 0)
   {
     CV_Error(CV_StsOk, "Cannot segment a transparent object");
@@ -172,15 +173,19 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   posesQualities.clear();
   for (std::map<std::string, PoseEstimator>::const_iterator it = poseEstimators.begin(); it != poseEstimators.end(); ++it)
   {
+#ifdef VERBOSE
     std::cout << "starting to estimate pose..." << std::endl;
+#endif
     std::vector<PoseRT> currentPoses;
     std::vector<float> currentPosesQualities;
 
     vector<Mat> initialSilhouettes;
     vector<Mat> *initialSilhouettesPtr = debugInfo == 0 ? 0 : &initialSilhouettes;
     it->second.estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
+#ifdef VERBOSE
     std::cout << "done." << std::endl;
     std::cout << "detected poses: " << currentPoses.size() << std::endl;
+#endif
     if (debugInfo != 0)
     {
       std::copy(initialSilhouettes.begin(), initialSilhouettes.end(), std::back_inserter(debugInfo->initialSilhouettes));
