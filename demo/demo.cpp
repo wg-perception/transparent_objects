@@ -1,0 +1,75 @@
+#include <opencv2/opencv.hpp>
+#include "edges_pose_refiner/detector.hpp"
+#include "edges_pose_refiner/TODBaseImporter.hpp"
+
+using namespace cv;
+using namespace transpod;
+
+void readData(const string &pathToDemoData, PinholeCamera &camera, Mat &objectPointCloud_1, Mat &objectPointCloud_2,
+              Mat &registrationMask, Mat &image, Mat &depth, Mat &testPointCloud);
+
+int main(int argc, char *argv[])
+{
+  if (argc != 2)
+  {
+    std::cout << argv[0] << " <path_to_demo_data>" << std::endl;
+    return -1;
+  }
+
+  string pathToDemoData = argv[1];
+  const string objectName_1 = "glass";
+  const string objectName_2 = "middle_cup";
+
+  // 1. Get the data
+  PinholeCamera camera;
+  Mat objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud;
+  readData(pathToDemoData, camera, objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud);
+
+  // 2. Initialize the detector
+  //    A. set morphology parameters of glass segmentation
+  DetectorParams params;
+  params.glassSegmentationParams.closingIterations = 6;
+  params.glassSegmentationParams.openingIterations = 10;
+  //    B. add train objects into the detector
+  Detector detector(camera, params);
+  detector.addTrainObject(objectName_1, objectPointCloud_1);
+  detector.addTrainObject(objectName_2, objectPointCloud_2);
+
+  // 3. Detect transparent objects
+  vector<PoseRT> poses;
+  vector<float> errors;
+  vector<string> detectedObjectsNames;
+  Detector::DebugInfo debugInfo;
+  detector.detect(image, depth, registrationMask, testPointCloud,
+                  poses, errors, detectedObjectsNames, &debugInfo);
+
+  // 4. Visualize results
+  imshow("input rgb image", image);
+  imshow("input depth image", depth);
+  showSegmentation(debugInfo.glassMask, image);
+  detector.showResults(poses, detectedObjectsNames, image);
+  waitKey();
+
+  return 0;
+}
+
+void readData(const string &pathToDemoData, PinholeCamera &camera, Mat &objectPointCloud_1, Mat &objectPointCloud_2,
+              Mat &registrationMask, Mat &image, Mat &depth, Mat &testPointCloud)
+{
+  const string objectPointCloudFilename_1 = pathToDemoData + "/trainObject_1.xml.gz";
+  const string objectPointCloudFilename_2 = pathToDemoData + "/trainObject_2.xml.gz";
+  const string cameraFilename = pathToDemoData + "/camera.yml";
+  const string registrationMaskFilename = pathToDemoData + "/registrationMask.png";
+  const string imageFilename = pathToDemoData + "/image.png";
+  const string depthFilename = pathToDemoData + "/depth.xml.gz";
+  const string testPointCloudFilename = pathToDemoData + "/testPointCloud.xml.gz";
+
+  TODBaseImporter dataImporter;
+  dataImporter.importCamera(cameraFilename, camera);
+  dataImporter.importPointCloud(objectPointCloudFilename_1, objectPointCloud_1);
+  dataImporter.importPointCloud(objectPointCloudFilename_2, objectPointCloud_2);
+  dataImporter.importRegistrationMask(registrationMaskFilename, registrationMask);
+  dataImporter.importBGRImage(imageFilename, image);
+  dataImporter.importDepth(depthFilename, depth);
+  dataImporter.importPointCloud(testPointCloudFilename, testPointCloud);
+}

@@ -134,7 +134,8 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<
 
 EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
 {
-  CV_Assert(false);
+  *this = EdgeModel(_points, std::vector<cv::Point3f> (), isModelUpsideDown, centralize, params);
+
   /*
    * Estimate normals
 

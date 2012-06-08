@@ -71,7 +71,7 @@ void Detector::addTrainObject(const std::string &objectName, const PoseEstimator
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   pcl::PointCloud<pcl::PointXYZ> pclCloud;
-  cv2pcl(sceneCloud, pclCloud);
+  cv2pcl(sceneCloud.reshape(3, 1), pclCloud);
   detect(srcBgrImage, srcDepth, srcRegistrationMask, pclCloud, poses_cam, posesQualities, detectedObjectNames, debugInfo);
 }
 
