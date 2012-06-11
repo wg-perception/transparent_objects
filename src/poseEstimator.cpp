@@ -93,13 +93,7 @@ namespace transpod
   //  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
     if (tablePlane != 0)
     {
-      //TODO: move up
-      params.lmParams.lmDownFactor = 0.5f;
-      params.lmParams.lmClosingIterationsCount = 5;
       refinePosesByTableOrientation(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
-
-      params.lmParams.lmDownFactor = 1.0f;
-      params.lmParams.lmClosingIterationsCount = 10;
       refineFinalTablePoses(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
     }
   }
@@ -117,7 +111,7 @@ namespace transpod
     }
 
     posesQualities.resize(poses_cam.size());
-    LocalPoseRefiner localPoseRefiner(edgeModel, testEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+    LocalPoseRefiner localPoseRefiner(edgeModel, testEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmFinalParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -141,48 +135,29 @@ namespace transpod
     initPosesQualities.resize(poses_cam.size());
     vector<float> rotationAngles(poses_cam.size());
 
-    TermCriteria oldCriteria = params.lmParams.termCriteria;
-    //TODO: move up
-    TermCriteria newCriteria = TermCriteria(CV_TERMCRIT_ITER, 5, 0.0);
-    params.lmParams.termCriteria = newCriteria;
+    LocalPoseRefinerParams lmJacobianParams = params.lmInitialParams;
+    lmJacobianParams.termCriteria = params.lmJacobianCriteria;
     vector<Mat> jacobians;
-    refineInitialPoses(centralEdges, silhouetteEdges, poses_cam, initPosesQualities, &jacobians);
-    params.lmParams.termCriteria = oldCriteria;
+    refineInitialPoses(centralEdges, silhouetteEdges, poses_cam, initPosesQualities, lmJacobianParams, &jacobians);
 
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
   #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
       showEdgels(centralEdges, edgeModel.points, poses_cam[initPoseIdx], kinectCamera, "before alignment to a table plane");
-
-  //    if (pt_pub != 0)
-  //    {
-  //      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
-  //      namedWindow("ready to align pose to a table plane");
-  //      waitKey();
-  //      destroyWindow("ready to align pose to a table plane");
-  //    }
   #endif
 
       findTransformationToTable(poses_cam[initPoseIdx], tablePlane, rotationAngles[initPoseIdx], jacobians[initPoseIdx]);
 
   #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
       showEdgels(centralEdges, edgeModel.points, poses_cam[initPoseIdx], kinectCamera, "after alignment to a table plane");
-  //    if (pt_pub != 0)
-  //    {
-  //      publishPoints(edgeModel.points, initialPose_cam.getRvec(), initialPose_cam.getTvec(), *pt_pub, 1, Scalar(0, 0, 255));
-  //      namedWindow("aligned pose to a table plane");
-  //      waitKey();
-  //      destroyWindow("aligned pose to a table plane");
-  //    }
       cout << "quality[" << initPoseIdx << "]: " << initPosesQualities[initPoseIdx] << endl;
       waitKey();
   #endif
     }
 
-    //TODO: move up
-    newCriteria = TermCriteria(CV_TERMCRIT_ITER, 1, 0.0);
-    params.lmParams.termCriteria = newCriteria;
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+    LocalPoseRefinerParams lmErrorParams = params.lmInitialParams;
+    lmErrorParams.termCriteria = params.lmErrorCriteria;
+    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), lmErrorParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -196,8 +171,7 @@ namespace transpod
       waitKey();
   #endif
     }
-    params.lmParams.termCriteria = oldCriteria;
-    localPoseRefiner.setParams(params.lmParams);
+    localPoseRefiner.setParams(params.lmInitialParams);
 
     vector<bool> isPoseFilteredOut;
     filterOutHighValues(initPosesQualities, params.ratioToMinimum, isPoseFilteredOut);
@@ -591,7 +565,6 @@ namespace transpod
     }
 
     vector<bool> isFilteredOut;
-    //TODO: change the parameter to 1.0/p
     suppress3DPoses(errors, poses_cam,
                      params.maxRotation3D, params.maxTranslation3D, isFilteredOut);
     filterValues(matches, isFilteredOut);
@@ -949,7 +922,7 @@ namespace transpod
 
   void PoseEstimator::refineInitialPoses(const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                                          vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities,
-                                         vector<cv::Mat> *jacobians) const
+                                         const LocalPoseRefinerParams &lmParams, vector<cv::Mat> *jacobians) const
   {
 #ifdef VERBOSE
     cout << "refine initial poses" << endl;
@@ -965,7 +938,7 @@ namespace transpod
       jacobians->resize(initPoses_cam.size());
     }
 
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmParams);
+    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), lmParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < initPoses_cam.size(); ++initPoseIdx)
     {

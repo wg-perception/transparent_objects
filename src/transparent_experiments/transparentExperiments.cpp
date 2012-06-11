@@ -380,8 +380,6 @@ int main(int argc, char **argv)
       continue;
     }
 
-    cout << poses_cam.size() << endl;
-
     if (!posesQualities.empty())
     {
       std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
@@ -453,6 +451,7 @@ int main(int argc, char **argv)
       }
 #endif
     }
+    cout << endl;
 
 #ifdef PROFILE
     return 0;

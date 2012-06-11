@@ -88,9 +88,6 @@ void LocalPoseRefiner::computeDistanceTransform(const cv::Mat &edges, int distan
 
   sepFilter2D(distanceImage, dx, CV_32F, kx_dx, ky_dx);
   sepFilter2D(distanceImage, dy, CV_32F, kx_dy, ky_dy);
-  //TODO: remove after OpenCV fix
-//  dy = -dy;
-
 
   assert(dx.size() == distanceImage.size());
   assert(dy.size() == distanceImage.size());

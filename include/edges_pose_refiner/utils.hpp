@@ -29,9 +29,6 @@ void getTransformationMatrix(const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam,
 void getTransformationMatrix(const cv::Mat &Rt_obj2cam, const cv::Mat &rvec_Object, const cv::Mat &tvec_Object, cv::Mat &transformationMatrix);
 
 void getRotationTranslation(const cv::Mat &projectiveMatrix, cv::Mat &R, cv::Mat &t);
-void vec2mats(const std::vector<double> &point6d, cv::Mat &rvec, cv::Mat &tvec);
-
-void interpolatePointCloud(const cv::Mat &mask, const std::vector<cv::Point3f> &pointCloud, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, std::vector<cv::Point3f> &interpolatedPointCloud);
 
 #ifdef USE_3D_VISUALIZATION
 void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "", const PoseRT &pose = PoseRT());

@@ -113,8 +113,17 @@ namespace transpod
     /** \brief translational distance between 3D poses which are considered as neighbors in suppression after alignment to a table */
     float neighborMaxTranslation;
 
-    /** \brief parameters to refine poses */
-    LocalPoseRefinerParams lmParams;
+    /** \brief parameters to refine poses while finding the correct pose */
+    LocalPoseRefinerParams lmInitialParams;
+
+    /** \brief parameters to refine the found final pose */
+    LocalPoseRefinerParams lmFinalParams;
+
+    /** \brief criteria for Levenberg-Marquardt to get the jacobian value */
+    cv::TermCriteria lmJacobianCriteria;
+
+    /** \brief criteria for Levenberg-Marquardt to get the error value */
+    cv::TermCriteria lmErrorCriteria;
 
     PoseEstimatorParams()
     {
@@ -156,6 +165,13 @@ namespace transpod
       ratioToMinimum = 2.0f;
       neighborMaxRotation = 0.1f;
       neighborMaxTranslation = 0.02f;
+
+      lmInitialParams.lmDownFactor = 0.5f;
+      lmInitialParams.lmClosingIterationsCount = 5;
+      lmFinalParams.lmDownFactor = 1.0f;
+      lmFinalParams.lmClosingIterationsCount = 10;
+      lmJacobianCriteria = cv::TermCriteria(CV_TERMCRIT_ITER, 5, 0.0);
+      lmErrorCriteria = cv::TermCriteria(CV_TERMCRIT_ITER, 1, 0.0);
     }
 
     void read(const cv::FileNode &fn);
@@ -280,7 +296,9 @@ namespace transpod
     void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
     void getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const;
 
-    void refineInitialPoses(const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities, std::vector<cv::Mat> *jacobians = 0) const;
+    void refineInitialPoses(const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+                            std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities,
+                            const LocalPoseRefinerParams &lmParams = LocalPoseRefinerParams(), std::vector<cv::Mat> *jacobians = 0) const;
     void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
     void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
     void refineFinalTablePoses(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
