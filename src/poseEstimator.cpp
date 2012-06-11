@@ -63,6 +63,14 @@ namespace transpod
     {
       silhouettes[i].generateGeometricHash(i, *ghTable, canonicScales[i], params.ghGranularity, params.ghBasisStep, params.ghMinDistanceBetweenBasisPoints);
     }
+
+    //These lines allocate memory for the created table more efficiently.
+    //Without them detection is slower in ~4x times.
+    //TODO: better investigate this issue and fix it in more elegant way.
+    Ptr<GHTable> finalGHTable = new GHTable(*ghTable);
+    ghTable = finalGHTable;
+
+    //TODO: make key distribution in the table more uniform
   }
 
   void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane, std::vector<cv::Mat> *initialSilhouettes) const
