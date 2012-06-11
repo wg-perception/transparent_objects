@@ -9,8 +9,8 @@ pipeline1:
   method: 'transparent_objects'
   package: 'object_recognition_transparent_objects'
   submethod: ''
-  sources: [1]
-  sinks: [1]
+  sources: [source1]
+  sinks: [sink1]
   parameters:
     registrationMaskFilename: '/tmp/registrationMask_SXGA.png'
     db:
