@@ -151,7 +151,16 @@ namespace transparent_objects
 
 #ifdef ADD_COLLISION_OBJECTS
       ros::NodeHandle nh;
-      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", 10, true);
+
+      std::vector<cv::Vec3f> collisionBoxesDimensions;
+      std::vector<PoseRT> collisionBoxesPoses;
+      transpod::reconstructCollisionMap(camera, debugInfo.glassMask,
+                              detector_->getModel(detectedObjects[bestDetectionIndex]), poses[bestDetectionIndex],
+                              collisionBoxesDimensions, collisionBoxesPoses);
+
+      int n_cubes = collisionBoxesPoses.size();
+      std::cout << "n cubes: " << n_cubes <<std::endl;
+      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", old_cubes_.size() + n_cubes, true);
       // Remove old cubes from the map
       for(size_t i=0; old_cubes_.size(); ++i)
       {
@@ -162,14 +171,7 @@ namespace transparent_objects
       // Add new cubes to the map
       old_cubes_.clear();
 
-      std::vector<cv::Vec3f> collisionBoxesDimensions;
-      std::vector<PoseRT> collisionBoxesPoses;
-      transpod::reconstructCollisionMap(camera, debugInfo.glassMask,
-                              detector_->getModel(detectedObjects[bestDetectionIndex]), poses[bestDetectionIndex],
-                              collisionBoxesDimensions, collisionBoxesPoses);
-
       // TODO n_cubes should be based on geometry
-      int n_cubes = collisionBoxesPoses.size();
       for(size_t i=0; n_cubes; ++i)
       {
         arm_navigation_msgs::CollisionObject collision_object;
@@ -189,7 +191,9 @@ namespace transparent_objects
         // TODO size_y
         object.dimensions[1] = collisionBoxesDimensions[i][1];
         // TODO size_z
-        object.dimensions[2] = collisionBoxesDimensions[i][2];
+        object.dimensions[2] = 1;//collisionBoxesDimensions[i][2];
+       std::cout << "object : " << object.dimensions[0] << " " <<  object.dimensions[1] << " " << object.dimensions[2] <<std::endl;
+
 
         geometry_msgs::Pose pose;
         // TODO should be close to the glass
