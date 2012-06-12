@@ -24,3 +24,9 @@ link_ecto(transparent_objects_cells
 )
 
 install_ecto_module(transparent_objects_cells)
+
+set(ADD_COLLISION_OBJECTS True)
+if (ADD_COLLISION_OBJECTS)
+    include_directories(/opt/ros/fuerte/stacks/arm_navigation/arm_navigation_msgs/msg_gen/cpp/include/)
+    add_definitions(-DADD_COLLISION_OBJECTS)
+endif()

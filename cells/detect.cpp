@@ -14,6 +14,11 @@
 #include <edges_pose_refiner/detector.hpp>
 #include "db_transparent_objects.hpp"
 
+#ifdef ADD_COLLISION_OBJECTS
+#include <ros/ros.h>
+#include <arm_navigation_msgs/CollisionObject.h>
+#endif
+
 //#define TRANSPARENT_DEBUG
 
 using ecto::tendrils;
@@ -143,6 +148,57 @@ namespace transparent_objects
         pose_result.set_T(poses[bestDetectionIndex].getTvec());
         pose_result.set_object_id(*object_db_, detectedObjects[bestDetectionIndex]);
         pose_results_->push_back(pose_result);
+
+#ifdef ADD_COLLISION_OBJECTS
+      ros::NodeHandle nh;
+      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", 10, true);
+      int n_cubes = 20;
+      // Remove old cubes from the map
+      for(size_t i=0; old_cubes_.size(); ++i)
+      {
+        old_cubes_[i].operation.operation = arm_navigation_msgs::CollisionObjectOperation::REMOVE;
+
+        pub.publish(old_cubes_[i]);
+      }
+      // Add new cubes to the map
+      old_cubes_.clear();
+      for(size_t i=0; n_cubes; ++i)
+      {
+        arm_navigation_msgs::CollisionObject collision_object;
+        std::stringstream ss;
+        ss << "cube" << i;
+        collision_object.id = ss.str();
+        collision_object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
+        collision_object.header.frame_id = "base_link";
+        collision_object.header.stamp = ros::Time::now();
+
+        arm_navigation_msgs::Shape object;
+        object.type = arm_navigation_msgs::Shape::CYLINDER;
+        object.dimensions.resize(2);
+        // Radius + length
+        // TODO pick one based on the sampling
+        object.dimensions[0] = .1;
+        // TODO should be the height of the object
+        object.dimensions[1] = .75;
+
+        geometry_msgs::Pose pose;
+        // TODO should be close to the glass
+        pose.position.x = .6;
+        pose.position.y = -.6;
+        pose.position.z = .375;
+        pose.orientation.x = 0;
+        pose.orientation.y = 0;
+        pose.orientation.z = 0;
+        pose.orientation.w = 1;
+
+        collision_object.shapes.push_back(object);
+        collision_object.poses.push_back(pose);
+        old_cubes_.push_back(collision_object);
+
+        pub.publish(collision_object);
+      }
+#endif
+
         if (*visualize_)
         {
           cv::Mat visualization = color_->clone();
@@ -181,6 +237,11 @@ namespace transparent_objects
     ecto::spore<ObjectDb> object_db_;
 
     cv::Ptr<transpod::Detector> detector_;
+
+#ifdef ADD_COLLISION_OBJECTS
+    /** Keep track of the cubes to delete */
+    std::vector<arm_navigation_msgs::CollisionObject> old_cubes_;
+#endif
   };
 }
 
