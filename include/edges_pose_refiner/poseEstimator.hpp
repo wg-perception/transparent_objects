@@ -195,6 +195,8 @@ namespace transpod
      */
     void setModel(const EdgeModel &edgeModel);
 
+    EdgeModel getModel() const;
+
     /** \brief Estimates pose of a transparent object
      *
      * \param edgeModel edge model of a transparent object for which you want to estimate poses

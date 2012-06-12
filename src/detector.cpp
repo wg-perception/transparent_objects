@@ -35,6 +35,11 @@ void Detector::initialize(const PinholeCamera &_camera, const DetectorParams &_p
   params = _params;
 }
 
+EdgeModel Detector::getModel(const string &objectName)
+{
+  return poseEstimators[objectName].getModel();
+}
+
 void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel edgeModel(points, isModelUpsideDown, centralize);
@@ -66,6 +71,111 @@ void Detector::addTrainObject(const std::string &objectName, const PoseEstimator
   {
     CV_Error(CV_StsBadArg, "Object name '" + objectName + "' is not unique");
   }
+}
+
+void reconstructCollisionMap(const PinholeCamera &validTestCamera,
+                             const cv::Mat &glassMask,
+                             const EdgeModel &objectModel, const PoseRT &objectPose,
+                             std::vector<cv::Vec3f> &collisionObjectsDimensions,
+                             std::vector<PoseRT> collisionObjectsPoses)
+{
+  //TODO: move up
+  const float collisionArea = 0.2f;
+  const float rectLength = 0.01f;
+  const float rectHeight = 0.2f;
+
+  vector<Point3f> rectBotttomCorners;
+  rectBotttomCorners.push_back(Point3f( rectLength / 2.0f,  rectLength / 2.0f, 0.0f));
+  rectBotttomCorners.push_back(Point3f( rectLength / 2.0f, -rectLength / 2.0f, 0.0f));
+  rectBotttomCorners.push_back(Point3f(-rectLength / 2.0f, -rectLength / 2.0f, 0.0f));
+  rectBotttomCorners.push_back(Point3f(-rectLength / 2.0f,  rectLength / 2.0f, 0.0f));
+
+  Vec3f dimensions = objectModel.getBoundingBox();
+
+  const float eps = 1e-4;
+/*
+  vector<vector<Point> > allCollisionContours;
+  Mat globalViz = glassMask.clone();
+*/
+  for (float dx = -collisionArea; dx <= collisionArea + eps; dx += rectLength)
+  {
+    for (float dy = -collisionArea; dy <= collisionArea + eps; dy += rectLength)
+    {
+      if (fabs(dx) < dimensions[0] / 2.0 && fabs(dy) < dimensions[1] / 2.0)
+      {
+        continue;
+      }
+
+      const int dim = 3;
+      Mat rvec = Mat::zeros(dim, 1, CV_64FC1);
+      Mat tvec = Mat::zeros(dim, 1, CV_64FC1);
+      tvec.at<double>(0) = dx;
+      tvec.at<double>(1) = dy;
+
+      PoseRT shift(rvec, tvec);
+      PoseRT currentPose = objectPose * shift;
+
+      vector<Point2f> projectedCorners;
+      validTestCamera.projectPoints(rectBotttomCorners, currentPose, projectedCorners);
+
+      bool isPotentialCollision = false;
+      for (size_t i = 0; i < projectedCorners.size(); ++i)
+      {
+        Point pt = projectedCorners[i];
+        if (isPointInside(glassMask, pt) && glassMask.at<uchar>(pt) != 0)
+        {
+          isPotentialCollision = true;
+          break;
+        }
+      }
+
+/*
+      for (size_t i = 0; i < projectedCorners.size(); ++i)
+      {
+        cout << projectedCorners[i] << " ";
+        circle(globalViz, projectedCorners[i], 2, Scalar(255, 0, 255), -1);
+      }
+*/
+      if (isPotentialCollision)
+      {
+        collisionObjectsPoses.push_back(currentPose);
+        collisionObjectsDimensions.push_back(Vec3f(rectLength, rectLength, rectHeight));
+
+/*
+        vector<Point> newContour;
+        for (size_t i = 0; i < projectedCorners.size(); ++i)
+        {
+          newContour.push_back(projectedCorners[i]);
+        }
+        allCollisionContours.push_back(newContour);
+*/
+      }
+/*
+      else
+      {
+
+      Mat visualization = glassMask.clone();
+      for (size_t i = 0; i < projectedCorners.size(); ++i)
+      {
+        cout << projectedCorners[i] << " ";
+        circle(visualization, projectedCorners[i], 2, Scalar(255, 0, 255), -1);
+      }
+      cout << endl;
+      imshow("viz", visualization);
+      waitKey();
+      }
+*/
+    }
+  }
+/*
+  imshow("glob", globalViz);
+  waitKey();
+
+  Mat viz = glassMask.clone();
+  drawContours(viz, allCollisionContours, -1, Scalar(128), -1);
+  imshow("viz", viz);
+  waitKey();
+*/
 }
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
@@ -262,7 +372,8 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
 bool Detector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
-  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
+//  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
+  const string fiducialFilename = "/u/ilysenkov/transparentBases/base/fiducial.yml";
   readFiducial(fiducialFilename, blackBlobsObject, whiteBlobsObject, allBlobsObject);
 
   SimpleBlobDetector::Params params;

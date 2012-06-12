@@ -74,6 +74,8 @@ namespace transpod
      */
     Detector(const PinholeCamera &camera = PinholeCamera(), const DetectorParams &params = DetectorParams());
 
+    EdgeModel getModel(const std::string &objectName);
+
     /** \brief Initializes the detector
      *
      * \param pinholeCamera test camera
@@ -166,6 +168,13 @@ namespace transpod
       cv::Mat glassMask;
       std::vector<cv::Mat> initialSilhouettes;
   };
+
+  void reconstructCollisionMap(const PinholeCamera &validTestCamera,
+                               const cv::Mat &glassMask,
+                               const EdgeModel &objectModel, const PoseRT &objectPose,
+                               std::vector<cv::Vec3f> &collisionObjectsDimensions,
+                               std::vector<PoseRT> collisionObjectsPoses);
 }
+
 
 #endif /* TRANSPARENTDETECTOR_HPP_ */

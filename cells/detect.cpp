@@ -161,8 +161,15 @@ namespace transparent_objects
       }
       // Add new cubes to the map
       old_cubes_.clear();
+
+      std::vector<cv::Vec3f> collisionBoxesDimensions;
+      std::vector<PoseRT> collisionBoxesPoses;
+      transpod::reconstructCollisionMap(camera, debugInfo.glassMask,
+                              detector_->getModel(detectedObjects[bestDetectionIndex]), poses[bestDetectionIndex],
+                              collisionBoxesDimensions, collisionBoxesPoses);
+
       // TODO n_cubes should be based on geometry
-      int n_cubes = 20;
+      int n_cubes = collisionBoxesPoses.size();
       for(size_t i=0; n_cubes; ++i)
       {
         arm_navigation_msgs::CollisionObject collision_object;
@@ -178,21 +185,23 @@ namespace transparent_objects
         object.dimensions.resize(3);
         // Radius + length
         // TODO size_x
-        object.dimensions[0] = .1;
+        object.dimensions[0] = collisionBoxesDimensions[i][0];
         // TODO size_y
-        object.dimensions[1] = .75;
+        object.dimensions[1] = collisionBoxesDimensions[i][1];
         // TODO size_z
-        object.dimensions[2] = .75;
+        object.dimensions[2] = collisionBoxesDimensions[i][2];
 
         geometry_msgs::Pose pose;
         // TODO should be close to the glass
-        pose.position.x = .6;
-        pose.position.y = -.6;
-        pose.position.z = .375;
-        pose.orientation.x = 0;
-        pose.orientation.y = 0;
-        pose.orientation.z = 0;
-        pose.orientation.w = 1;
+        pose.position.x = collisionBoxesPoses[i].getTvec().at<double>(0);
+        pose.position.y = collisionBoxesPoses[i].getTvec().at<double>(1);
+        pose.position.z = collisionBoxesPoses[i].getTvec().at<double>(2);
+
+        float angle = norm(collisionBoxesPoses[i].getRvec());
+        pose.orientation.x = collisionBoxesPoses[i].getRvec().at<double>(0) * sin(angle / 2.0);
+        pose.orientation.y = collisionBoxesPoses[i].getRvec().at<double>(1) * sin(angle / 2.0);
+        pose.orientation.z = collisionBoxesPoses[i].getRvec().at<double>(2) * sin(angle / 2.0);
+        pose.orientation.w = cos(angle / 2.0);
 
         collision_object.shapes.push_back(object);
         collision_object.poses.push_back(pose);

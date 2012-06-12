@@ -19,6 +19,21 @@ using std::endl;
 //#define VISUALIZE_SILHOUETTE_GENERATION
 //#define VISUALIZE_EDGE_MODEL_CREATION
 
+cv::Vec3f EdgeModel::getBoundingBox() const
+{
+  Mat pointsMat = Mat(points).reshape(1);
+
+  Vec3f dimensions;
+  CV_Assert(pointsMat.cols == Vec3f::channels);
+  for (int col = 0; col < pointsMat.cols; ++col)
+  {
+    double minVal, maxVal;
+    minMaxLoc(pointsMat.col(col), &minVal, &maxVal);
+    dimensions[col] = maxVal - minVal;
+  }
+  return dimensions;
+}
+
 void EdgeModel::projectPointsOnAxis(const EdgeModel &edgeModel, Point3d axis, vector<float> &projections, Point3d &center_d)
 {
   Mat rvec, tvec;

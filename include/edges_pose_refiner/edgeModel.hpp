@@ -170,6 +170,8 @@ struct EdgeModel
    */
   cv::Point3f getObjectCenter() const;
 
+  cv::Vec3f getBoundingBox() const;
+
   /** \brief Clear all data in the edge model */
   void clear();
 

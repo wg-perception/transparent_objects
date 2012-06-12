@@ -51,6 +51,12 @@ namespace transpod
     }
   }
 
+  EdgeModel PoseEstimator::getModel() const
+  {
+    return edgeModel;
+  }
+
+
   void PoseEstimator::generateGeometricHashes()
   {
     ghTable = new GHTable();
