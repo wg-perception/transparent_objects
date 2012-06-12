@@ -15,12 +15,8 @@
 #include "db_transparent_objects.hpp"
 
 #ifdef ADD_COLLISION_OBJECTS
-#define dSINGLE
 #include <ros/ros.h>
 #include <arm_navigation_msgs/CollisionObject.h>
-#include <arm_navigation_msgs/GetPlanningScene.h>
-#include <planning_environment/models/collision_models.h>
-static const std::string SET_PLANNING_SCENE_DIFF_NAME = "/environment_server/set_planning_scene_diff";
 #endif
 
 //#define TRANSPARENT_DEBUG
@@ -154,6 +150,8 @@ namespace transparent_objects
         pose_results_->push_back(pose_result);
 
 #ifdef ADD_COLLISION_OBJECTS
+      ros::NodeHandle nh;
+
       std::vector<cv::Vec3f> collisionBoxesDimensions;
       std::vector<PoseRT> collisionBoxesPoses;
       transpod::reconstructCollisionMap(camera, debugInfo.glassMask,
@@ -162,22 +160,13 @@ namespace transparent_objects
 
       int n_cubes = collisionBoxesPoses.size();
       std::cout << "n cubes: " << n_cubes <<std::endl;
-
-      ros::NodeHandle rh;
-
-      ros::service::waitForService(SET_PLANNING_SCENE_DIFF_NAME);
-      ros::ServiceClient get_planning_scene_client =
-        rh.serviceClient<arm_navigation_msgs::GetPlanningScene>(SET_PLANNING_SCENE_DIFF_NAME);
-
-      arm_navigation_msgs::GetPlanningScene::Request planning_scene_req;
-      arm_navigation_msgs::GetPlanningScene::Response planning_scene_res;
-
+      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", old_cubes_.size() + n_cubes, true);
       // Remove old cubes from the map
       for(size_t i=0; old_cubes_.size(); ++i)
       {
         old_cubes_[i].operation.operation = arm_navigation_msgs::CollisionObjectOperation::REMOVE;
 
-        planning_scene_req.planning_scene_diff.collision_objects.push_back(old_cubes_[i]);
+        pub.publish(old_cubes_[i]);
       }
       // Add new cubes to the map
       old_cubes_.clear();
@@ -222,11 +211,9 @@ namespace transparent_objects
         collision_object.poses.push_back(pose);
         old_cubes_.push_back(collision_object);
 
-        planning_scene_req.planning_scene_diff.collision_objects.push_back(collision_object);
+        pub.publish(collision_object);
       }
-      if(!get_planning_scene_client.call(planning_scene_req, planning_scene_res)) {
-          ROS_WARN("Can't get planning scene");
-        }
+      ros::Duration(1).sleep();
 #endif
 
         if (*visualize_)
