@@ -173,7 +173,7 @@ namespace transpod
                                const cv::Mat &glassMask,
                                const EdgeModel &objectModel, const PoseRT &objectPose,
                                std::vector<cv::Vec3f> &collisionObjectsDimensions,
-                               std::vector &collisionObjectsPoses);
+                               std::vector<PoseRT> &collisionObjectsPoses);
 }
 
 
