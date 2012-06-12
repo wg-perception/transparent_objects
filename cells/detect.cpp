@@ -152,7 +152,6 @@ namespace transparent_objects
 #ifdef ADD_COLLISION_OBJECTS
       ros::NodeHandle nh;
       ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", 10, true);
-      int n_cubes = 20;
       // Remove old cubes from the map
       for(size_t i=0; old_cubes_.size(); ++i)
       {
@@ -162,6 +161,8 @@ namespace transparent_objects
       }
       // Add new cubes to the map
       old_cubes_.clear();
+      // TODO n_cubes should be based on geometry
+      int n_cubes = 20;
       for(size_t i=0; n_cubes; ++i)
       {
         arm_navigation_msgs::CollisionObject collision_object;
@@ -173,13 +174,15 @@ namespace transparent_objects
         collision_object.header.stamp = ros::Time::now();
 
         arm_navigation_msgs::Shape object;
-        object.type = arm_navigation_msgs::Shape::CYLINDER;
-        object.dimensions.resize(2);
+        object.type = arm_navigation_msgs::Shape::BOX;
+        object.dimensions.resize(3);
         // Radius + length
-        // TODO pick one based on the sampling
+        // TODO size_x
         object.dimensions[0] = .1;
-        // TODO should be the height of the object
+        // TODO size_y
         object.dimensions[1] = .75;
+        // TODO size_z
+        object.dimensions[2] = .75;
 
         geometry_msgs::Pose pose;
         // TODO should be close to the glass
