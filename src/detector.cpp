@@ -77,12 +77,15 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
                              const cv::Mat &glassMask,
                              const EdgeModel &objectModel, const PoseRT &objectPose,
                              std::vector<cv::Vec3f> &collisionObjectsDimensions,
-                             std::vector<PoseRT> collisionObjectsPoses)
+                             std::vector<PoseRT> &collisionObjectsPoses)
 {
   //TODO: move up
   const float collisionArea = 0.2f;
   const float rectLength = 0.01f;
   const float rectHeight = 0.2f;
+
+  collisionObjectsPoses.clear();
+  collisionObjectsDimensions.clear();
 
   vector<Point3f> rectBotttomCorners;
   rectBotttomCorners.push_back(Point3f( rectLength / 2.0f,  rectLength / 2.0f, 0.0f));
