@@ -160,30 +160,20 @@ namespace transparent_objects
 
       int n_cubes = collisionBoxesPoses.size();
       std::cout << "n cubes: " << n_cubes <<std::endl;
-      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("/collision_object", old_cubes_.size() + n_cubes, true);
+      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("/collision_object", 2, true);
       ros::Duration(1).sleep();
       // Remove old cubes from the map
-      for(size_t i=0; i < old_cubes_.size(); ++i)
-      {
-        old_cubes_[i].operation.operation = arm_navigation_msgs::CollisionObjectOperation::REMOVE;
-
-        pub.publish(old_cubes_[i]);
-      }
-      ros::Duration(1).sleep();
-      // Add new cubes to the map
-      old_cubes_.clear();
 
       // TODO n_cubes should be based on geometry
+      nan_cubes_.id = "nan_cube";
+      nan_cubes_.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
+      nan_cubes_.header.frame_id = "/head_mount_kinect_rgb_optical_frame";
+      nan_cubes_.header.stamp = ros::Time::now();
+
+      nan_cubes_.shapes.clear();
+      nan_cubes_.poses.clear();
       for(size_t i=0; i < n_cubes; ++i)
       {
-        arm_navigation_msgs::CollisionObject collision_object;
-        std::stringstream ss;
-        ss << "cube" << i;
-        collision_object.id = ss.str();
-        collision_object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
-        collision_object.header.frame_id = "/head_mount_kinect_rgb_optical_frame";
-        collision_object.header.stamp = ros::Time::now();
-
         arm_navigation_msgs::Shape object;
         object.type = arm_navigation_msgs::Shape::BOX;
         object.dimensions.resize(3);
@@ -204,12 +194,10 @@ namespace transparent_objects
         pose.orientation.z = collisionBoxesPoses[i].getRvec().at<double>(2) * sin(angle / 2.0) / angle;
         pose.orientation.w = cos(angle / 2.0);
 
-        collision_object.shapes.push_back(object);
-        collision_object.poses.push_back(pose);
-        old_cubes_.push_back(collision_object);
-
-        pub.publish(collision_object);
+        nan_cubes_.shapes.push_back(object);
+        nan_cubes_.poses.push_back(pose);
       }
+      pub.publish(nan_cubes_);
       ros::Duration(1).sleep();
 #endif
 
@@ -254,7 +242,7 @@ namespace transparent_objects
 
 #ifdef ADD_COLLISION_OBJECTS
     /** Keep track of the cubes to delete */
-    std::vector<arm_navigation_msgs::CollisionObject> old_cubes_;
+    arm_navigation_msgs::CollisionObject nan_cubes_;
 #endif
   };
 }
