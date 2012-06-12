@@ -160,7 +160,8 @@ namespace transparent_objects
 
       int n_cubes = collisionBoxesPoses.size();
       std::cout << "n cubes: " << n_cubes <<std::endl;
-      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("collision_object", old_cubes_.size() + n_cubes, true);
+      ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("/collision_object", old_cubes_.size() + n_cubes, true);
+      ros::Duration(1).sleep();
       // Remove old cubes from the map
       for(size_t i=0; old_cubes_.size(); ++i)
       {
@@ -202,9 +203,9 @@ namespace transparent_objects
         pose.position.z = collisionBoxesPoses[i].getTvec().at<double>(2);
 
         float angle = norm(collisionBoxesPoses[i].getRvec());
-        pose.orientation.x = collisionBoxesPoses[i].getRvec().at<double>(0) * sin(angle / 2.0);
-        pose.orientation.y = collisionBoxesPoses[i].getRvec().at<double>(1) * sin(angle / 2.0);
-        pose.orientation.z = collisionBoxesPoses[i].getRvec().at<double>(2) * sin(angle / 2.0);
+        pose.orientation.x = collisionBoxesPoses[i].getRvec().at<double>(0) * sin(angle / 2.0) / angle;
+        pose.orientation.y = collisionBoxesPoses[i].getRvec().at<double>(1) * sin(angle / 2.0) / angle;
+        pose.orientation.z = collisionBoxesPoses[i].getRvec().at<double>(2) * sin(angle / 2.0) / angle;
         pose.orientation.w = cos(angle / 2.0);
 
         collision_object.shapes.push_back(object);
