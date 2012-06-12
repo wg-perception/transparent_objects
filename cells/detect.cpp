@@ -163,12 +163,13 @@ namespace transparent_objects
       ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("/collision_object", old_cubes_.size() + n_cubes, true);
       ros::Duration(1).sleep();
       // Remove old cubes from the map
-      for(size_t i=0; old_cubes_.size(); ++i)
+      for(size_t i=0; i < old_cubes_.size(); ++i)
       {
         old_cubes_[i].operation.operation = arm_navigation_msgs::CollisionObjectOperation::REMOVE;
 
         pub.publish(old_cubes_[i]);
       }
+      ros::Duration(1).sleep();
       // Add new cubes to the map
       old_cubes_.clear();
 
@@ -180,21 +181,16 @@ namespace transparent_objects
         ss << "cube" << i;
         collision_object.id = ss.str();
         collision_object.operation.operation = arm_navigation_msgs::CollisionObjectOperation::ADD;
-        collision_object.header.frame_id = "base_link";
+        collision_object.header.frame_id = "/head_mount_kinect_rgb_optical_frame";
         collision_object.header.stamp = ros::Time::now();
 
         arm_navigation_msgs::Shape object;
         object.type = arm_navigation_msgs::Shape::BOX;
         object.dimensions.resize(3);
         // Radius + length
-        // TODO size_x
         object.dimensions[0] = collisionBoxesDimensions[i][0];
-        // TODO size_y
         object.dimensions[1] = collisionBoxesDimensions[i][1];
-        // TODO size_z
         object.dimensions[2] = 1;//collisionBoxesDimensions[i][2];
-       std::cout << "object : " << object.dimensions[0] << " " <<  object.dimensions[1] << " " << object.dimensions[2] <<std::endl;
-
 
         geometry_msgs::Pose pose;
         // TODO should be close to the glass

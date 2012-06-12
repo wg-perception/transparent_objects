@@ -80,8 +80,8 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
                              std::vector<PoseRT> &collisionObjectsPoses)
 {
   //TODO: move up
-  const float collisionArea = 0.2f;
-  const float rectLength = 0.01f;
+  const float collisionArea = 0.15f;
+  const float rectLength = 0.10f;
   const float rectHeight = 0.2f;
 
   collisionObjectsPoses.clear();
@@ -104,7 +104,7 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
   {
     for (float dy = -collisionArea; dy <= collisionArea + eps; dy += rectLength)
     {
-      if (fabs(dx) < dimensions[0] / 2.0 && fabs(dy) < dimensions[1] / 2.0)
+      if (fabs(dx) < (dimensions[0] / 2.0 + 0.03) && fabs(dy) < (dimensions[1] / 2.0 + 0.03))
       {
         continue;
       }
