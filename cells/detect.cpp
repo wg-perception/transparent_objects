@@ -172,7 +172,7 @@ namespace transparent_objects
       old_cubes_.clear();
 
       // TODO n_cubes should be based on geometry
-      for(size_t i=0; n_cubes; ++i)
+      for(size_t i=0; i < n_cubes; ++i)
       {
         arm_navigation_msgs::CollisionObject collision_object;
         std::stringstream ss;
