@@ -86,6 +86,18 @@ cv::Mat PoseRT::getProjectiveMatrix() const
   return Rt;
 }
 
+cv::Mat PoseRT::getQuaternion() const
+{
+  Mat quaternion(4, 1, CV_64FC1);
+  double angle = norm(getRvec());
+  CV_Assert(getRvec().type() == CV_64FC1);
+  quaternion.at<double>(0) = getRvec().at<double>(0) * sin(angle / 2.0) / angle;
+  quaternion.at<double>(1) = getRvec().at<double>(1) * sin(angle / 2.0) / angle;
+  quaternion.at<double>(2) = getRvec().at<double>(2) * sin(angle / 2.0) / angle;
+  quaternion.at<double>(3) = cos(angle / 2.0);
+  return quaternion;
+}
+
 void PoseRT::setRotation(const cv::Mat &rotation)
 {
   CV_Assert(rotation.rows == 3 && rotation.cols == 3);
