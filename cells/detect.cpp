@@ -154,7 +154,7 @@ namespace transparent_objects
 
       std::vector<cv::Vec3f> collisionBoxesDimensions;
       std::vector<PoseRT> collisionBoxesPoses;
-      transpod::reconstructCollisionMap(camera, debugInfo.glassMask,
+      transpod::reconstructCollisionMap(camera, debugInfo.tablePlane, debugInfo.glassMask,
                               detector_->getModel(detectedObjects[bestDetectionIndex]), poses[bestDetectionIndex],
                               collisionBoxesDimensions, collisionBoxesPoses);
 
@@ -180,7 +180,7 @@ namespace transparent_objects
         // Radius + length
         object.dimensions[0] = collisionBoxesDimensions[i][0];
         object.dimensions[1] = collisionBoxesDimensions[i][1];
-        object.dimensions[2] = 1;//collisionBoxesDimensions[i][2];
+        object.dimensions[2] = collisionBoxesDimensions[i][2];
 
         geometry_msgs::Pose pose;
         // TODO should be close to the glass
@@ -200,7 +200,6 @@ namespace transparent_objects
       pub.publish(nan_cubes_);
       ros::Duration(1).sleep();
 #endif
-
         if (*visualize_)
         {
           cv::Mat visualization = color_->clone();

@@ -73,12 +73,128 @@ void Detector::addTrainObject(const std::string &objectName, const PoseEstimator
   }
 }
 
+
 void reconstructCollisionMap(const PinholeCamera &validTestCamera,
-                             const cv::Mat &glassMask,
+                             const cv::Vec4f &tablePlane, const cv::Mat &glassMask,
                              const EdgeModel &objectModel, const PoseRT &objectPose,
                              std::vector<cv::Vec3f> &collisionObjectsDimensions,
                              std::vector<PoseRT> &collisionObjectsPoses)
 {
+  //TODO: move up
+  const float gapAroundObject = 0.05f;
+  const float maxL1DistanceToCollisionObject = 1.0f;
+  const float collisionObjectHeight = 0.3f;
+  const float downFactor = 1.0f;
+  const int closingIterationsCount = 10;
+  const float minDistanceToObjectSilhouette = 4.5f; //in pixels
+
+  collisionObjectsDimensions.clear();
+  collisionObjectsPoses.clear();
+
+  vector<std::pair<float, float> > objectRanges = objectModel.getObjectRanges();
+
+  vector<Point2f> glassContourPoints;
+  mask2contour(glassMask, glassContourPoints);
+  vector<Point3f> contourPoints3D_Vec;
+  validTestCamera.reprojectPointsOnTable(glassContourPoints, tablePlane, contourPoints3D_Vec);
+  PoseRT invertedPose = objectPose.inv();
+  vector<Point3f> transformedContourPoints;
+  project3dPoints(contourPoints3D_Vec, invertedPose.getRvec(), invertedPose.getTvec(), transformedContourPoints);
+  for (size_t i = 0; i < transformedContourPoints.size(); ++i)
+  {
+    CV_Assert(fabs(transformedContourPoints[i].z) < 1e-2);
+  }
+  Mat contourPoints3D = Mat(transformedContourPoints).reshape(1);
+
+
+  //TODO: add function for this
+  vector<Point2f> projectedObjectPoints;
+  validTestCamera.projectPoints(objectModel.points, objectPose, projectedObjectPoints);
+  Mat objectMask;
+  Point tl;
+  bool cropMask = false;
+  EdgeModel::computePointsMask(projectedObjectPoints, glassMask.size(), downFactor, closingIterationsCount, objectMask, tl, cropMask);
+
+  Mat dt;
+  //TODO: move up
+  distanceTransform(~objectMask, dt, CV_DIST_L2, CV_DIST_MASK_PRECISE);
+
+  //TODO: this assumption is incorrect if you have a small object behing a large object
+  Mat objectSilhouettePointsMask(glassContourPoints.size(), 1, CV_8UC1, Scalar(0));
+  for (size_t i = 0; i < glassContourPoints.size(); ++i)
+  {
+    Point pt = glassContourPoints[i];
+    CV_Assert(isPointInside(dt, pt));
+    CV_Assert(dt.type() == CV_32FC1);
+    if (dt.at<float>(pt) < minDistanceToObjectSilhouette)
+    {
+      objectSilhouettePointsMask.at<uchar>(i) = 255;
+    }
+  }
+
+
+  const size_t dim = 3;
+  CV_Assert(objectRanges.size() == dim);
+  const size_t collisionDim = 2;
+  for (int axisIndex = 0; axisIndex < collisionDim; ++axisIndex)
+  {
+    CV_Assert(objectRanges[axisIndex].first < 0 && objectRanges[axisIndex].second > 0);
+    int otherAxisIndex = 1 - axisIndex;
+    float lowerBound = objectRanges[axisIndex].first - gapAroundObject;
+    float upperBound = objectRanges[axisIndex].second + gapAroundObject;
+    Mat currentAxisCoordinates = contourPoints3D.col(axisIndex);
+    Mat otherAxisCoordinates = contourPoints3D.col(otherAxisIndex);
+
+    const int sidesCount = 2;
+    for (int sideIndex = 0; sideIndex < sidesCount; ++sideIndex)
+    {
+      Mat collisionPointsMask;
+      if (sideIndex == 0)
+      {
+        collisionPointsMask = currentAxisCoordinates > upperBound &
+                              currentAxisCoordinates < maxL1DistanceToCollisionObject;
+      }
+      else
+      {
+        collisionPointsMask = currentAxisCoordinates < lowerBound &
+                              currentAxisCoordinates > -maxL1DistanceToCollisionObject;
+      }
+      collisionPointsMask = collisionPointsMask &
+                            otherAxisCoordinates > -maxL1DistanceToCollisionObject &
+                            otherAxisCoordinates < maxL1DistanceToCollisionObject &
+                            ~objectSilhouettePointsMask;
+
+      if (countNonZero(collisionPointsMask) == 0)
+      {
+        continue;
+      }
+
+      double minCurrentAxis, maxCurrentAxis;
+      double minOtherAxis, maxOtherAxis;
+      minMaxLoc(currentAxisCoordinates, &minCurrentAxis, &maxCurrentAxis, 0, 0, collisionPointsMask);
+      minMaxLoc(otherAxisCoordinates, &minOtherAxis, &maxOtherAxis, 0, 0, collisionPointsMask);
+
+      Vec3f dimensions;
+      dimensions[axisIndex] = maxCurrentAxis - minCurrentAxis;
+      dimensions[otherAxisIndex] = maxOtherAxis - minOtherAxis;
+      dimensions[2] = collisionObjectHeight;
+
+      const int dim = 3;
+      Mat rvec = Mat::zeros(dim, 1, CV_64FC1);
+      Mat tvec = Mat::zeros(dim, 1, CV_64FC1);
+      tvec.at<double>(axisIndex) = (minCurrentAxis + maxCurrentAxis) / 2.0;
+      tvec.at<double>(otherAxisIndex) = (minOtherAxis + maxOtherAxis) / 2.0;
+
+      PoseRT shift(rvec, tvec);
+      PoseRT currentPose = objectPose * shift;
+
+      collisionObjectsDimensions.push_back(dimensions);
+      collisionObjectsPoses.push_back(currentPose);
+    }
+  }
+
+  // super-boxes
+#if 0
   //TODO: move up
   const float collisionArea = 0.15f;
   const float rectLength = 0.10f;
@@ -179,6 +295,7 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
   imshow("viz", viz);
   waitKey();
 */
+#endif
 }
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
@@ -252,6 +369,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   if (debugInfo != 0)
   {
     debugInfo->glassMask = glassMask;
+    debugInfo->tablePlane = tablePlane;
   }
 #ifdef VERBOSE
   std::cout << "glass is segmented" << std::endl;

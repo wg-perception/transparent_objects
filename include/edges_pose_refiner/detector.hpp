@@ -167,13 +167,14 @@ namespace transpod
   {
       cv::Mat glassMask;
       std::vector<cv::Mat> initialSilhouettes;
+      cv::Vec4f tablePlane;
   };
 
   void reconstructCollisionMap(const PinholeCamera &validTestCamera,
-                               const cv::Mat &glassMask,
-                               const EdgeModel &objectModel, const PoseRT &objectPose,
-                               std::vector<cv::Vec3f> &collisionObjectsDimensions,
-                               std::vector<PoseRT> &collisionObjectsPoses);
+                               const cv::Vec4f &tablePlane,
+                               const cv::Mat &glassMask, const EdgeModel &objectModel,
+                               const PoseRT &objectPose,
+                               std::vector<cv::Vec3f> &collisionObjectsDimensions, std::vector<PoseRT> &collisionObjectsPoses);
 }
 
 

@@ -129,3 +129,32 @@ void PinholeCamera::resize(cv::Size destinationSize)
 
   imageSize = destinationSize;
 }
+
+void PinholeCamera::reprojectPointsOnTable(const std::vector<cv::Point2f> &points, const cv::Vec4f &tablePlane,
+                                           std::vector<cv::Point3f> &reprojectedPoints) const
+{
+  const float eps = 1e-4;
+  CV_Assert(norm(distCoeffs) < eps);
+
+  Mat homogeneousPoints;
+  convertPointsToHomogeneous(points, homogeneousPoints);
+  Mat cameraMatrixFloat;
+  cameraMatrix.convertTo(cameraMatrixFloat, CV_32FC1);
+  Mat reprojectedRaysMat = homogeneousPoints.reshape(1) * cameraMatrixFloat.inv().t();
+  CV_Assert(reprojectedRaysMat.type() == CV_32FC1);
+  vector<Point3f> reprojectedRays = reprojectedRaysMat.reshape(3);
+
+  reprojectedPoints.clear();
+  reprojectedPoints.reserve(points.size());
+  for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
+  {
+    Point3f ray = reprojectedRays[pointIndex];
+    double denominator = tablePlane[0] * ray.x +
+                         tablePlane[1] * ray.y +
+                         tablePlane[2] * ray.z;
+    CV_Assert(fabs(denominator) > eps);
+    double t = -tablePlane[3] / denominator;
+    Point3f finalPoint = ray * t;
+    reprojectedPoints.push_back(finalPoint);
+  }
+}

@@ -19,11 +19,29 @@ using std::endl;
 //#define VISUALIZE_SILHOUETTE_GENERATION
 //#define VISUALIZE_EDGE_MODEL_CREATION
 
-cv::Vec3f EdgeModel::getBoundingBox() const
+std::vector<std::pair<float, float> > EdgeModel::getObjectRanges() const
 {
   Mat pointsMat = Mat(points).reshape(1);
 
+  vector<std::pair<float, float> > ranges;
+  for (int col = 0; col < pointsMat.cols; ++col)
+  {
+    double minVal, maxVal;
+    minMaxLoc(pointsMat.col(col), &minVal, &maxVal);
+    ranges.push_back(std::pair<float, float>(minVal, maxVal));
+  }
+  return ranges;
+}
+
+/*
+cv::Vec3f EdgeModel::getBoundingBox() const
+{
+  std::vector<std::pair<float, float> > ranges = getObjectRanges();
   Vec3f dimensions;
+  CV_Assert(
+  Mat pointsMat = Mat(points).reshape(1);
+
+
   CV_Assert(pointsMat.cols == Vec3f::channels);
   for (int col = 0; col < pointsMat.cols; ++col)
   {
@@ -33,6 +51,7 @@ cv::Vec3f EdgeModel::getBoundingBox() const
   }
   return dimensions;
 }
+*/
 
 void EdgeModel::projectPointsOnAxis(const EdgeModel &edgeModel, Point3d axis, vector<float> &projections, Point3d &center_d)
 {
@@ -322,7 +341,7 @@ void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera,
   silhouette.init(footprintPoints, pose_cam);
 }
 
-void EdgeModel::computePointsMask(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, float downFactor, int closingIterationsCount, cv::Mat &image, cv::Point &tl)
+void EdgeModel::computePointsMask(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, float downFactor, int closingIterationsCount, cv::Mat &image, cv::Point &tl, bool cropMask)
 {
   CV_Assert(imageSize.height > 0 && imageSize.width > 0);
   bool isValid = false;
@@ -362,7 +381,8 @@ void EdgeModel::computePointsMask(const std::vector<cv::Point2f> &points, const 
 
   CV_Assert(tl.x >= 0 && tl.x < projectedPointsImg.cols && tl.y >= 0 && tl.y < projectedPointsImg.rows);
   CV_Assert(br.x > 0 && br.x <= projectedPointsImg.cols && br.y > 0 && br.y <= projectedPointsImg.rows);
-  Mat projectedPointsROI = projectedPointsImg(Rect(tl, br));
+  //TODO: if cropMask = false then compute morphology on a cropped image and then copy it to uncropped
+  Mat projectedPointsROI = cropMask ? projectedPointsImg(Rect(tl, br)) : projectedPointsImg;
 
   //  morphologyEx(projectedPointsROI, projectedPointsROI, MORPH_CLOSE, Mat(), Point(-1, -1), closingIterationsCount );
   Mat structuringElement = getStructuringElement(MORPH_ELLIPSE, Size(elementSize, elementSize), Point(closingIterationsCount, closingIterationsCount));
