@@ -27,6 +27,7 @@ public:
   cv::Mat getTvec() const;
   cv::Mat getRotationMatrix() const;
   cv::Mat getProjectiveMatrix() const;
+  cv::Mat getQuaternion() const;
 
   void setRotation(const cv::Mat &rotation);
   void setProjectiveMatrix(const cv::Mat &rt);

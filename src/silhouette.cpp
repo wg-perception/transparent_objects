@@ -140,7 +140,7 @@ void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, 
   for (int firstIndex = 0; firstIndex < downsampledEdgels.rows; ++firstIndex)
   {
     //TODO: use symmetry (i, j) and (j, i)
-    for (int secondIndex = 0; secondIndex < downsampledEdgels.rows; ++secondIndex)
+    for (int secondIndex = firstIndex + 1; secondIndex < downsampledEdgels.rows; ++secondIndex)
     {
       float dist = norm(downsampledEdgelsVec[firstIndex] - downsampledEdgelsVec[secondIndex]);
       if (dist < minDistanceBetweenPoints)
@@ -149,6 +149,7 @@ void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, 
       }
 
       GHValue basisIndices(silhouetteIndex, firstIndex, secondIndex);
+      GHValue invertedBasisIndices(silhouetteIndex, secondIndex, firstIndex);
       Mat transformedEdgels;
       generateHashForBasis(firstIndex, secondIndex, transformedEdgels);
       vector<Point2f> transformedEdgelsVec = transformedEdgels;
@@ -161,9 +162,14 @@ void Silhouette::generateGeometricHash(int silhouetteIndex, GHTable &hashTable, 
         float invertedGranularity = 1.0 / granularity;
         Point pt = transformedEdgelsVec[i] * invertedGranularity;
 //        cout << pt << endl;
+
         GHKey ptPair(pt.x, pt.y);
         std::pair<GHKey, GHValue> value(ptPair, basisIndices);
         hashTable.insert(value);
+
+        GHKey invertedPtPair(-pt.x, -pt.y);
+        std::pair<GHKey, GHValue> invertedValue(invertedPtPair, invertedBasisIndices);
+        hashTable.insert(invertedValue);
       }
     }
   }
