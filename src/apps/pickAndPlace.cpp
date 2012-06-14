@@ -51,6 +51,8 @@ int main(int argc, char **argv)
   const std::string PLACE_ACTION_NAME =
     "/object_manipulator/object_manipulator_place";
 
+  const std::string armName = "left_arm";
+
   //create service and action clients
   ros::ServiceClient object_detection_srv;
   ros::ServiceClient collision_processing_srv;
@@ -97,9 +99,15 @@ int main(int argc, char **argv)
   if (!nh.ok()) exit(0);
 
 
-
+  int demoIteration = 0;
+  geometry_msgs::Point previousPlacing;
+  geometry_msgs::Pose previousDetectedPose;
+  previousDetectedPose.position.x = 0.0;
+  previousDetectedPose.position.y = 0.0;
+  previousDetectedPose.position.z = 0.0;
   while(true)
   {
+#if 1
 #if 1
     //call the tabletop detection
     ROS_INFO("Calling tabletop detector");
@@ -143,16 +151,22 @@ int main(int argc, char **argv)
     processing_call.request.detection_result =
       detection_call.response.detection;
     //ask for the existing map and collision models to be reset
-    processing_call.request.reset_collision_models = true;
+//    processing_call.request.reset_collision_models = true;
+//    processing_call.request.reset_collision_models = false;
+//    processing_call.request.reset_collision_models = (demoIteration == 0);
+    //TODO: reset collisions at the beginning
+    processing_call.request.reset_collision_models = false;
     processing_call.request.reset_attached_models = true;
     //ask for the results to be returned in base link frame
-    //  processing_call.request.desired_frame = "base_link";
+    // processing_call.request.desired_frame = "base_link";
     //  processing_call.request.desired_frame = "/head_mount_kinect_rgb_optical_frame";
     if (!collision_processing_srv.call(processing_call))
     {
       ROS_ERROR("Collision map processing service failed");
       return -1;
     }
+
+
 
     std::cout << "collision results:" << std::endl;
     std::cout << processing_call.response.graspable_objects.size() << std::endl;
@@ -164,6 +178,12 @@ int main(int argc, char **argv)
       ROS_ERROR("Collision map processing returned no graspable objects");
       return -1;
     }
+
+    geometry_msgs::Pose detectedObjectPose = processing_call.response.graspable_objects[0].potential_models[0].pose.pose;
+    std::cout << "detected pose: " << detectedObjectPose << std::endl;
+
+
+
 
     //call object pickup
     ROS_INFO("Calling the pickup action");
@@ -180,7 +200,7 @@ int main(int argc, char **argv)
     pickup_goal.collision_support_surface_name =
       processing_call.response.collision_support_surface_name;
     //pick up the object with the right arm
-    pickup_goal.arm_name = "right_arm";
+    pickup_goal.arm_name = armName;
     //we will be lifting the object along the "vertical" direction
     //which is along the z axis in the base_link frame
     geometry_msgs::Vector3Stamped direction;
@@ -243,13 +263,22 @@ int main(int argc, char **argv)
     object_manipulation_msgs::PlaceGoal place_goal;
 
     //create a place location, offset by 10 cm from the pickup location
-    const float halfRange = 0.1;
-    //  const float minRange = 0.1;
-    const float step = 0.01;
     const float eps = 1e-4;
-    for (float dx = -halfRange; dx < halfRange + eps; dx += step)
+/*
+    // Vertical place
+    float xshift = (demoIteration == 0) ? -0.4 : (previousDetectedPose.position.x - detectedObjectPose.position.x) + previousPlacing.x;
+    const float xmin = xshift - 0.05;
+//    const float xmax = xshift + 0.05;
+    const float xmax = xshift + 0.4;
+    const float xstep = 0.002;
+
+    float yshift = (demoIteration == 0) ? 0.1 : (previousDetectedPose.position.y - detectedObjectPose.position.y) + previousPlacing.y - 0.05;
+    const float ymin = -0.5;
+    const float ymax = (demoIteration == 0) ? 0.1 : yshift;
+    const float ystep = 0.002;
+//    for (float dx = xmin; dx < xmax + eps; dx += xstep)
     {
-      for (float dy = -halfRange; dy < halfRange + eps; dy += step)
+//      for (float dy = ymax; dy > ymin - eps; dy -= ystep)
       {
         //    	if (fabs(dx) < minRange && fabs(dy) < minRange)
         //	{
@@ -260,16 +289,73 @@ int main(int argc, char **argv)
         //identity pose
         place_location.pose.orientation.w = 1;
         place_location.header.stamp = ros::Time::now();
-        //  place_location.pose.position.x -= 0.12;
-        //place_location.pose.position.x += 0.01;
-        place_location.pose.position.x += dx;
-        place_location.pose.position.y += dy;
+//        place_location.pose.position.x += (armName == "right_arm" || demoIteration != 0) ? dx : -dx;
+//        place_location.pose.position.y += dy;
+        place_location.pose.position.x += 0.3;
+        place_location.pose.position.y += 0.0;
+//        std::cout << dx << " " << dy << std::endl;
         place_goal.place_locations.push_back(place_location);
       }
     }
+*/
 
+    //Horizontal shift
+    float xshift = (demoIteration == 0) ? -0.4 : -((previousDetectedPose.position.x - detectedObjectPose.position.x) + previousPlacing.x + 0.05);
+    const float xmin = xshift;
+    const float xmax = 0.1;
+//    const float xstep = 0.002;
+//    const float xstep = 0.002;
+    const float xstep = 0.01;
 
+    float yshift = (demoIteration == 0) ? 0.0 : (previousDetectedPose.position.y - detectedObjectPose.position.y) + previousPlacing.y;
+    const float ymin = yshift - 0.03;
+    const float ymax = yshift + 0.3;
+//    const float ymin = -1.0;
+//   const float ymax = 1.0;
+//    const float ystep = 0.002;
+    const float ystep = 0.01;
+    for (float dx = xmin; dx < xmax + eps; dx += xstep)
+    {
+      for (float dy = ymax; dy > ymin - eps; dy -= ystep)
+      {
+        //    	if (fabs(dx) < minRange && fabs(dy) < minRange)
+        //	{
+        //	  continue;
+        //	}
+        geometry_msgs::PoseStamped place_location;
+        place_location.header.frame_id = processing_call.response.graspable_objects.at(0).reference_frame_id;
+        //identity pose
+        place_location.pose.orientation.w = 1;
+        place_location.header.stamp = ros::Time::now();
+        place_location.pose.position.x += (armName == "right_arm") ? dx : -dx;
+        place_location.pose.position.y += dy;
+//        std::cout << place_location.pose.position << std::endl;
+        place_goal.place_locations.push_back(place_location);
+      }
+    }
+    
 
+/*
+    for (float dx = -1.0; dx < 1.0; dx += 0.05)
+    {
+      for (float dy = -1.0; dy < 1.0; dy += 0.05)
+      {
+        //    	if (fabs(dx) < minRange && fabs(dy) < minRange)
+        //	{
+        //	  continue;
+        //	}
+        geometry_msgs::PoseStamped place_location;
+        place_location.header.frame_id = processing_call.response.graspable_objects.at(0).reference_frame_id;
+        //identity pos
+        place_location.pose.orientation.w = 1;
+        place_location.header.stamp = ros::Time::now();
+        place_location.pose.position.x += dx;
+        place_location.pose.position.y += dy;
+//        std::cout << place_location.pose.position << std::endl;
+        place_goal.place_locations.push_back(place_location);
+      }
+    }
+*/
     //place at the prepared location
     //place_goal.place_locations.push_back(place_location);
     //the collision names of both the objects and the table
@@ -282,12 +368,13 @@ int main(int argc, char **argv)
     //returned by the pickup action
     place_goal.grasp = pickup_result.grasp;
     //use the right rm to place
-    place_goal.arm_name = "right_arm";
+    place_goal.arm_name = armName;
     //padding used when determining if the requested place location
     //would bring the object in collision with the environment
-    place_goal.place_padding = 0.02;
+    place_goal.place_padding = 0.01;
     //  place_goal.place_padding = 0.001;
     //how much the gripper should retreat after placing the object
+    //TODO: increase
     place_goal.desired_retreat_distance = 0.1;
     place_goal.min_retreat_distance = 0.05;
     //  place_goal.min_retreat_distance = 0.001;
@@ -300,11 +387,18 @@ int main(int argc, char **argv)
     direction.vector.z = -1;
     place_goal.approach.direction = direction;
     //request a vertical put down motion of 10cm before placing the object
+    //TODO: set back for real objects
+//    place_goal.approach.desired_distance = 0.07;
+//    place_goal.approach.desired_distance = 0.07;
     place_goal.approach.desired_distance = 0.1;
-    place_goal.approach.min_distance = 0.05;
+//    place_goal.approach.desired_distance = 0.05;
+    place_goal.approach.min_distance = 0.03;
+//    place_goal.approach.desired_distance = 0.03;
+ //   place_goal.approach.min_distance = 0.01;
     //we are not using tactile based placing
     place_goal.use_reactive_place = false;
-    place_goal.allow_gripper_support_collision = true;
+//    place_goal.allow_gripper_support_collision = true;
+    place_goal.allow_gripper_support_collision = false;
     //send the goal
     place_client.sendGoal(place_goal);
     while (!place_client.waitForResult(ros::Duration(10.0)))
@@ -313,6 +407,13 @@ int main(int argc, char **argv)
     }
     object_manipulation_msgs::PlaceResult place_result =
       *(place_client.getResult());
+
+    std::cout << "tried locations:" << std::endl;
+    for (size_t i = 0; i < place_result.attempted_locations.size(); ++i)
+    {
+      std::cout << place_result.attempted_locations[i] << std::endl;
+    }
+
     if (place_client.getState() !=
         actionlib::SimpleClientGoalState::SUCCEEDED)
     {
@@ -321,6 +422,8 @@ int main(int argc, char **argv)
       return -1;
     }
 
+    previousPlacing = place_result.place_location.pose.position;
+    std::cout << "Placed to the position: " << previousPlacing.x << " " << previousPlacing.y << std::endl;
 
 
 
@@ -387,23 +490,28 @@ int main(int argc, char **argv)
 
 #endif
 
+#endif
 
-    actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> move_arm("move_right_arm",true);
+    actionlib::SimpleActionClient<arm_navigation_msgs::MoveArmAction> move_arm("move_" + armName,true);
 
     move_arm.waitForServer();
     ROS_INFO("Connected to server");
 
     arm_navigation_msgs::MoveArmGoal goalB;
     std::vector<std::string> names(7);
-    names[0] = "r_shoulder_pan_joint";
-    names[1] = "r_shoulder_lift_joint";
-    names[2] = "r_upper_arm_roll_joint";
-    names[3] = "r_elbow_flex_joint";
-    names[4] = "r_forearm_roll_joint";
-    names[5] = "r_wrist_flex_joint";
-    names[6] = "r_wrist_roll_joint";
+    names[0] = "_shoulder_pan_joint";
+    names[1] = "_shoulder_lift_joint";
+    names[2] = "_upper_arm_roll_joint";
+    names[3] = "_elbow_flex_joint";
+    names[4] = "_forearm_roll_joint";
+    names[5] = "_wrist_flex_joint";
+    names[6] = "_wrist_roll_joint";
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+      names[i] = armName[0] + names[i];
+    }
 
-    goalB.motion_plan_request.group_name = "right_arm";
+    goalB.motion_plan_request.group_name = armName;
     goalB.motion_plan_request.num_planning_attempts = 1;
     goalB.motion_plan_request.allowed_planning_time = ros::Duration(5.0);
 
@@ -419,7 +527,7 @@ int main(int argc, char **argv)
       goalB.motion_plan_request.goal_constraints.joint_constraints[i].tolerance_above = 0.1;
     }
 
-    std::vector<double> sp = getSidePosition("right_arm");
+    std::vector<double> sp = getSidePosition(armName);
     for (size_t i = 0; i < sp.size(); ++i)
     {
       goalB.motion_plan_request.goal_constraints.joint_constraints[i].position = sp[i];
@@ -465,6 +573,8 @@ int main(int argc, char **argv)
 
     //success!
     ROS_INFO("Success! Object moved.");
+    ++demoIteration;
+    previousDetectedPose = detectedObjectPose;
   }  
   return 0;
 
