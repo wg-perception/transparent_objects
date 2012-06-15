@@ -81,12 +81,13 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
                              std::vector<PoseRT> &collisionObjectsPoses)
 {
   //TODO: move up
-  const float gapAroundObject = 0.05f;
+  const float gapAroundObject = 0.03f;
   const float maxL1DistanceToCollisionObject = 1.0f;
-  const float collisionObjectHeight = 0.3f;
+//  const float collisionObjectHeight = 0.3f;
+  const float collisionObjectHeight = 0.45f;
   const float downFactor = 1.0f;
   const int closingIterationsCount = 10;
-  const float minDistanceToObjectSilhouette = 4.5f; //in pixels
+  const float minDistanceToObjectSilhouette = 6.5f; //in pixels
 
   collisionObjectsDimensions.clear();
   collisionObjectsPoses.clear();
