@@ -34,6 +34,7 @@ inline std::vector<double> getSidePosition(std::string arm_name)
 
 int main(int argc, char **argv)
 {
+  bool resetCollisions = (argc == 1);
   //initialize the ROS node
   ros::init(argc, argv, "pick_and_place_app");
   ros::NodeHandle nh;
@@ -52,6 +53,8 @@ int main(int argc, char **argv)
     "/object_manipulator/object_manipulator_place";
 
 //  const std::string armName = "left_arm";
+//  std::string arms[] = {"left_arm", "right_arm"};
+//  std::string arms[] = {"right_arm", "left_arm"};
   std::string arms[] = {"left_arm", "right_arm"};
 
   //create service and action clients
@@ -100,6 +103,7 @@ int main(int argc, char **argv)
   if (!nh.ok()) exit(0);
 
 
+  if (resetCollisions)
 {
     //call collision map processing
     ROS_INFO("Calling collision map processing");
@@ -405,7 +409,7 @@ int main(int argc, char **argv)
         place_location.pose.position.x += dx;
 //        place_location.pose.position.x += dx;
         place_location.pose.position.y += dy;
-        place_location.pose.position.z += 0.06;
+        place_location.pose.position.z += 0.04;
 //        place_location.pose.position.z += 0.1;
 
 //        std::cout << place_location.pose.position << std::endl;
@@ -441,11 +445,6 @@ int main(int argc, char **argv)
     //same as in the pickup action
 
 
-    
-    bool isObjectPlaced = false; 
-    bool isArmOnSide = false;
-while (!isObjectPlaced)
-{
     place_goal.collision_object_name =
       processing_call.response.collision_object_names.at(0);
     place_goal.collision_support_surface_name =
@@ -478,7 +477,7 @@ while (!isObjectPlaced)
 //    place_goal.approach.desired_distance = 0.07;
     place_goal.approach.desired_distance = 0.1;
 //    place_goal.approach.desired_distance = 0.05;
-    place_goal.approach.min_distance = 0.03;
+    place_goal.approach.min_distance = 0.05;
 //    place_goal.approach.desired_distance = 0.03;
  //   place_goal.approach.min_distance = 0.01;
     //we are not using tactile based placing
@@ -506,17 +505,12 @@ while (!isObjectPlaced)
       ROS_ERROR("Place failed with error code %d",
           place_result.manipulation_result.value);
 
-      if (isArmOnSide)
-      {
-        ROS_ERROR("Cannot place the object automacaly, please move the arm manually and provide input when this is done");
-        std::string str;
-        std::cin >> str;
-        continue;
-      }
+      ROS_ERROR("Cannot place the object automacaly, please move the arm manually and provide input when this is done");
+      std::string str;
+      std::cin >> str;
     }
     else
     {
-      isObjectPlaced = true;
       previousPlacing = place_result.place_location.pose.position;
       std::cout << "Placed to the position: " << previousPlacing.x << " " << previousPlacing.y << std::endl;
     }
@@ -636,11 +630,14 @@ while (!isObjectPlaced)
     {
       bool finished_within_time = false;
       move_arm.sendGoal(goalB);
-      finished_within_time = move_arm.waitForResult(ros::Duration(200.0));
+      finished_within_time = move_arm.waitForResult(ros::Duration(120.0));
       if (!finished_within_time)
       {
         move_arm.cancelGoal();
         ROS_INFO("Timed out achieving goal A");
+        ROS_ERROR("Cannot move the arm to a side, please use rviz to do this and provide the input when done");
+        std::string str;
+        std::cin >> str;
       }
       else
       {
@@ -649,7 +646,6 @@ while (!isObjectPlaced)
         if(success)
         {
           ROS_INFO("Action finished: %s",state.toString().c_str());
-          isArmOnSide = true;
         }
         else
         {
@@ -660,7 +656,6 @@ while (!isObjectPlaced)
         }
       }
     }
-}
 
 #if 0
     object_manipulator::MechanismInterface mech_interface;
