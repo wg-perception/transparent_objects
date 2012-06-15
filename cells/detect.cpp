@@ -158,6 +158,7 @@ namespace transparent_objects
                               detector_->getModel(detectedObjects[bestDetectionIndex]), poses[bestDetectionIndex],
                               collisionBoxesDimensions, collisionBoxesPoses);
 
+      //TODO: remove cubes if there are no cubes at all
       int n_cubes = collisionBoxesPoses.size();
       std::cout << "n cubes: " << n_cubes <<std::endl;
       ros::Publisher pub = nh.advertise<arm_navigation_msgs::CollisionObject>("/collision_object", 2, true);
