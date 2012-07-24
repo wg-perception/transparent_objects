@@ -34,6 +34,8 @@ public:
   void importBGRImage(int testImageIdx, cv::Mat &bgrImage) const;
   static void importBGRImage(const std::string &filename, cv::Mat &depth);
 
+  void importRawMask(int testImageIdx, cv::Mat &bgrImage) const;
+
   void importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const;
   static void importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud);
   static void importPointCloud(const std::string &filename, cv::Mat &cloud);

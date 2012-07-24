@@ -154,13 +154,14 @@ void TODBaseImporter::importTestIndices(vector<int> &testIndices) const
   string basePath = testFolder + "/";
   string imagesList = basePath + "testImages.txt";
   std::ifstream fin(imagesList.c_str());
-  CV_Assert(fin.is_open());
+  if (!fin.is_open())
+  {
+    CV_Error(CV_StsError, "Cannot open the file " + imagesList);
+  }
   while(!fin.eof())
   {
     int idx = -1;
     fin >> idx;
-
-    cout << idx << endl;
 
     if(idx >= 0)
       testIndices.push_back(idx);
@@ -186,7 +187,10 @@ void TODBaseImporter::importDepth(int testImageIdx, cv::Mat &depth) const
 void TODBaseImporter::importBGRImage(const std::string &filename, cv::Mat &bgrImage)
 {
   bgrImage = imread(filename, CV_LOAD_IMAGE_UNCHANGED);
-  CV_Assert(!bgrImage.empty());
+  if (bgrImage.empty())
+  {
+    CV_Error(CV_StsBadArg, "Cannot read the image " + filename);
+  }
 }
 
 void TODBaseImporter::importBGRImage(int testImageIdx, cv::Mat &bgrImage) const
@@ -194,6 +198,14 @@ void TODBaseImporter::importBGRImage(int testImageIdx, cv::Mat &bgrImage) const
   std::stringstream imageFilename;
   imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png";
   importBGRImage(imageFilename.str(), bgrImage);
+}
+
+void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
+{
+  std::stringstream imageFilename;
+  imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.raw_mask.png";
+  importBGRImage(imageFilename.str(), mask);
+  CV_Assert(mask.channels() == 1);
 }
 
 void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) const
