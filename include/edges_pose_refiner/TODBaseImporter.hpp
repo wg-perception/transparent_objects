@@ -26,6 +26,7 @@ public:
   void importEdgeModel(const std::string &modelsPath, const std::string &objectName, EdgeModel &edgeModel) const;
   void importTestIndices(std::vector<int> &testIndices) const;
   void importGroundTruth(int testImageIdx, PoseRT &model2test) const;
+  void importAllGroundTruth(std::map<int, PoseRT> &allPoses) const;
   static void importRegistrationMask(const std::string &filename, cv::Mat &registrationMask);
 
   void importDepth(int testImageIdx, cv::Mat &depth) const;

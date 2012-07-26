@@ -300,6 +300,15 @@ void Silhouette::draw(cv::Mat &image, int thickness) const
   drawPoints(edgelsVec, image, Scalar::all(255), thickness);
 }
 
+void Silhouette::drawMask(cv::Mat &image) const
+{
+  Mat edgelsInt;
+  edgels.convertTo(edgelsInt, CV_32SC2);
+  vector<vector<Point> > contours(1);
+  contours[0] = edgelsInt;
+  drawContours(image, contours, -1, Scalar::all(255), -1);
+}
+
 
 void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform)
 {

@@ -16,7 +16,7 @@ Line2D::Line2D(const std::vector<cv::Ptr<linemod::Modality> >& modalities, const
 }
 
 int Line2D::addTemplate(const std::vector<Mat> &sources, const std::string &class_id,
-                        const Mat &object_mask, Rect *bounding_box, PoseRT *pose)
+                        const Mat &object_mask, Rect *bounding_box, const PoseRT *pose)
 {
   Rect box;
   Rect *boxPtr = bounding_box ? bounding_box : &box;
@@ -84,11 +84,12 @@ Ptr<Line2D> getDefaultLine2D()
   const int T_DEFAULTS[] = {5, 8};
   std::vector< Ptr<linemod::Modality> > modalities;
   modalities.push_back(new linemod::ColorGradient);
-//  modalities.push_back(new linemod::ColorGradient(10.0f, 30, 30.0f));
+//  modalities.push_back(new linemod::ColorGradient(10.0f, 63, 30.0f));
   return new Line2D(modalities, std::vector<int>(T_DEFAULTS, T_DEFAULTS + 2));
 }
 
-Ptr<Line2D> trainLine2D(const std::string &baseFolder, const std::vector<std::string> &objectNames)
+Ptr<Line2D> trainLine2D(const std::string &baseFolder, const std::vector<std::string> &objectNames,
+                        std::vector<int> *testIndicesPtr)
 {
   Ptr<Line2D> line2D = getDefaultLine2D();
   for (size_t objectIndex = 0; objectIndex < objectNames.size(); ++objectIndex)
@@ -98,7 +99,15 @@ Ptr<Line2D> trainLine2D(const std::string &baseFolder, const std::vector<std::st
     TODBaseImporter dataImporter(testFolder);
 
     vector<int> testIndices;
-    dataImporter.importTestIndices(testIndices);
+    if (testIndicesPtr != 0)
+    {
+      testIndices = *testIndicesPtr;
+    }
+    else
+    {
+      dataImporter.importTestIndices(testIndices);
+    }
+
     for (size_t testIndex = 0; testIndex < testIndices.size(); ++testIndex)
     {
       int imageIndex = testIndices[testIndex];
@@ -119,6 +128,33 @@ Ptr<Line2D> trainLine2D(const std::string &baseFolder, const std::vector<std::st
 
       line2D->addTemplate(sources, currentObjectName, objectMask, 0, &trainPose);
     }
+  }
+
+  return line2D;
+}
+
+Ptr<Line2D> trainLine2D(const PinholeCamera &camera, const EdgeModel &edgeModel, const std::string &objectName, const std::vector<PoseRT> &trainPoses)
+{
+  Ptr<Line2D> line2D = getDefaultLine2D();
+  for (size_t i = 0; i < trainPoses.size(); ++i)
+  {
+    Silhouette silhouette;
+    //TODO: move up
+    float downFactor = 1.0;
+    int closingIterationsCount = 6;
+    cv::Ptr<PinholeCamera> cameraPtr = new PinholeCamera(camera);
+    edgeModel.getSilhouette(cameraPtr, trainPoses[i], silhouette, downFactor, closingIterationsCount);
+
+    Mat mask(camera.imageSize, CV_8UC1, Scalar(0));
+    silhouette.drawMask(mask);
+
+    Mat colorMask;
+    cvtColor(mask, colorMask, COLOR_GRAY2BGR);
+
+    vector<Mat> sources;
+    sources.push_back(colorMask);
+
+    line2D->addTemplate(sources, objectName, mask, 0, &trainPoses[i]);
   }
 
   return line2D;

@@ -27,6 +27,11 @@ double PoseError::getRotationDifference() const
   return rotationDifference;
 }
 
+double PoseError::getDifference() const
+{
+  return totalDiff;
+}
+
 std::ostream& operator<<(std::ostream& output, const PoseError& poseError)
 {
   const double rad2deg = 180.0 / CV_PI;
@@ -42,7 +47,9 @@ PoseError::PoseError()
 void PoseError::init(const PoseRT &_posesDifference, double _rotationDifference, double _translationDifference)
 {
   posesDifference = _posesDifference;
-  rotationDifference = std::min(_rotationDifference, CV_PI - _rotationDifference);
+  //TODO: was it a bug?
+//  rotationDifference = std::min(_rotationDifference, CV_PI - _rotationDifference);
+  rotationDifference = std::min(_rotationDifference, 2 * CV_PI - _rotationDifference);
   CV_Assert(rotationDifference >= 0);
   translationDiff = _translationDifference;
   computeSingleCriteria();

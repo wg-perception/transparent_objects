@@ -71,6 +71,7 @@ public:
 
   void visualizeSimilarityTransformation(const cv::Mat &similarityTransformation, cv::Mat &image, cv::Scalar color = cv::Scalar::all(255)) const;
   void draw(cv::Mat &image, int thickness) const;
+  void drawMask(cv::Mat &image) const;
 private:
   void generateHashForBasis(int firstIndex, int secondIndex, cv::Mat &transformedEdgels);
   static void getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform);

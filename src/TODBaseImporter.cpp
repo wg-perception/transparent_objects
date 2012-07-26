@@ -226,6 +226,20 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) co
   model2test = model2test * offset;
 }
 
+void TODBaseImporter::importAllGroundTruth(std::map<int, PoseRT> &allPoses) const
+{
+  allPoses.clear();
+  vector<int> testIndices;
+  importTestIndices(testIndices);
+  for (size_t testIndex = 0; testIndex < testIndices.size(); ++testIndex)
+  {
+    int imageIndex = testIndices[testIndex];
+    PoseRT pose;
+    importGroundTruth(imageIndex, pose);
+    allPoses[imageIndex] = pose;
+  }
+}
+
 void TODBaseImporter::importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
   pcl::io::loadPCDFile(filename, cloud);

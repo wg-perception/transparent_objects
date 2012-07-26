@@ -97,6 +97,118 @@ void drawResponse(const std::vector<cv::linemod::Template>& templates,
   }
 }
 
+//TODO: re-write the function
+void generatePoses(std::vector<PoseRT> &poses)
+{
+  //TODO: move up
+  const bool hasRotationSymmetry = true;
+  const int silhouetteCount = 20;
+  const float minDistance = 0.5f;
+  const float maxDistance = 0.7f;
+  const float distanceStep = 0.01f;
+
+  poses.clear();
+  for (float distance = minDistance; distance < maxDistance; distance += distanceStep)
+  {
+    for (int k = 0; k < silhouetteCount; ++k)
+    {
+      for(int i = 0; i < silhouetteCount; ++i)
+      {
+        for (int j = 0; j < silhouetteCount; ++j)
+        {
+          if (hasRotationSymmetry && j != 0)
+          {
+            continue;
+          }
+
+          //TODO: generate silhouettes uniformly on the viewing sphere
+          //TODO: move up
+          double xAngle = 2.0 * CV_PI / 3.0 + i * 2.0 * (CV_PI / 3.0) / (silhouetteCount - 1.0);
+          double yAngle = j * (2 * CV_PI) / silhouetteCount;
+          const int dim = 3;
+          Mat x_rvec_obj = (Mat_<double>(dim, 1) << xAngle, 0.0, 0.0);
+          Mat y_rvec_obj = (Mat_<double>(dim, 1) << 0.0, yAngle, 0.0);
+
+          //TODO: move up
+          double zAngle = -CV_PI/6 + (CV_PI / 3) * (k / (silhouetteCount - 1.0));
+          Mat z_rvec_obj = (Mat_<double>(dim, 1) << 0.0, 0.0, zAngle);
+          Mat zeroTvec = Mat::zeros(dim, 1, CV_64FC1);
+
+          PoseRT rotationPose = PoseRT(z_rvec_obj, zeroTvec) * PoseRT(x_rvec_obj, zeroTvec) * PoseRT(y_rvec_obj, zeroTvec);
+          PoseRT translationPose;
+          translationPose.tvec.at<double>(2) = distance;
+
+          PoseRT generatedPose = translationPose * rotationPose;
+          poses.push_back(generatedPose);
+        }
+      }
+    }
+  }
+  cout << "all templates count: " << poses.size() << endl;
+}
+
+void generateTrainPoses(const PinholeCamera &camera, const EdgeModel &edgeModel, std::map<int, PoseRT> &trainPoses)
+{
+  trainPoses.clear();
+
+  vector<PoseRT> sampledPoses_obj;
+  generatePoses(sampledPoses_obj);
+
+  EdgeModel canonicalEdgeModel = edgeModel;
+  PoseRT model2canonicalPose;
+  canonicalEdgeModel.rotateToCanonicalPose(camera, model2canonicalPose, 0.0f);
+
+  for (size_t i = 0; i < sampledPoses_obj.size(); ++i)
+  {
+    PoseRT silhouettePose_cam = sampledPoses_obj[i].obj2cam(canonicalEdgeModel.Rt_obj2cam);
+    silhouettePose_cam = silhouettePose_cam * model2canonicalPose;
+    trainPoses[i] = silhouettePose_cam;
+  }
+}
+
+void getBestTrainPoses(const EdgeModel &edgeModel, const std::map<int, PoseRT> &trainPoses, const std::map<int, PoseRT> &testPoses,
+                       std::vector<PoseRT> &bestTrainPoses)
+{
+  //TODO: move up
+//  int templatesCount = 5;
+//  int templatesCount = 50;
+  int templatesCount = 5000;
+//  int templatesCount = 400;
+//  const int templatesCount = 2000;
+
+  std::multimap<double, int> sortedTrainIndices;
+  for (std::map<int, PoseRT>::const_iterator trainIt = trainPoses.begin(); trainIt != trainPoses.end(); ++trainIt)
+  {
+    double minDistance = std::numeric_limits<double>::max();
+
+    for (std::map<int, PoseRT>::const_iterator testIt = testPoses.begin(); testIt != testPoses.end(); ++testIt)
+    {
+      PoseError poseError;
+      evaluatePoseWithRotation(edgeModel, trainIt->second, testIt->second, poseError);
+      double distance = poseError.getDifference();
+      if (distance < minDistance)
+      {
+        minDistance = distance;
+      }
+    }
+    sortedTrainIndices.insert(std::make_pair(minDistance, trainIt->first));
+  }
+
+
+  int addedTemplatesCount = 0;
+  bestTrainPoses.clear();
+  for (std::multimap<double, int>::iterator it = sortedTrainIndices.begin();
+       it != sortedTrainIndices.end(); ++it)
+  {
+    if (addedTemplatesCount < templatesCount)
+    {
+      cout << it->first << " -> " << it->second << endl;
+      bestTrainPoses.push_back(trainPoses.find(it->second)->second);
+      ++addedTemplatesCount;
+    }
+  }
+}
+
 int main(int argc, char *argv[])
 {
   std::system("date");
@@ -120,9 +232,52 @@ int main(int argc, char *argv[])
 
   const int matching_threshold = 80;
 
+  bool simulateTrainData = true;
+
+  CV_Assert(objectNames.size() == 1);
+  TODBaseImporter dataImporter(testFolder);
+  vector<EdgeModel> edgeModels(objectNames.size());
+  for (size_t i = 0; i < objectNames.size(); ++i)
+  {
+    dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
+    cout << "All points in the model: " << edgeModels[i].points.size() << endl;
+    cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
+  }
+
+  PinholeCamera kinectCamera;
+  if(!kinectCameraFilename.empty())
+  {
+    dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
+    CV_Assert(kinectCamera.imageSize == Size(640, 480));
+  }
+
+  vector<int> testIndices;
+  dataImporter.importTestIndices(testIndices);
+
+
+  CV_Assert(edgeModels.size() == 1);
+  std::map<int, PoseRT> trainPoses;
+  if (simulateTrainData)
+  {
+    generateTrainPoses(kinectCamera, edgeModels[0], trainPoses);
+  }
+  else
+  {
+    TODBaseImporter trainDataImporter(trainBaseFolder + "/" + testObjectName + "/");
+    trainDataImporter.importAllGroundTruth(trainPoses);
+  }
+
+  std::map<int, PoseRT> testPoses;
+  dataImporter.importAllGroundTruth(testPoses);
+
+  vector<PoseRT> bestTrainPoses;
+  CV_Assert(edgeModels.size() == 1);
+  getBestTrainPoses(edgeModels[0], trainPoses, testPoses, bestTrainPoses);
+
 
   std::cout << "Training Line2D...  " << std::flush;
-  cv::Ptr<Line2D> detector = trainLine2D(trainBaseFolder, objectNames);
+  CV_Assert(edgeModels.size() == 1);
+  cv::Ptr<Line2D> detector = trainLine2D(kinectCamera, edgeModels[0], objectNames[0], bestTrainPoses);
   std::cout << "done." << std::endl;
 
   std::vector<std::string> ids = detector->classIds();
@@ -136,27 +291,6 @@ int main(int argc, char *argv[])
   }
   int num_modalities = (int)detector->getModalities().size();
 
-
-
-  TODBaseImporter dataImporter(testFolder);
-
-  PinholeCamera kinectCamera;
-  if(!kinectCameraFilename.empty())
-  {
-    dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
-    CV_Assert(kinectCamera.imageSize == Size(640, 480));
-  }
-
-  vector<EdgeModel> edgeModels(objectNames.size());
-  for (size_t i = 0; i < objectNames.size(); ++i)
-  {
-    dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
-    cout << "All points in the model: " << edgeModels[i].points.size() << endl;
-    cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
-  }
-
-  vector<int> testIndices;
-  dataImporter.importTestIndices(testIndices);
 
   Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
   CV_Assert(!registrationMask.empty());
