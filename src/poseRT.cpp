@@ -106,6 +106,15 @@ void PoseRT::setRotation(const cv::Mat &rotation)
   Rodrigues(rotation, rvec);
 }
 
+void PoseRT::setQuaternion(double x, double y, double z, double w)
+{
+  double theta = 2 * acos(w);
+  rvec = (Mat_<double>(dim, 1, CV_64FC1) << x, y, z);
+  double norm = sin(theta/2);
+  CV_Assert(fabs(norm) > 1e-4);
+  rvec *= theta / norm;
+}
+
 void PoseRT::setProjectiveMatrix(const cv::Mat &rt)
 {
   if (rt.empty())

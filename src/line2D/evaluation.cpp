@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iterator>
 #include <set>
+#include <fstream>
 
 using namespace cv;
 using std::cout;
@@ -97,17 +98,44 @@ void drawResponse(const std::vector<cv::linemod::Template>& templates,
   }
 }
 
-//TODO: re-write the function
 void generatePoses(std::vector<PoseRT> &poses)
 {
   //TODO: move up
-  const bool hasRotationSymmetry = true;
-  const int silhouetteCount = 20;
+  const int rotationsPosesCount = 100;
+  const string rotationsFilename = "rotations.txt";
   const float minDistance = 0.5f;
   const float maxDistance = 0.7f;
   const float distanceStep = 0.01f;
 
+  std::ifstream fin(rotationsFilename);
+  CV_Assert(fin.is_open());
+  vector<PoseRT> rotationPoses;
+  for (size_t i = 0; i < rotationsPosesCount; ++i)
+  {
+    double x, y, z, w;
+    fin >> x >> y >> z >> w;
+    PoseRT currentPose;
+    currentPose.setQuaternion(x, y, z, w);
+    rotationPoses.push_back(currentPose);
+  }
+
   poses.clear();
+  for (float distance = minDistance; distance < maxDistance; distance += distanceStep)
+  {
+    PoseRT translationPose;
+    translationPose.tvec.at<double>(2) = distance;
+    for (size_t i = 0; i < rotationPoses.size(); ++i)
+    {
+      PoseRT generatedPose = translationPose * rotationPoses[i];
+      poses.push_back(generatedPose);
+    }
+  }
+
+/*
+  //TODO: move up
+  const bool hasRotationSymmetry = true;
+  const int silhouetteCount = 20;
+
   for (float distance = minDistance; distance < maxDistance; distance += distanceStep)
   {
     for (int k = 0; k < silhouetteCount; ++k)
@@ -144,6 +172,7 @@ void generatePoses(std::vector<PoseRT> &poses)
       }
     }
   }
+*/
   cout << "all templates count: " << poses.size() << endl;
 }
 
@@ -171,8 +200,8 @@ void getBestTrainPoses(const EdgeModel &edgeModel, const std::map<int, PoseRT> &
 {
   //TODO: move up
 //  int templatesCount = 5;
-//  int templatesCount = 50;
-  int templatesCount = 5000;
+  int templatesCount = 50;
+//  int templatesCount = 5000;
 //  int templatesCount = 400;
 //  const int templatesCount = 2000;
 

@@ -17,6 +17,7 @@ public:
   cv::Mat tvec;
 
   PoseRT();
+  PoseRT(double x, double y, double z, double w);
   PoseRT(const cv::Mat &projectiveMatrix);
   PoseRT(const cv::Mat &rotation, const cv::Mat &translation);
   PoseRT(const PoseRT &pose);
@@ -30,6 +31,7 @@ public:
   cv::Mat getQuaternion() const;
 
   void setRotation(const cv::Mat &rotation);
+  void setQuaternion(double x, double y, double z, double w);
   void setProjectiveMatrix(const cv::Mat &rt);
 
   PoseRT operator*(const PoseRT &pose) const;
