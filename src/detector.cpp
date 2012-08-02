@@ -308,6 +308,9 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
+  //TODO: move up
+  const bool useFiducials = false;
+
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
   PinholeCamera validTestCamera = srcCamera;
@@ -344,15 +347,24 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 #ifdef VISUALIZE_DETECTION
   cv::imshow("bgrImage", bgrImage);
   cv::imshow("depth", depth);
-  cv::waitKey(100);
+  cv::waitKey(1000);
 #endif
 
   cv::Vec4f tablePlane;
   pcl::PointCloud<pcl::PointXYZ> tableHull;
-  bool isEstimated = computeTableOrientation(params.planeSegmentationParams.downLeafSize,
-                       params.planeSegmentationParams.kSearch, params.planeSegmentationParams.distanceThreshold,
-                       sceneCloud, tablePlane, &tableHull, params.planeSegmentationParams.clusterTolerance, params.planeSegmentationParams.verticalDirection);
-//  bool isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
+
+  bool isEstimated;
+  if (useFiducials)
+  {
+    isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
+  }
+  else
+  {
+    isEstimated = computeTableOrientation(params.planeSegmentationParams.downLeafSize,
+                    params.planeSegmentationParams.kSearch, params.planeSegmentationParams.distanceThreshold,
+                    sceneCloud, tablePlane, &tableHull, params.planeSegmentationParams.clusterTolerance, params.planeSegmentationParams.verticalDirection);
+  }
+
   if (!isEstimated)
   {
     CV_Error(CV_StsOk, "Cannot find a table plane");
@@ -365,8 +377,15 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   int numberOfComponents;
   cv::Mat glassMask;
   GlassSegmentator glassSegmentator(params.glassSegmentationParams);
-  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
-//  glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
+  if (useFiducials)
+  {
+    glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
+  }
+  else
+  {
+    glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
+  }
+
   if (debugInfo != 0)
   {
     debugInfo->glassMask = glassMask;
@@ -413,7 +432,8 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 
     vector<Mat> initialSilhouettes;
     vector<Mat> *initialSilhouettesPtr = debugInfo == 0 ? 0 : &initialSilhouettes;
-    it->second.estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr);
+    vector<PoseRT> *initialPosesPtr = (debugInfo == 0) ? 0 : &(debugInfo->initialPoses);
+    it->second.estimatePose(bgrImage, glassMask, currentPoses, currentPosesQualities, &tablePlane, initialSilhouettesPtr, initialPosesPtr);
 #ifdef VERBOSE
     std::cout << "done." << std::endl;
     std::cout << "detected poses: " << currentPoses.size() << std::endl;
@@ -494,8 +514,8 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
 bool Detector::tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane) const
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
-//  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
-  const string fiducialFilename = "/u/ilysenkov/transparentBases/base/fiducial.yml";
+  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
+//  const string fiducialFilename = "/u/ilysenkov/transparentBases/base/fiducial.yml";
   readFiducial(fiducialFilename, blackBlobsObject, whiteBlobsObject, allBlobsObject);
 
   SimpleBlobDetector::Params params;

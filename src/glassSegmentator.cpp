@@ -154,7 +154,7 @@ void showGrabCutResults(const Mat &mask, const string &title)
   imshow(title, result);
 }
 
-void showSegmentation(const Mat &mask, const Mat &image, const string &title)
+void showSegmentation(const Mat &image, const Mat &mask, const string &title)
 {
   Mat drawImage = drawSegmentation(image, mask);
   imshow(title, drawImage);

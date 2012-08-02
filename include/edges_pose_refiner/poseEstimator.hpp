@@ -104,6 +104,8 @@ namespace transpod
     /** \brief minimum scale of the object on a test scene */
     float minScale;
 
+    float maxScale;
+
     /** \brief ratio between maximum confidence and current confidence to suppress it after alignment to a table */
     float ratioToMinimum;
 
@@ -127,7 +129,9 @@ namespace transpod
 
     PoseEstimatorParams()
     {
-      silhouetteCount = 10;
+//      silhouetteCount = 10;
+//      silhouetteCount = 100;
+      silhouetteCount = 60;
       downFactor = 1.0f;
       closingIterationsCount = 10;
 
@@ -160,7 +164,9 @@ namespace transpod
       maxRotation3D = 0.8f;
       maxTranslation3D = 0.15f;
 
-      minScale = 0.2f;
+//      minScale = 0.2f;
+      minScale = 1.0 / 0.9;
+      maxScale = 1.0 / 0.4;
 
       ratioToMinimum = 2.0f;
       neighborMaxRotation = 0.1f;
@@ -209,7 +215,8 @@ namespace transpod
      */
     void estimatePose(const cv::Mat &bgrImage, const cv::Mat &glassMask,
                       std::vector<PoseRT> &poses_cam, std::vector<float> &poseQualities,
-                      const cv::Vec4f *tablePlane = 0, std::vector<cv::Mat> *initialSilhouettes = 0) const;
+                      const cv::Vec4f *tablePlane = 0,
+                      std::vector<cv::Mat> *initialSilhouettes = 0, std::vector<PoseRT> *initialPoses = 0) const;
 
     /** \brief Reads a pose estimator from a file
      *

@@ -167,6 +167,7 @@ namespace transpod
   {
       cv::Mat glassMask;
       std::vector<cv::Mat> initialSilhouettes;
+      std::vector<PoseRT> initialPoses;
       cv::Vec4f tablePlane;
   };
 

@@ -164,7 +164,9 @@ void TODBaseImporter::importTestIndices(vector<int> &testIndices) const
     fin >> idx;
 
     if(idx >= 0)
+    {
       testIndices.push_back(idx);
+    }
   }
 }
 

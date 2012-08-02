@@ -508,7 +508,16 @@ cv::Mat getFromCache(const std::string &name)
 
 cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registrationMask)
 {
-  Mat invalidDepthMask = (depthMat != depthMat);
+  Mat invalidDepthMask;
+  if (depthMat.type() == CV_32FC1 || depthMat.type() == CV_64FC1)
+  {
+    invalidDepthMask = (depthMat != depthMat);
+  }
+  else
+  {
+    invalidDepthMask = (depthMat == 0);
+  }
+
   CV_Assert(!registrationMask.empty());
   CV_Assert(registrationMask.size() == depthMat.size());
   CV_Assert(registrationMask.type() == CV_8UC1);

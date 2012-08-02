@@ -8,6 +8,9 @@
 #include <set>
 #include <fstream>
 
+//#define VERBOSE
+//#define VISUALIZE_POSES
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -102,9 +105,9 @@ void generatePoses(int rotationsPosesCount, std::vector<PoseRT> &poses)
 {
   //TODO: move up
   const string rotationsFilename = "rotations.txt";
-  const float minDistance = 0.5f;
-  const float maxDistance = 0.7f;
-  const float distanceStep = 0.01f;
+  const float minDistance = 0.4f;
+  const float maxDistance = 0.9f;
+  const float distanceStep = 0.03f;
 
   std::ifstream fin(rotationsFilename);
   CV_Assert(fin.is_open());
@@ -236,12 +239,25 @@ int main(int argc, char *argv[])
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
   const vector<string> objectNames = {testObjectName};
 
-  const int matching_threshold = 80;
-  const int rotationsPosesCount = 2000;
+  const string initialPosesFilename = "initialPoses.txt";
+
+  const int matching_threshold = 70;
+//  const int rotationsPosesCount = 2000;
+  const int rotationsPosesCount = 60;
   const float templatesCountBase = 1.05f;
   const float matchingThresholdBase = 0.8f;
 
-  bool simulateTrainData = true;
+  bool simulateTrainPoses = true;
+  bool simulateTrainImages = true;
+
+  vector<string> initialPosesStrings;
+  readLinesInFile(initialPosesFilename, initialPosesStrings);
+  vector<int> initialPosesCount;
+  for (size_t i = 0; i < initialPosesStrings.size(); ++i)
+  {
+    //TODO: fix
+    initialPosesCount.push_back(atoi(initialPosesStrings[i].c_str()));
+  }
 
   CV_Assert(objectNames.size() == 1);
   TODBaseImporter dataImporter(testFolder);
@@ -265,7 +281,7 @@ int main(int argc, char *argv[])
 
   CV_Assert(edgeModels.size() == 1);
   std::map<int, PoseRT> trainPoses;
-  if (simulateTrainData)
+  if (simulateTrainPoses)
   {
     generateTrainPoses(rotationsPosesCount, kinectCamera, edgeModels[0], trainPoses);
   }
@@ -284,7 +300,8 @@ int main(int argc, char *argv[])
 //  getBestTrainPoses(edgeModels[0], trainPoses, testPoses, templatesCount, bestTrainPoses);
 
   float step = 1.0f;
-  for (size_t templatesCount = 1; templatesCount < trainPoses.size(); templatesCount += cvRound(step))
+//  for (size_t templatesCount = 1; templatesCount < trainPoses.size(); templatesCount += cvRound(step))
+  size_t templatesCount = trainPoses.size();
   {
     step *= templatesCountBase;
 
@@ -296,7 +313,9 @@ int main(int argc, char *argv[])
     {
       if (addedTemplatesCount < templatesCount)
       {
+#ifdef VERBOSE
         cout << it->first << " -> " << it->second << endl;
+#endif
         bestTrainPoses.push_back(trainPoses.find(it->second)->second);
         bestTrainIndices.push_back(it->second);
         ++addedTemplatesCount;
@@ -306,7 +325,7 @@ int main(int argc, char *argv[])
     std::cout << "Training Line2D...  " << std::flush;
     CV_Assert(edgeModels.size() == 1);
     cv::Ptr<Line2D> detector;
-    if (simulateTrainData)
+    if (simulateTrainImages)
     {
       detector = trainLine2D(kinectCamera, edgeModels[0], objectNames[0], bestTrainPoses);
     }
@@ -315,6 +334,7 @@ int main(int argc, char *argv[])
       detector = trainLine2D(trainBaseFolder, objectNames, &bestTrainIndices);
     }
     std::cout << "done." << std::endl;
+    CV_Assert(detector->numTemplates() != 0);
 
     std::vector<std::string> ids = detector->classIds();
     int num_classes = detector->numClasses();
@@ -343,7 +363,9 @@ int main(int argc, char *argv[])
       boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("transparent experiments"));
   #endif
       int testImageIdx = testIndices[ testIdx ];
+#ifdef VERBOSE
       cout << "Test: " << testIdx << " " << testImageIdx << endl;
+#endif
 
       Mat kinectDepth, kinectBgrImage;
       if(!kinectCameraFilename.empty())
@@ -355,16 +377,9 @@ int main(int argc, char *argv[])
       std::vector<cv::Mat> sources;
       sources.push_back(kinectBgrImage);
       sources.push_back(kinectDepth);
-      cv::Mat display = kinectBgrImage.clone();
-
-
-
 
       PoseRT model2test_ground;
       dataImporter.importGroundTruth(testImageIdx, model2test_ground);
-
-      pcl::PointCloud<pcl::PointXYZ> testPointCloud;
-      dataImporter.importPointCloud(testImageIdx, testPointCloud);
 
       TickMeter recognitionTime;
       recognitionTime.start();
@@ -385,43 +400,52 @@ int main(int argc, char *argv[])
       int classes_visited = 0;
       std::set<std::string> visited;
 
-      for (int i = 0; (i < (int)matches.size()) && (classes_visited < num_classes); ++i)
-      {
-        cv::linemod::Match m = matches[i];
-
-        if (visited.insert(m.class_id).second)
-        {
-          ++classes_visited;
-
-          printf("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                 m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-
-          // Draw matching template
-  //        const std::vector<cv::linemod::Template>& templates = detector->getTemplates(m.class_id, m.template_id);
-  //        drawResponse(templates, num_modalities, display, cv::Point(m.x, m.y), detector->getT(0));
-  //        imshow("display", display);
-  //        waitKey();
-        }
-      }
-
       if (objectNames.size() == 1)
       {
         int objectIndex = 0;
 
-        PoseError poseError;
-        PoseRT pose_cam = detector->getTestPose(kinectCamera, matches[0]);
-        evaluatePoseWithRotation(edgeModels[objectIndex], pose_cam, model2test_ground, poseError);
-        cout << poseError << endl;
 
-        bestPoses.push_back(poseError);
+        vector<PoseError> poseErrors;
+        for (int i = 0; i < initialPosesCount[testIdx]; ++i)
+        {
+          CV_Assert(i < matches.size());
+          PoseRT pose_cam = detector->getTestPose(kinectCamera, matches[i]);
+          PoseError currentPoseError;
+          evaluatePoseWithRotation(edgeModels[objectIndex], pose_cam, model2test_ground, currentPoseError);
+          poseErrors.push_back(currentPoseError);
+  #ifdef VERBOSE
+          cout << i << ":\t" << currentPoseError << endl;
+  #endif
+
+        cv::linemod::Match m = matches[i];
+
+#ifdef VERBOSE
+          printf("Similarity[%d]: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
+                 i, m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
+          std::flush(std::cout);
+#endif
+
+#ifdef VISUALIZE_POSES
+          // Draw matching template
+          cv::Mat display = kinectBgrImage.clone();
+          const std::vector<cv::linemod::Template>& templates = detector->getTemplates(m.class_id, m.template_id);
+          drawResponse(templates, num_modalities, display, cv::Point(m.x, m.y), detector->getT(0));
+          imshow("display", display);
+          waitKey();
+#endif
+        }
+        vector<PoseError>::iterator bestPoseIt = std::min_element(poseErrors.begin(), poseErrors.end());
+        int bestPoseIdx = std::distance(poseErrors.begin(), bestPoseIt);
+        cout << "Best pose: " << poseErrors.at(bestPoseIdx) << endl;
+        bestPoses.push_back(poseErrors[bestPoseIdx]);
       }
     }
 
     if (objectNames.size() == 1)
     {
       cout << "templates count: " << bestTrainPoses.size() << endl;
-      const double cmThreshold = 3.0;
-  //    const double cmThreshold = 200.0;
+//      const double cmThreshold = 3.0;
+      const double cmThreshold = 6.0;
       PoseError::evaluateErrors(bestPoses, cmThreshold);
     }
   }

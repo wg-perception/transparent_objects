@@ -225,7 +225,7 @@ int main(int argc, char **argv)
   CV_Assert(!registrationMask.empty());
 
   vector<size_t> initialPoseCount;
-  vector<PoseError> bestPoses;
+  vector<PoseError> bestPoses, bestInitialPoses;
   int segmentationFailuresCount = 0;
   int badSegmentationCount = 0;
 
@@ -398,6 +398,26 @@ int main(int argc, char **argv)
 
     if (objectNames.size() == 1)
     {
+      cout << "initial poses: " << debugInfo.initialPoses.size() << endl;
+      vector<PoseError> initialPoseErrors;
+      for (size_t i = 0 ; i < debugInfo.initialPoses.size(); ++i)
+      {
+        PoseError poseError;
+        evaluatePoseWithRotation(edgeModels[0], debugInfo.initialPoses[i], model2test_ground, poseError);
+        cout << poseError << endl;
+        initialPoseErrors.push_back(poseError);
+//        showEdgels(kinectBgrImage, edgeModels[0].points, debugInfo.initialPoses[i], kinectCamera, "gh pose");
+//        waitKey();
+      }
+      cout << "the end." << endl;
+      {
+        vector<PoseError>::iterator bestPoseIt = std::min_element(initialPoseErrors.begin(), initialPoseErrors.end());
+        int bestPoseIdx = std::distance(initialPoseErrors.begin(), bestPoseIt);
+        cout << "Best initial pose: " << initialPoseErrors[bestPoseIdx] << endl;
+        bestInitialPoses.push_back(initialPoseErrors[bestPoseIdx]);
+      }
+
+
       CV_Assert(poses_cam.size() == 1);
       int objectIndex = 0;
       initialPoseCount.push_back(poses_cam.size());
@@ -488,10 +508,15 @@ int main(int argc, char **argv)
     meanInitialPoseCount /= initialPoseCount.size();
     cout << "mean initial pose count: " << meanInitialPoseCount << endl;
 
+    //TODO: move up
     const double cmThreshold = 2.0;
 
 //    const double cmThreshold = 5.0;
     PoseError::evaluateErrors(bestPoses, cmThreshold);
+
+    cout << "initial poses:" << endl;
+    //TODO: move up
+    PoseError::evaluateErrors(bestInitialPoses, 3.0 * cmThreshold);
   }
 
   cout << "Evaluation of geometric hashing" << endl;

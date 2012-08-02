@@ -24,9 +24,10 @@ def getStatistics(logFilename):
 if __name__ == '__main__':
     assert len(sys.argv) > 2, sys.argv[0] + ' <rowsCount> <logFilename> [...]'
 
-    rowsCount = int(argv[1]) 
+    rowsCount = int(sys.argv[1])
     statistics = np.zeros((rowsCount, 2))
     for filename in sys.argv[2:]:
+        print filename
         currentStatistics = getStatistics(filename)
         statistics += currentStatistics[:rowsCount, :]
 

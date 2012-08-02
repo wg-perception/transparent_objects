@@ -79,7 +79,8 @@ namespace transpod
     //TODO: make key distribution in the table more uniform
   }
 
-  void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane, std::vector<cv::Mat> *initialSilhouettes) const
+  void PoseEstimator::estimatePose(const cv::Mat &kinectBgrImage, const cv::Mat &glassMask, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, const cv::Vec4f *tablePlane,
+                                   std::vector<cv::Mat> *initialSilhouettes, std::vector<PoseRT> *initialPoses) const
   {
     CV_Assert(kinectBgrImage.size() == glassMask.size());
     CV_Assert(kinectBgrImage.size() == getValidTestImageSize());
@@ -95,6 +96,10 @@ namespace transpod
 
   //  getInitialPoses(glassMask, poses_cam, posesQualities);
     getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
+    if (initialPoses != 0)
+    {
+      *initialPoses = poses_cam;
+    }
 
   //  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
     if (tablePlane != 0)
@@ -488,7 +493,8 @@ namespace transpod
         BasisMatch match;
         match.confidence = currentVotes.at<float>(maxLoc.y, maxLoc.x);
 
-        if (currentScale.at<float>(maxLoc.y, maxLoc.x) < params.minScale)
+        if (currentScale.at<float>(maxLoc.y, maxLoc.x) < params.minScale ||
+            currentScale.at<float>(maxLoc.y, maxLoc.x) > params.maxScale)
         {
           continue;
         }
