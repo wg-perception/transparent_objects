@@ -2,6 +2,8 @@
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 #include "edges_pose_refiner/line2D.hpp"
 #include "edges_pose_refiner/poseError.hpp"
+#include "edges_pose_refiner/glassSegmentator.hpp"
+#include "edges_pose_refiner/nonMaximumSuppression.hpp"
 
 #include <iostream>
 #include <iterator>
@@ -11,9 +13,58 @@
 //#define VERBOSE
 //#define VISUALIZE_POSES
 
+
 using namespace cv;
 using std::cout;
 using std::endl;
+
+//TODO: remove code duplication
+void suppress3DPoses(const EdgeModel &edgeModel, const std::vector<float> &confidences, const std::vector<PoseRT> &poses_cam,
+                                    float neighborMaxRotation, float neighborMaxTranslation,
+                                    std::vector<bool> &isFilteredOut)
+{
+  CV_Assert(confidences.size() == poses_cam.size());
+
+  if (isFilteredOut.empty())
+  {
+    isFilteredOut.resize(confidences.size(), false);
+  }
+  else
+  {
+    CV_Assert(isFilteredOut.size() == confidences.size());
+  }
+
+  vector<vector<int> > neighbors(poses_cam.size());
+  for (size_t i = 0; i < poses_cam.size(); ++i)
+  {
+    if (isFilteredOut[i])
+    {
+      continue;
+    }
+
+    for (size_t j = i + 1; j < poses_cam.size(); ++j)
+    {
+      if (isFilteredOut[j])
+      {
+        continue;
+      }
+
+      double rotationDistance, translationDistance;
+      //TODO: use rotation symmetry
+      //TODO: check symmetry of the distance
+      PoseRT::computeDistance(poses_cam[i], poses_cam[j], rotationDistance, translationDistance, edgeModel.Rt_obj2cam);
+
+      if (rotationDistance < neighborMaxRotation && translationDistance < neighborMaxTranslation)
+      {
+        neighbors[i].push_back(j);
+        neighbors[j].push_back(i);
+      }
+    }
+  }
+
+  filterOutNonMaxima(confidences, neighbors, isFilteredOut);
+}
+
 
 void evaluatePoseWithRotation(const EdgeModel &originalEdgeModel, const PoseRT &est_cam, const PoseRT &ground_cam, PoseError &poseError)
 {
@@ -239,7 +290,7 @@ int main(int argc, char *argv[])
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
   const vector<string> objectNames = {testObjectName};
 
-  const string initialPosesFilename = "initialPoses.txt";
+  const string initialPosesFilename = "initialPoses_" + testObjectName + ".txt";
 
   const int matching_threshold = 70;
 //  const int rotationsPosesCount = 2000;
@@ -268,6 +319,9 @@ int main(int argc, char *argv[])
     cout << "All points in the model: " << edgeModels[i].points.size() << endl;
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
+
+  Mat registrationMask;
+  dataImporter.importRegistrationMask(registrationMaskFilename, registrationMask);
 
   PinholeCamera kinectCamera;
   if(!kinectCameraFilename.empty())
@@ -348,9 +402,6 @@ int main(int argc, char *argv[])
     int num_modalities = (int)detector->getModalities().size();
 
 
-    Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-    CV_Assert(!registrationMask.empty());
-
     vector<PoseError> bestPoses;
     vector<double> allRecognitionTimes;
     for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
@@ -381,6 +432,25 @@ int main(int argc, char *argv[])
       PoseRT model2test_ground;
       dataImporter.importGroundTruth(testImageIdx, model2test_ground);
 
+      //TODO: move up
+      //good clutter
+      GlassSegmentatorParams glassSegmentationParams;
+      glassSegmentationParams.openingIterations = 15;
+      glassSegmentationParams.closingIterations = 12;
+      glassSegmentationParams.finalClosingIterations = 32;
+      glassSegmentationParams.grabCutErosionsIterations = 4;
+      GlassSegmentator glassSegmentator(glassSegmentationParams);
+      int numberOfComponents;
+      Mat glassMask;
+      glassSegmentator.segment(kinectBgrImage, kinectDepth, registrationMask, numberOfComponents, glassMask);
+
+      //TODO: move up
+      const int maskWidth = 40;
+      dilate(glassMask, glassMask, Mat(), Point(-1, -1), maskWidth);
+      vector<Mat> masks;
+      masks.push_back(glassMask);
+      masks.push_back(glassMask);
+
       TickMeter recognitionTime;
       recognitionTime.start();
 
@@ -390,7 +460,7 @@ int main(int argc, char *argv[])
       float matchingThreshold = matching_threshold;
       do
       {
-        detector->match(sources, matchingThreshold, matches, class_ids, quantized_images);
+        detector->match(sources, matchingThreshold, matches, class_ids, quantized_images, masks);
         matchingThreshold *= matchingThresholdBase;
       }
       while(matches.empty());
@@ -405,14 +475,46 @@ int main(int argc, char *argv[])
         int objectIndex = 0;
 
 
-        vector<PoseError> poseErrors;
-        for (int i = 0; i < initialPosesCount[testIdx]; ++i)
+        vector<PoseRT> allDetectedPoses;
+        vector<float> confidences;
+        for (size_t i = 0; i < matches.size(); ++i)
         {
-          CV_Assert(i < matches.size());
           PoseRT pose_cam = detector->getTestPose(kinectCamera, matches[i]);
+          allDetectedPoses.push_back(pose_cam);
+          confidences.push_back(matches[i].similarity);
+        }
+
+#ifdef SUPPRESS_POSES
+        //TODO: move up
+        const float neighborMaxRotation = 0.1f;
+        const float neighborMaxTranslation = 0.02f;
+        vector<bool> isFilteredOut;
+        suppress3DPoses(edgeModels[0], confidences, allDetectedPoses, neighborMaxRotation, neighborMaxTranslation, isFilteredOut);
+
+        int remainedPosesCount = 0;
+        for (size_t i = 0; i < isFilteredOut.size(); ++i)
+        {
+          if (!isFilteredOut[i])
+             ++remainedPosesCount;
+        }
+        cout << "Suppression: " << matches.size() << " --> " << remainedPosesCount << endl;
+#endif
+
+        vector<PoseError> poseErrors;
+        int addedPosesCount = 0;
+        for (size_t i = 0; i < matches.size() && addedPosesCount < initialPosesCount[testIdx]; ++i)
+        {
+#ifdef SUPPRESS_POSES
+          if (isFilteredOut[i])
+            continue;
+#endif
+
+          PoseRT pose_cam = allDetectedPoses[i];
           PoseError currentPoseError;
           evaluatePoseWithRotation(edgeModels[objectIndex], pose_cam, model2test_ground, currentPoseError);
           poseErrors.push_back(currentPoseError);
+          ++addedPosesCount;
+
   #ifdef VERBOSE
           cout << i << ":\t" << currentPoseError << endl;
   #endif
