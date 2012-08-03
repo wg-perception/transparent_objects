@@ -13,7 +13,7 @@
 
 namespace transpod
 {
-  struct PlaneSegmentationParams
+  struct PCLPlaneSegmentationParams
   {
     /** \brief leaf size of the voxel grid used to downsample a test point cloud */
     float downLeafSize;
@@ -36,7 +36,7 @@ namespace transpod
      */
     cv::Point3f verticalDirection;
 
-    PlaneSegmentationParams()
+    PCLPlaneSegmentationParams()
     {
       downLeafSize = 0.002f;
       kSearch = 10;
@@ -46,17 +46,22 @@ namespace transpod
     }
   };
 
+  enum PlaneSegmentationMethod {PCL, RGBD, FIDUCIALS};
+
   struct DetectorParams
   {
     /** \brief parameters to segment a plane in a test scene */
-    PlaneSegmentationParams planeSegmentationParams;
+    PCLPlaneSegmentationParams pclPlaneSegmentationParams;
 
     /** \brief parameters to segment glass */
     GlassSegmentatorParams glassSegmentationParams;
 
+    PlaneSegmentationMethod planeSegmentationMethod;
+
     DetectorParams()
     {
-      planeSegmentationParams = PlaneSegmentationParams();
+      planeSegmentationMethod = PCL;
+      pclPlaneSegmentationParams = PCLPlaneSegmentationParams();
       glassSegmentationParams = GlassSegmentatorParams();
     }
   };

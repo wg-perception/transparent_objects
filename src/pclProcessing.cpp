@@ -39,6 +39,9 @@
 #include <pcl/visualization/cloud_viewer.h>
 #endif
 
+#include "edges_pose_refiner/utils.hpp"
+#include <opencv2/rgbd/rgbd.hpp>
+
 using namespace cv;
 
 using std::cout;
@@ -151,7 +154,8 @@ void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointClou
   coefficients->values[2] = 1;
 }
 
-bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud, cv::Vec4f &tablePlane, pcl::PointCloud<pcl::PointXYZ> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
+bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud,
+                             cv::Vec4f &tablePlane, const PinholeCamera *camera, std::vector<cv::Point2f> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
 {
 #ifdef VERBOSE
   cout << "Estimating table plane...  " << std::flush;
@@ -190,7 +194,7 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
     tablePlane[i] = coefficients->values[i];
   }
 
-  if (tableHull != 0)
+  if (camera != 0 && tableHull != 0)
   {
     pcl::PointCloud<pcl::PointXYZ> projectedInliers;
     projectInliersOnTable(sceneCloud, inliers, coefficients, projectedInliers);
@@ -220,7 +224,12 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
     pcl::PointCloud<pcl::PointXYZ> table;
     extractPointCloud(projectedInliers, boost::make_shared<pcl::PointIndices>(clusterIndices[maxClusterIndex]), table);
 
-    reconstructConvexHull(table, *tableHull);
+    pcl::PointCloud<pcl::PointXYZ> tableHull3D;
+    reconstructConvexHull(table, tableHull3D);
+
+    vector<Point3f> cvTableHull3D;
+    pcl2cv(tableHull3D, cvTableHull3D);
+    camera->projectPoints(cvTableHull3D, PoseRT(), *tableHull);
   }
 #ifdef VERBOSE
   cout << "Done." << endl;
@@ -244,6 +253,62 @@ bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThre
   {
   }
 #endif
+
+  return true;
+}
+
+bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera,
+                                   cv::Vec4f &tablePlane, std::vector<cv::Point> *tableHull,
+                                   Point3f verticalDirection)
+{
+  Mat points3d;
+  depthTo3d(depth, camera.cameraMatrix, points3d);
+  RgbdNormals normalsEstimator(depth.rows, depth.cols, depth.depth(), camera.cameraMatrix);
+  Mat normals = normalsEstimator(points3d);
+
+  RgbdPlane planeEstimator;
+  Mat planesMask;
+  vector<Vec4f> planeCoefficients;
+  planeEstimator(points3d, normals, planesMask, planeCoefficients);
+  CV_Assert(planesMask.type() == CV_8UC1);
+
+  vector<int> pixelCounts(planeCoefficients.size(), 0);
+  for (int i = 0; i < planesMask.rows; ++i)
+  {
+    for (int j = 0; j < planesMask.cols; ++j)
+    {
+      pixelCounts[planesMask.at<uchar>(i, j)] += 1;
+    }
+  }
+  std::vector<int>::iterator largestPlaneIt = std::max_element(pixelCounts.begin(), pixelCounts.end());
+  int largestPlaneIndex = std::distance(pixelCounts.begin(), largestPlaneIt);
+
+  tablePlane = planeCoefficients[largestPlaneIndex];
+
+  Point3f tableNormal(tablePlane[0],
+                      tablePlane[1],
+                      tablePlane[2]);
+  if (tableNormal.dot(verticalDirection) < 0)
+  {
+    tablePlane *= -1;
+  }
+
+
+  if (tableHull != 0)
+  {
+    vector<Point> tablePoints;
+    for (int i = 0; i < planesMask.rows; ++i)
+    {
+      for (int j = 0; j < planesMask.cols; ++j)
+      {
+        if (planesMask.at<uchar>(i, j) == largestPlaneIndex)
+        {
+          tablePoints.push_back(Point(j, i));
+        }
+      }
+    }
+    convexHull(tablePoints, *tableHull);
+  }
 
   return true;
 }

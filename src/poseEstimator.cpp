@@ -552,6 +552,7 @@ namespace transpod
         }
 
         double rotationDistance, translationDistance;
+        //TODO: use rotation symmetry
         //TODO: check symmetry of the distance
         PoseRT::computeDistance(poses_cam[i], poses_cam[j], rotationDistance, translationDistance, edgeModel.Rt_obj2cam);
 

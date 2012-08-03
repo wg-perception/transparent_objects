@@ -175,13 +175,8 @@ GlassSegmentator::GlassSegmentator(const GlassSegmentatorParams &_params)
   params = _params;
 }
 
-void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Vec4f &tablePlane, const pcl::PointCloud<pcl::PointXYZ> &pclTableHull, cv::Mat &glassMask)
+void refineGlassMaskByTableHull(const std::vector<cv::Point2f> &tableHull, cv::Mat &glassMask)
 {
-  vector<Point3f> tableHull;
-  pcl2cv(pclTableHull, tableHull);
-  vector<Point2f> projectedHull;
-  camera.projectPoints(tableHull, PoseRT(), projectedHull);
-
 #ifdef VISUALIZE_TABLE
   Mat visualizedGlassMask;
   cvtColor(glassMask, visualizedGlassMask, CV_GRAY2BGR);
@@ -200,23 +195,24 @@ void refineGlassMaskByTableOrientation(const PinholeCamera &camera, const cv::Ve
   {
     Moments moms = moments(contours[i]);
     Point2f centroid(moms.m10 / moms.m00, moms.m01 / moms.m00);
-    if (pointPolygonTest(projectedHull, centroid, false) < 0)
+    if (pointPolygonTest(tableHull, centroid, false) < 0)
     {
       drawContours(glassMask, contours, i, Scalar(0, 0, 0), -1);
     }
   }
 }
 
-void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents, cv::Mat &glassMask, const PinholeCamera *camera, const cv::Vec4f *tablePlane, const pcl::PointCloud<pcl::PointXYZ> *tableHull)
+void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat, const cv::Mat &registrationMask, int &numberOfComponents,
+                               cv::Mat &glassMask, const std::vector<cv::Point2f> *tableHull)
 {
   Mat srcMask = getInvalidDepthMask(depthMat, registrationMask);
 #ifdef VISUALIZE
   imshow("mask without registration errors", srcMask);
 #endif
 
-  if (camera != 0 && tablePlane != 0 && tableHull != 0)
+  if (tableHull != 0)
   {
-    refineGlassMaskByTableOrientation(*camera, *tablePlane, *tableHull, srcMask);
+    refineGlassMaskByTableHull(*tableHull, srcMask);
   }
 
 #ifdef VISUALIZE

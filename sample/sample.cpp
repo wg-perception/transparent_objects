@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
   // 4. Visualize results
   imshow("input rgb image", image);
   imshow("input depth image", depth);
-  showSegmentation(debugInfo.glassMask, image);
+  showSegmentation(image, debugInfo.glassMask);
   detector.showResults(poses, detectedObjectsNames, image);
   waitKey();
 

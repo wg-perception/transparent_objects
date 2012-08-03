@@ -10,6 +10,7 @@ if (catkin_FOUND)
     catkin_python_setup()
 
     find_package(ecto REQUIRED)
+    find_package(ecto_opencv REQUIRED)
     find_pcl_package()
     find_package(object_recognition_core REQUIRED)
 else()

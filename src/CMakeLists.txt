@@ -17,6 +17,7 @@ set(src
 
 include_directories(SYSTEM
                     ${PCL_INCLUDE_DIRS}
+                    ${ecto_opencv_INCLUDE_DIRS}
 )
 
 #EAR: is there a reason to list headers in this target?
@@ -33,6 +34,7 @@ target_link_libraries(edges_pose_refiner
                       ${PCL_LIBRARIES}
                       ${OpenCV_LIBS}
                       ${OpenCV_LIBRARIES}
+                      ${ecto_opencv_LIBRARIES}
 )
 
 install(TARGETS edges_pose_refiner

@@ -16,6 +16,7 @@
   <build_depends>openni-dev</build_depends>
   <build_depends>pcl</build_depends>
   <depends>ecto</depends>
+  <depends>ecto_opencv</depends>
   <depends>object_recognition_core</depends>
   <depends>openni-dev</depends>
   <depends>pcl</depends>

@@ -15,6 +15,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <opencv2/rgbd/rgbd.hpp>
+
 //#define VISUALIZE_DETECTION
 
 using namespace cv;
@@ -308,9 +310,6 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
-  //TODO: move up
-  const bool useFiducials = false;
-
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
   PinholeCamera validTestCamera = srcCamera;
@@ -351,18 +350,30 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 #endif
 
   cv::Vec4f tablePlane;
-  pcl::PointCloud<pcl::PointXYZ> tableHull;
+  std::vector<cv::Point2f> tableHull;
 
   bool isEstimated;
-  if (useFiducials)
+  switch(params.planeSegmentationMethod)
   {
-    isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
-  }
-  else
-  {
-    isEstimated = computeTableOrientation(params.planeSegmentationParams.downLeafSize,
-                    params.planeSegmentationParams.kSearch, params.planeSegmentationParams.distanceThreshold,
-                    sceneCloud, tablePlane, &tableHull, params.planeSegmentationParams.clusterTolerance, params.planeSegmentationParams.verticalDirection);
+    case PCL:
+      isEstimated = computeTableOrientation(params.pclPlaneSegmentationParams.downLeafSize,
+                      params.pclPlaneSegmentationParams.kSearch, params.pclPlaneSegmentationParams.distanceThreshold,
+                      sceneCloud, tablePlane, &validTestCamera, &tableHull, params.pclPlaneSegmentationParams.clusterTolerance, params.pclPlaneSegmentationParams.verticalDirection);
+      break;
+
+    case FIDUCIALS:
+      isEstimated = tmpComputeTableOrientation(validTestCamera, bgrImage, tablePlane);
+      break;
+
+    case RGBD:
+      //TODO: use InputArray
+      std::vector<Point> tableHullInt;
+      isEstimated = computeTableOrientationByRGBD(depth, validTestCamera, tablePlane, &tableHullInt, params.pclPlaneSegmentationParams.verticalDirection);
+      for (size_t i = 0; i < tableHullInt.size(); ++i)
+      {
+        tableHull.push_back(tableHullInt[i]);
+      }
+      break;
   }
 
   if (!isEstimated)
@@ -374,16 +385,20 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   std::cout << "table plane is estimated" << std::endl;
 #endif
 
+  GlassSegmentator glassSegmentator(params.glassSegmentationParams);
   int numberOfComponents;
   cv::Mat glassMask;
-  GlassSegmentator glassSegmentator(params.glassSegmentationParams);
-  if (useFiducials)
+
+  switch(params.planeSegmentationMethod)
   {
-    glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
-  }
-  else
-  {
-    glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &validTestCamera, &tablePlane, &tableHull);
+    case PCL:
+    case RGBD:
+      glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask, &tableHull);
+      break;
+
+    case FIDUCIALS:
+      glassSegmentator.segment(bgrImage, depth, registrationMask, numberOfComponents, glassMask);
+      break;
   }
 
   if (debugInfo != 0)
