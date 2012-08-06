@@ -206,6 +206,7 @@ int main(int argc, char **argv)
   params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.finalClosingIterations = 32;
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
+  params.planeSegmentationMethod = FIDUCIALS;
 
   //clutter
   //bucket
@@ -339,6 +340,7 @@ int main(int argc, char **argv)
     waitKey();
 #endif
 
+#ifndef PROFILE
 
     if (edgeModels.size() == 1)
     {
@@ -475,6 +477,7 @@ int main(int argc, char **argv)
       }
 #endif
     }
+#endif
     cout << endl;
 
 #ifdef PROFILE

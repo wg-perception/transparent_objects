@@ -459,9 +459,12 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
     }
     if (!currentPoses.empty())
     {
-      poses_cam.push_back(currentPoses[0]);
-      posesQualities.push_back(currentPosesQualities[0]);
-      detectedObjectNames.push_back(it->first);
+      std::copy(currentPoses.begin(), currentPoses.end(), std::back_inserter(poses_cam));
+      std::copy(currentPosesQualities.begin(), currentPosesQualities.end(), std::back_inserter(posesQualities));
+      for (size_t i = 0; i < currentPoses.size(); ++i)
+      {
+        detectedObjectNames.push_back(it->first);
+      }
     }
   }
 }
@@ -476,8 +479,7 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
 
   for (size_t i = 0; i < poses.size(); ++i)
   {
-    //TODO: use randomization
-    cv::Scalar color(255, 0, 255);
+    cv::Scalar color;
     switch (i)
     {
       case 0:
@@ -489,6 +491,12 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
       case 2:
         color = cv::Scalar(0, 255, 0);
         break;
+      case 3:
+        color = cv::Scalar(255, 0, 255);
+        break;
+      default:
+        //TODO: don't change current state of the random generator
+        color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
     }
 
     poseEstimators.find(objectNames[i])->second.visualize(poses[i], image, color);

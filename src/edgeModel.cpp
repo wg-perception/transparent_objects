@@ -338,6 +338,14 @@ void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera,
   Mat footprintPoints;
   computeFootprint(projectedPointsVector, pinholeCamera->imageSize, footprintPoints, downFactor, closingIterationsCount);
 
+/*
+  cout << footprintPoints.rows << " x " << footprintPoints.cols << endl;
+  vector<Point2f> projectedStableEdgels;
+  pinholeCamera->projectPoints(stableEdgels, pose_cam, projectedStableEdgels);
+  cout << projectedStableEdgels.size() << endl;
+  footprintPoints.push_back(Mat(projectedStableEdgels));
+*/
+
   silhouette.init(footprintPoints, pose_cam);
 }
 
