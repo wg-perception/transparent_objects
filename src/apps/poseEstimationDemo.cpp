@@ -49,6 +49,13 @@ int main(int argc, char *argv[])
 
   TODBaseImporter dataImporter(testFolder);
 
+  Mat kinectDepth, kinectBgrImage;
+  dataImporter.importBGRImage(imageFilename, kinectBgrImage);
+  dataImporter.importDepth(depthFilename, kinectDepth);
+  imshow("rgb image", kinectBgrImage);
+  imshow("depth", kinectDepth);
+  waitKey(2000);
+
   PinholeCamera kinectCamera;
   dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
   CV_Assert(kinectCamera.imageSize == Size(640, 480));
@@ -70,9 +77,6 @@ int main(int argc, char *argv[])
   Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
   CV_Assert(!registrationMask.empty());
 
-  Mat kinectDepth, kinectBgrImage;
-  dataImporter.importBGRImage(imageFilename, kinectBgrImage);
-  dataImporter.importDepth(depthFilename, kinectDepth);
 
   pcl::PointCloud<pcl::PointXYZ> testPointCloud;
   dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
@@ -111,13 +115,13 @@ int main(int argc, char *argv[])
   {
     std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
     int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
-    int detectedObjectIndex = detector.getTrainObjectIndex(detectedObjectsNames[bestDetectionIndex]);
     cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
 
     Mat detectionResults = kinectBgrImage.clone();
     vector<PoseRT> bestPose(1, poses_cam[bestDetectionIndex]);
     vector<string> bestName(1, detectedObjectsNames[bestDetectionIndex]);
-    detector.visualize(bestPose, bestName, detectionResults);
+//    detector.visualize(bestPose, bestName, detectionResults);
+    detector.visualize(poses_cam, detectedObjectsNames, detectionResults);
     imshow("detection", detectionResults);
     imwrite("detection_" + bestName[0] + ".png", detectionResults);
     imwrite("testImage_" + bestName[0] + ".png", kinectBgrImage);
