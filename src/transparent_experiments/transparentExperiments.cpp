@@ -31,7 +31,6 @@ using std::stringstream;
 //#define VISUALIZE_POSE_REFINEMENT
 //#define WRITE_ERRORS
 //#define PROFILE
-//#define WRITE_GLASS_SEGMENTATION
 
 
 #if defined(VISUALIZE_POSE_REFINEMENT) && defined(USE_3D_VISUALIZATION)
@@ -143,6 +142,70 @@ void writeImages(const vector<Mat> &images, const string &path, int testIdx, int
   imwrite(name.str(), commonImage);
 }
 
+float computeOcclusionPercentage(const PinholeCamera &camera,
+                                 const EdgeModel &testObject, const PoseRT &objectOffset,
+                                 const std::vector<EdgeModel> &occlusionObjects, const std::vector<PoseRT> &occlusionOffsets,
+                                 const PoseRT &model2test_fiducials)
+{
+  //TODO: move up
+  const float downFactor = 1.0f;
+  const int closingIterationsCount = 7;
+  const int objectColor = 127;
+  const int occlusionColor = 255;
+
+  PoseRT objectPose = model2test_fiducials * objectOffset;
+  Silhouette objectSilhouette;
+  Ptr<PinholeCamera> cameraPtr = new PinholeCamera(camera);
+  testObject.getSilhouette(cameraPtr, objectPose, objectSilhouette, downFactor, closingIterationsCount);
+
+  Mat image(camera.imageSize, CV_8UC1, Scalar(0));
+  objectSilhouette.draw(image, Scalar(objectColor), 0);
+
+  for (size_t i = 0; i < occlusionObjects.size(); ++i)
+  {
+    PoseRT pose_cam = model2test_fiducials * occlusionOffsets[i];
+    Silhouette silhouette;
+    occlusionObjects[i].getSilhouette(cameraPtr, pose_cam, silhouette, downFactor, closingIterationsCount);
+    silhouette.draw(image, Scalar(occlusionColor), -1);
+  }
+
+
+  Mat edgels;
+  objectSilhouette.getEdgels(edgels);
+  vector<Point2f> contour = edgels;
+
+  bool isOccluded = true;
+  int firstUnoccludedIndex = 0;
+  double unoccludedLength = 0.0;
+  for (int i = 0; i < edgels.rows; ++i)
+  {
+    Point pt = contour[i];
+    if (image.at<uchar>(pt) == objectColor && isOccluded)
+    {
+      firstUnoccludedIndex = i;
+      isOccluded = false;
+    }
+
+    if (image.at<uchar>(pt) == occlusionColor && !isOccluded)
+    {
+      isOccluded = true;
+
+      unoccludedLength += arcLength(edgels.rowRange(firstUnoccludedIndex, i), false);
+    }
+  }
+  if (!isOccluded)
+  {
+    bool isClosed = (firstUnoccludedIndex == 0);
+    unoccludedLength += arcLength(edgels.rowRange(firstUnoccludedIndex, edgels.rows), isClosed);
+  }
+
+  double contourLength = arcLength(edgels, true);
+
+  const float eps = 1e-2;
+  CV_Assert(contourLength > eps);
+  return 1.0 - (unoccludedLength / contourLength);
+}
+
 int main(int argc, char **argv)
 {
   std::system("date");
@@ -163,7 +226,7 @@ int main(int argc, char **argv)
 //  const string camerasListFilename = baseFolder + "/cameras.txt";
   const string kinectCameraFilename = baseFolder + "/center.yml";
 //  const string visualizationPath = "visualized_results/";
-//  const string errorsVisualizationPath = "/home/ilysenkov/errors/";
+  const string errorsVisualizationPath = "/home/ilysenkov/errors/";
 //  const vector<string> objectNames = {"bank", "bucket"};
 //  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
@@ -188,6 +251,10 @@ int main(int argc, char **argv)
     cout << "All points in the model: " << edgeModels[i].points.size() << endl;
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
   }
+
+  vector<EdgeModel> occlusionObjects;
+  vector<PoseRT> occlusionOffsets;
+  dataImporter.importOcclusionObjects(modelsPath, occlusionObjects, occlusionOffsets);
 
 
 //#ifdef VISUALIZE_POSE_REFINEMENT
@@ -253,7 +320,6 @@ int main(int argc, char **argv)
       dataImporter.importDepth(testImageIdx, kinectDepth);
     }
 
-
 /*
     Mat silhouetteImage(480, 640, CV_8UC1, Scalar(0));
     silhouettes[0].draw(silhouetteImage);
@@ -270,12 +336,20 @@ int main(int argc, char **argv)
     exit(-1);
 */
 
-    PoseRT model2test_ground;
-    dataImporter.importGroundTruth(testImageIdx, model2test_ground);
+    PoseRT model2test_fiducials, objectOffset;
+    dataImporter.importGroundTruth(testImageIdx, model2test_fiducials, false, &objectOffset);
+    PoseRT model2test_ground = model2test_fiducials * objectOffset;
 //    cout << "Ground truth: " << model2test_ground << endl;
 
+    CV_Assert(edgeModels.size() == 1);
+    float occlusionPercentage = computeOcclusionPercentage(kinectCamera, edgeModels[0], objectOffset, occlusionObjects, occlusionOffsets, model2test_fiducials);
+    CV_Assert(0.0 <= occlusionPercentage && occlusionPercentage <= 1.0);
+    cout << "occlusion percentage: " << occlusionPercentage << endl;
+
     pcl::PointCloud<pcl::PointXYZ> testPointCloud;
+#ifdef USE_3D_VISUALIZATION
     dataImporter.importPointCloud(testImageIdx, testPointCloud);
+#endif
 
 #ifdef VISUALIZE_TEST_DATA
     imshow("rgb", kinectBgrImage);
@@ -412,11 +486,13 @@ int main(int argc, char **argv)
 //        waitKey();
       }
       cout << "the end." << endl;
+      PoseError currentBestInitialError;
       {
         vector<PoseError>::iterator bestPoseIt = std::min_element(initialPoseErrors.begin(), initialPoseErrors.end());
         int bestPoseIdx = std::distance(initialPoseErrors.begin(), bestPoseIt);
-        cout << "Best initial pose: " << initialPoseErrors[bestPoseIdx] << endl;
-        bestInitialPoses.push_back(initialPoseErrors[bestPoseIdx]);
+        currentBestInitialError = initialPoseErrors[bestPoseIdx];
+        cout << "Best initial error: " << currentBestInitialError << endl;
+        bestInitialPoses.push_back(currentBestInitialError);
       }
 
 
@@ -455,8 +531,13 @@ int main(int argc, char **argv)
       }
       vector<PoseError>::iterator bestPoseIt = std::min_element(currentPoseErrors.begin(), currentPoseErrors.end());
       int bestPoseIdx = std::distance(currentPoseErrors.begin(), bestPoseIt);
-      cout << "Best pose: " << currentPoseErrors[bestPoseIdx] << endl;
-      bestPoses.push_back(currentPoseErrors[bestPoseIdx]);
+      PoseError currentBestError = currentPoseErrors[bestPoseIdx];
+      cout << "Best pose: " << currentBestError << endl;
+      bestPoses.push_back(currentBestError);
+
+      cout << "Result: " << occlusionPercentage << ", " << debugInfo.initialPoses.size() << ", " <<
+              currentBestInitialError.getTranslationDifference() << ", " << currentBestInitialError.getRotationDifference(false) << ", " <<
+              currentBestError.getTranslationDifference() << ", " << currentBestError.getRotationDifference(false) << endl;
 
 #ifdef WRITE_ERRORS
       const float maxTrans = 0.02;

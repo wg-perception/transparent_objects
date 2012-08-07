@@ -44,4 +44,6 @@ bool computeTableOrientationByRGBD(const cv::Mat &depth, const PinholeCamera &ca
                                    cv::Vec4f &tablePlane, std::vector<cv::Point> *tableHull = 0,
                                    cv::Point3f verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f));
 
+bool computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Mat &bgrImage,
+                                        cv::Vec4f &tablePlane);
 #endif /* PCLPROCESSING_HPP_ */

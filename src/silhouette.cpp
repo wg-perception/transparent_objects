@@ -293,21 +293,14 @@ void Silhouette::visualizeSimilarityTransformation(const cv::Mat &similarityTran
   drawPoints(transformedEdgelsVec, image, color);
 }
 
-void Silhouette::draw(cv::Mat &image, int thickness) const
-{
-  vector<Point2f> edgelsVec = edgels;
-  drawPoints(edgelsVec, image, Scalar::all(255), thickness);
-}
-
-void Silhouette::drawMask(cv::Mat &image) const
+void Silhouette::draw(cv::Mat &image, cv::Scalar color, int thickness) const
 {
   Mat edgelsInt;
   edgels.convertTo(edgelsInt, CV_32SC2);
   vector<vector<Point> > contours(1);
   contours[0] = edgelsInt;
-  drawContours(image, contours, -1, Scalar::all(255), -1);
+  drawContours(image, contours, -1, color, thickness);
 }
-
 
 void Silhouette::getNormalizationTransform(const cv::Mat &points, cv::Mat &normalizationTransform)
 {

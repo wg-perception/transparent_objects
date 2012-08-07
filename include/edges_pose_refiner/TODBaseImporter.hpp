@@ -25,8 +25,11 @@ public:
   static void importCamera(const std::string &filename, PinholeCamera &camera);
   void importEdgeModel(const std::string &modelsPath, const std::string &objectName, EdgeModel &edgeModel) const;
   void importTestIndices(std::vector<int> &testIndices) const;
-  void importGroundTruth(int testImageIdx, PoseRT &model2test) const;
+  void importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset = true, PoseRT *offsetPtr = 0) const;
   void importAllGroundTruth(std::map<int, PoseRT> &allPoses) const;
+  void importOcclusionObjects(const std::string &modelsPath,
+                              std::vector<EdgeModel> &occlusionObjects, std::vector<PoseRT> &occlusionOffsets) const;
+
   static void importRegistrationMask(const std::string &filename, cv::Mat &registrationMask);
 
   void importDepth(int testImageIdx, cv::Mat &depth) const;

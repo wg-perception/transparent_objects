@@ -22,9 +22,10 @@ double PoseError::getTranslationDifference() const
   return translationDiff;
 }
 
-double PoseError::getRotationDifference() const
+double PoseError::getRotationDifference(bool useRadians) const
 {
-  return rotationDifference;
+  const double rad2deg = 180.0 / CV_PI;
+  return (useRadians ? rotationDifference : rotationDifference * rad2deg);
 }
 
 double PoseError::getDifference() const

@@ -11,6 +11,9 @@
 #include "pcl/io/pcd_io.h"
 #include "pcl/point_types.h"
 
+#include <sys/types.h>
+#include <dirent.h>
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -107,6 +110,38 @@ void TODBaseImporter::readRegisteredClouds(const string &configFilename, vector<
   for(size_t i=0; i<filenames.size(); i++)
   {
     readPointCloud(filenames[i], registeredClouds[i]);
+  }
+}
+
+void TODBaseImporter::importOcclusionObjects(const std::string &modelsPath,
+                                             std::vector<EdgeModel> &occlusionObjects, std::vector<PoseRT> &occlusionOffsets) const
+{
+  //TODO: move up
+  const string occlusionPrefix = "occlusion_";
+  const string occlusionPostFix = ".xml";
+  //TOOD: port to other systems too
+  DIR *directory = opendir(testFolder.c_str());
+  CV_Assert(directory != 0);
+
+  occlusionObjects.clear();
+  for (dirent *entry = readdir(directory); entry != 0; entry = readdir(directory))
+  {
+    string filename = entry->d_name;
+    if (filename.substr(0, occlusionPrefix.length()) != occlusionPrefix)
+    {
+      continue;
+    }
+
+    int objectNameLength = static_cast<int>(filename.length()) - static_cast<int>(occlusionPostFix.length()) - static_cast<int>(occlusionPrefix.length());
+    string objectName = filename.substr(occlusionPrefix.length(), objectNameLength);
+
+    EdgeModel edgeModel;
+    importEdgeModel(modelsPath, objectName, edgeModel);
+    occlusionObjects.push_back(edgeModel);
+
+    PoseRT offset;
+    offset.read(testFolder + "/" + filename);
+    occlusionOffsets.push_back(offset);
   }
 }
 
@@ -210,7 +245,7 @@ void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
   CV_Assert(mask.channels() == 1);
 }
 
-void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) const
+void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset, PoseRT *offsetPtr) const
 {
   std::stringstream testPoseFilename;
   testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
@@ -222,10 +257,21 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test) co
   testPoseFS["pose"]["tvec"] >> model2test.tvec;
   testPoseFS.release();
 
-  const string offsetFilename = "offset.xml";
-  PoseRT offset;
-  offset.read(testFolder + "/" + offsetFilename);
-  model2test = model2test * offset;
+  if (shiftByOffset || offsetPtr != 0)
+  {
+    //TODO: move up
+    const string offsetFilename = "offset.xml";
+    PoseRT offset;
+    offset.read(testFolder + "/" + offsetFilename);
+    if (shiftByOffset)
+    {
+      model2test = model2test * offset;
+    }
+    if (offsetPtr != 0)
+    {
+      *offsetPtr = offset;
+    }
+  }
 }
 
 void TODBaseImporter::importAllGroundTruth(std::map<int, PoseRT> &allPoses) const

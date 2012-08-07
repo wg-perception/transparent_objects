@@ -146,7 +146,7 @@ Ptr<Line2D> trainLine2D(const PinholeCamera &camera, const EdgeModel &edgeModel,
     edgeModel.getSilhouette(cameraPtr, trainPoses[i], silhouette, downFactor, closingIterationsCount);
 
     Mat mask(camera.imageSize, CV_8UC1, Scalar(0));
-    silhouette.drawMask(mask);
+    silhouette.draw(mask, Scalar::all(255), -1);
 
     Mat colorMask;
     cvtColor(mask, colorMask, COLOR_GRAY2BGR);

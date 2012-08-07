@@ -25,7 +25,7 @@ public:
 
   PoseRT getPosesDifference() const;
   double getTranslationDifference() const;
-  double getRotationDifference() const;
+  double getRotationDifference(bool useRadians = true) const;
   double getDifference() const;
 private:
   void computeSingleCriteria();

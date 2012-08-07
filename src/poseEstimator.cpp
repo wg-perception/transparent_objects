@@ -91,9 +91,6 @@ namespace transpod
       return;
     }
 
-    Mat testEdges, silhouetteEdges;
-    computeCentralEdges(kinectBgrImage, glassMask, testEdges, silhouetteEdges);
-
   //  getInitialPoses(glassMask, poses_cam, posesQualities);
     getInitialPosesByGeometricHashing(glassMask, poses_cam, posesQualities, initialSilhouettes);
     if (initialPoses != 0)
@@ -104,9 +101,17 @@ namespace transpod
   //  refineInitialPoses(kinectBgrImage, glassMask, poses_cam, posesQualities);
     if (tablePlane != 0)
     {
-      refinePosesByTableOrientation(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
-      refineFinalTablePoses(*tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+      refinePosesBySupportPlane(kinectBgrImage, glassMask, *tablePlane, poses_cam, posesQualities);
     }
+  }
+
+  void PoseEstimator::refinePosesBySupportPlane(const cv::Mat &bgrImage, const cv::Mat &glassMask, const cv::Vec4f &tablePlane,
+                                                std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
+  {
+      Mat testEdges, silhouetteEdges;
+      computeCentralEdges(bgrImage, glassMask, testEdges, silhouetteEdges);
+      refinePosesByTableOrientation(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+      refineFinalTablePoses(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
   }
 
   void PoseEstimator::refineFinalTablePoses(const cv::Vec4f &tablePlane,

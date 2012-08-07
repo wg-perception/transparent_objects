@@ -218,6 +218,9 @@ namespace transpod
                       const cv::Vec4f *tablePlane = 0,
                       std::vector<cv::Mat> *initialSilhouettes = 0, std::vector<PoseRT> *initialPoses = 0) const;
 
+    void refinePosesBySupportPlane(const cv::Mat &bgrImage, const cv::Mat &glassMask, const cv::Vec4f &tablePlane,
+                                   std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const;
+
     /** \brief Reads a pose estimator from a file
      *
      * \param filename Name of a file where a pose estimator is stored

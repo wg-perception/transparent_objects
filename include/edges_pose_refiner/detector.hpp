@@ -47,21 +47,24 @@ namespace transpod
   };
 
   enum PlaneSegmentationMethod {PCL, RGBD, FIDUCIALS};
+  enum GlassSegmentationMethod {AUTOMATIC, MANUAL};
 
   struct DetectorParams
   {
+    PlaneSegmentationMethod planeSegmentationMethod;
     /** \brief parameters to segment a plane in a test scene */
     PCLPlaneSegmentationParams pclPlaneSegmentationParams;
 
+    GlassSegmentationMethod glassSegmentationMethod;
     /** \brief parameters to segment glass */
     GlassSegmentatorParams glassSegmentationParams;
 
-    PlaneSegmentationMethod planeSegmentationMethod;
 
     DetectorParams()
     {
       planeSegmentationMethod = PCL;
       pclPlaneSegmentationParams = PCLPlaneSegmentationParams();
+      glassSegmentationMethod = AUTOMATIC;
       glassSegmentationParams = GlassSegmentatorParams();
     }
   };
@@ -159,9 +162,6 @@ namespace transpod
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
                    pcl::PointCloud<pcl::PointXYZ> &cloud) const;
   private:
-    bool tmpComputeTableOrientation(const PinholeCamera &camera, const cv::Mat &centralBgrImage,
-                                    cv::Vec4f &tablePlane) const;
-
     DetectorParams params;
     PinholeCamera srcCamera;
     std::map<std::string, PoseEstimator> poseEstimators;

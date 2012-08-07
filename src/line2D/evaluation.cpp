@@ -258,6 +258,7 @@ void getSortedTrainIndices(const EdgeModel &edgeModel, const std::map<int, PoseR
     for (std::map<int, PoseRT>::const_iterator testIt = testPoses.begin(); testIt != testPoses.end(); ++testIt)
     {
       PoseError poseError;
+      //TODO: measure distance in z-direction only
       evaluatePoseWithRotation(edgeModel, trainIt->second, testIt->second, poseError);
       double distance = poseError.getDifference();
       if (distance < minDistance)
