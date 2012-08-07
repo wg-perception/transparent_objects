@@ -261,6 +261,9 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
                                    cv::Vec4f &tablePlane, std::vector<cv::Point> *tableHull,
                                    Point3f verticalDirection)
 {
+  CV_Assert(false);
+  //TODO: fix compilation with Jenkins
+#if 0
   Mat points3d;
   depthTo3d(depth, camera.cameraMatrix, points3d);
   RgbdNormals normalsEstimator(depth.rows, depth.cols, depth.depth(), camera.cameraMatrix);
@@ -311,6 +314,7 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
   }
 
   return true;
+#endif
 }
 
 
