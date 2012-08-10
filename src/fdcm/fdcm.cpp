@@ -1,0 +1,167 @@
+#include "fdcm/fdcm.hpp"
+#include "fdcm/image/Image.h"
+#include "fdcm/fitline/LFLineFitter.h"
+#include "fdcm/fdcm/LMDistanceImage.h"
+
+#include <opencv2/opencv.hpp>
+
+using namespace cv;
+
+void cv2fdcm(const Mat &cvImage, Ptr<Image<uchar> > &fdcmImage)
+{
+  CV_Assert(cvImage.type() == CV_8UC1);
+
+  fdcmImage = new Image<uchar>(cvImage.cols, cvImage.rows, false);
+
+  CV_Assert(cvImage.isContinuous());
+  memcpy(fdcmImage->data, cvImage.data, cvImage.total());
+
+  //TODO: remove
+  for (int i = 0; i < cvImage.rows; ++i)
+  {
+    for (int j = 0; j < cvImage.cols; ++j)
+    {
+      CV_Assert(cvImage.at<uchar>(i, j) == fdcmImage->Access(j, i));
+    }
+  }
+}
+
+//TODO: add const
+void fdcm2cv(Image<uchar> &fdcmImage, Mat &cvImage)
+{
+//  cvImage = Mat(fdcmImage.height(), fdcmImage.width(), CV_8UC1, fdcmImage.data);
+  cvImage.create(fdcmImage.height(), fdcmImage.width(), CV_8UC1);
+  memcpy(cvImage.data, fdcmImage.data, cvImage.total());
+
+  //TODO: remove
+  for (int i = 0; i < cvImage.rows; ++i)
+  {
+    for (int j = 0; j < cvImage.cols; ++j)
+    {
+      CV_Assert(cvImage.at<uchar>(i, j) == fdcmImage.Access(j, i));
+    }
+  }
+}
+
+void fdcm2cv(Image<float> &fdcmImage, Mat &cvImage)
+{
+  cvImage.create(fdcmImage.height(), fdcmImage.width(), CV_32FC1);
+  memcpy(cvImage.data, fdcmImage.data, cvImage.total() * sizeof(float));
+
+  //TODO: remove
+  for (int i = 0; i < cvImage.rows; ++i)
+  {
+    for (int j = 0; j < cvImage.cols; ++j)
+    {
+      CV_Assert(cvImage.at<float>(i, j) == fdcmImage.Access(j, i));
+    }
+  }
+}
+
+void fitLines(const cv::Mat &edges, LFLineFitter &lineFitter)
+{
+  Ptr<Image<uchar> > fdcmEdges;
+  cv2fdcm(edges, fdcmEdges);
+  lineFitter.Init();
+  lineFitter.FitLine(fdcmEdges);
+}
+
+void computeNormals(const cv::Mat &edges, cv::Mat &normals)
+{
+  LFLineFitter lineFitter;
+  fitLines(edges, lineFitter);
+
+  Mat linearMap(edges.size(), CV_8UC1, Scalar(0));
+  Mat linearMapNormals(edges.size(), CV_32FC2, Scalar::all(std::numeric_limits<float>::quiet_NaN()));
+  for (int i = 0; i < lineFitter.rNLineSegments(); ++i)
+  {
+    cv::Point start(lineFitter.outEdgeMap_[i].sx_, lineFitter.outEdgeMap_[i].sy_);
+    cv::Point end(lineFitter.outEdgeMap_[i].ex_, lineFitter.outEdgeMap_[i].ey_);
+
+    LineIterator edgelsIterator(linearMap, start, end);
+    for(int j = 0; j < edgelsIterator.count; ++j, ++edgelsIterator)
+    {
+      **edgelsIterator = 255;
+      Vec2f normal(lineFitter.outEdgeMap_[i].normal_.x, lineFitter.outEdgeMap_[i].normal_.y);
+      linearMapNormals.at<Vec2f>(edgelsIterator.pos()) = normal;
+    }
+  }
+//  imshow("linearMap", linearMap);
+//  waitKey();
+
+  Mat dt, labels;
+  distanceTransform(~linearMap, dt, labels, CV_DIST_L2, CV_DIST_MASK_PRECISE, DIST_LABEL_PIXEL);
+
+  CV_Assert(linearMap.type() == CV_8UC1);
+  CV_Assert(labels.type() == CV_32SC1);
+  std::map<int, cv::Point> label2position;
+  for (int i = 0; i < linearMap.rows; ++i)
+  {
+    for (int j = 0; j < linearMap.cols; ++j)
+    {
+      if (linearMap.at<uchar>(i, j) != 0)
+      {
+        //TODO: singal error if the label already exists
+        label2position[labels.at<int>(i, j)] = cv::Point(j, i);
+      }
+    }
+  }
+
+  normals.create(edges.size(), CV_32FC2);
+  normals= Scalar::all(std::numeric_limits<float>::quiet_NaN());
+  for (int i = 0; i < edges.rows; ++i)
+  {
+    for (int j = 0; j < edges.cols; ++j)
+    {
+      if (edges.at<uchar>(i, j) != 0)
+      {
+        cv::Point nearestEdgelPosition = label2position[labels.at<int>(i, j)];
+        normals.at<Vec2f>(i, j) = linearMapNormals.at<Vec2f>(nearestEdgelPosition);
+      }
+    }
+  }
+
+/*
+  Mat vis(orientations.size(), CV_8UC1, Scalar(0));
+  for (int i = 0; i < orientations.rows; ++i)
+  {
+    for (int j = 0; j < orientations.cols; ++j)
+    {
+      Vec2f elem = orientations.at<Vec2f>(i, j);
+      vis.at<uchar>(i, j) = (cvIsNaN(elem[0]) || cvIsNaN(elem[1])) ? 0 : 255;
+    }
+  }
+  imshow("final or", vis);
+  waitKey();
+*/
+}
+
+void computeDistanceTransform3D(const cv::Mat &edges,
+                                std::vector<cv::Mat> &dtImages)
+{
+  //TODO: move up
+  const float directionCost = 0.5f;
+  const double maxCost = 30.0;
+  const int nDirections = 60;
+  const double scale = 1.0;
+
+  LFLineFitter lineFitter;
+  fitLines(edges, lineFitter);
+
+  EIEdgeImage linearEdges;
+  linearEdges.SetNumDirections(nDirections);
+  linearEdges.Read(lineFitter);
+  linearEdges.Scale(scale);
+
+  LMDistanceImage distanceImage;
+  distanceImage.Configure(directionCost, maxCost);
+  distanceImage.SetImage(linearEdges);
+
+  vector<Image<float> > &fdcmDtImages = distanceImage.getDtImages();
+  dtImages.resize(fdcmDtImages.size());
+
+  for (size_t i = 0; i < fdcmDtImages.size(); ++i)
+  {
+    fdcm2cv(fdcmDtImages[i], dtImages[i]);
+  }
+}
