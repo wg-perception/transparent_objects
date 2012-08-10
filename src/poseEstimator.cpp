@@ -23,6 +23,8 @@
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
 //#define VISUALIZE_GEOMETRIC_HASHING
 
+//#define VISUALIZE_FINAL_REFINEMENT
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -132,7 +134,16 @@ namespace transpod
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
       PoseRT &initialPose_cam = poses_cam[initPoseIdx];
+#ifdef VISUALIZE_FINAL_REFINEMENT
+      showEdgels(testEdges, edgeModel.points, initialPose_cam, kinectCamera, "before final refinement");
+      showEdgels(testEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable before final refinement");
+#endif
       posesQualities[initPoseIdx] = localPoseRefiner.refineUsingSilhouette(initialPose_cam, true, tablePlane);
+#ifdef VISUALIZE_FINAL_REFINEMENT
+      showEdgels(testEdges, edgeModel.points, initialPose_cam, kinectCamera, "after final refinement");
+      showEdgels(testEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable after final refinement");
+      waitKey();
+#endif
     }
   }
 
@@ -159,6 +170,7 @@ namespace transpod
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
   #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
+      cout << "quality[" << initPoseIdx << "]: " << initPosesQualities[initPoseIdx] << endl;
       showEdgels(centralEdges, edgeModel.points, poses_cam[initPoseIdx], kinectCamera, "before alignment to a table plane");
   #endif
 
@@ -346,7 +358,7 @@ namespace transpod
   #ifdef VISUALIZE_INITIAL_POSE_REFINEMENT
     imshow("central edges even after", centralEdges);
     imshow("silhouette edges", silhouetteEdges);
-    //waitKey();
+    waitKey();
   #endif
 
   }

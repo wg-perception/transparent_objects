@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
   params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.finalClosingIterations = 32;
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
+  params.planeSegmentationMethod = FIDUCIALS;
 
   TODBaseImporter dataImporter(testFolder);
 
@@ -54,7 +55,7 @@ int main(int argc, char *argv[])
   dataImporter.importDepth(depthFilename, kinectDepth);
   imshow("rgb image", kinectBgrImage);
   imshow("depth", kinectDepth);
-  waitKey(2000);
+  waitKey(500);
 
   PinholeCamera kinectCamera;
   dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);

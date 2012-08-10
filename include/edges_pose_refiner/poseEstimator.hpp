@@ -129,9 +129,8 @@ namespace transpod
 
     PoseEstimatorParams()
     {
-//      silhouetteCount = 10;
-//      silhouetteCount = 100;
-      silhouetteCount = 60;
+      silhouetteCount = 10;
+//      silhouetteCount = 60;
       downFactor = 1.0f;
       closingIterationsCount = 10;
 

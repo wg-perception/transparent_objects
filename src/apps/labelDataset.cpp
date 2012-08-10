@@ -39,11 +39,16 @@ int main(int argc, char *argv[])
   PinholeCamera camera;
   baseImporter.importCamera(cameraFilename, camera);
 
-
   transpod::PoseEstimator occlusionPoseEstimator(camera);
   occlusionPoseEstimator.setModel(occlusionEdgeModel);
 
-  GlassSegmentator glassSegmentator;
+  GlassSegmentatorParams glassSegmentationParams;
+  //good_clutter
+  glassSegmentationParams.openingIterations = 15;
+  glassSegmentationParams.closingIterations = 12;
+  glassSegmentationParams.finalClosingIterations = 32;
+  glassSegmentationParams.grabCutErosionsIterations = 4;
+  GlassSegmentator glassSegmentator(glassSegmentationParams);
 
   vector<PoseRT> occlusionOffsets;
   cout << "offsets:" << endl;
@@ -75,7 +80,7 @@ int main(int argc, char *argv[])
       detector.addTrainObject(occlusionName, occlusionPoseEstimator);
       detector.detect(bgrImage, depthImage, registrationMask, sceneCloud, poses_cam, posesQualities, objectNames);
       detector.showResults(poses_cam, objectNames, bgrImage);
-      waitKey(200);
+      waitKey(1000);
     }
     else
     {
@@ -92,6 +97,8 @@ int main(int argc, char *argv[])
       Mat glassMask;
       int numberOfComponents;
       glassSegmentator.segment(bgrImage, depthImage, registrationMask, numberOfComponents, glassMask);
+      showSegmentation(bgrImage, glassMask);
+
       Vec4f tablePlane;
       computeTableOrientationByFiducials(camera, bgrImage, tablePlane);
       occlusionPoseEstimator.refinePosesBySupportPlane(bgrImage, glassMask, tablePlane, poses_cam, posesQualities);
@@ -119,7 +126,7 @@ int main(int argc, char *argv[])
     Mat tvec = occlusionOffsets[i].getTvec();
     xs.push_back(tvec.at<double>(0));
     ys.push_back(tvec.at<double>(1));
-    const float eps = 1e-4;
+    const float eps = 1e-3;
     CV_Assert(fabs(tvec.at<double>(2)) < eps);
   }
 
@@ -137,7 +144,6 @@ int main(int argc, char *argv[])
 
   string offsetFilename = baseFolder + "/" + testObjectName + "/occlusion_" + occlusionName + ".xml";
   finalOffset.write(offsetFilename);
-
 
   for (vector<int>::iterator testIterator = testIndices.begin(); testIterator != testIndices.end(); ++testIterator)
   {
