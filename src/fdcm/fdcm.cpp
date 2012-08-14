@@ -66,13 +66,59 @@ void fitLines(const cv::Mat &edges, LFLineFitter &lineFitter)
   lineFitter.FitLine(fdcmEdges);
 }
 
-void computeNormals(const cv::Mat &edges, cv::Mat &normals)
+//TODO: remove code duplication with EIEdgeImage::Theta2Index
+int theta2Index(double theta, int directionsCount)
 {
+  return (int) floor ((theta * directionsCount) / (M_PI+1e-5));
+}
+
+void computeOrientationIndices(const std::vector<cv::Point2f> &points, const cv::Mat &dx, const cv::Mat &dy,
+                               std::vector<int> &orientationIndices)
+{
+  CV_Assert(dx.size() == dy.size());
+  CV_Assert(dx.type() == CV_32FC1);
+  CV_Assert(dy.type() == CV_32FC1);
+
+  //TODO: move up
+  const int directionsCount = 60;
+
+  orientationIndices.clear();
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    cv::Point pt = points[i];
+
+    //TODO: use isPointInside
+    if (0 <= pt.x && pt.x < dx.cols && 0 <= pt.y && pt.y < dx.rows)
+    {
+      //TODO: use LFLineSegment::Theta()
+      //TODO: do you need inverse y-axis?
+      double theta = atan2(dy.at<float>(pt), dx.at<float>(pt));
+      if (theta<0)
+      {
+          theta += M_PI;
+      }
+      int orIndex = theta2Index(theta, directionsCount);
+      orientationIndices.push_back(orIndex);
+    }
+    else
+    {
+      //TODO: move up
+      const int defaultOrIndex = 0;
+      orientationIndices.push_back(defaultOrIndex);
+    }
+  }
+}
+
+void computeNormals(const cv::Mat &edges, cv::Mat &normals, cv::Mat &orientationIndices)
+{
+  //TODO: move up
+  const int directionsCount = 60;
   LFLineFitter lineFitter;
   fitLines(edges, lineFitter);
 
   Mat linearMap(edges.size(), CV_8UC1, Scalar(0));
   Mat linearMapNormals(edges.size(), CV_32FC2, Scalar::all(std::numeric_limits<float>::quiet_NaN()));
+  Mat linearMapOrientationIndices(edges.size(), CV_32SC1, Scalar(-1));
   for (int i = 0; i < lineFitter.rNLineSegments(); ++i)
   {
     cv::Point start(lineFitter.outEdgeMap_[i].sx_, lineFitter.outEdgeMap_[i].sy_);
@@ -84,6 +130,7 @@ void computeNormals(const cv::Mat &edges, cv::Mat &normals)
       **edgelsIterator = 255;
       Vec2f normal(lineFitter.outEdgeMap_[i].normal_.x, lineFitter.outEdgeMap_[i].normal_.y);
       linearMapNormals.at<Vec2f>(edgelsIterator.pos()) = normal;
+      linearMapOrientationIndices.at<int>(edgelsIterator.pos()) = theta2Index(lineFitter.outEdgeMap_[i].Theta(), directionsCount);
     }
   }
 //  imshow("linearMap", linearMap);
@@ -107,17 +154,20 @@ void computeNormals(const cv::Mat &edges, cv::Mat &normals)
     }
   }
 
+  orientationIndices.create(edges.size(), CV_32SC1);
+  orientationIndices = -1;
+
   normals.create(edges.size(), CV_32FC2);
-  normals= Scalar::all(std::numeric_limits<float>::quiet_NaN());
+  normals = Scalar::all(std::numeric_limits<float>::quiet_NaN());
   for (int i = 0; i < edges.rows; ++i)
   {
     for (int j = 0; j < edges.cols; ++j)
     {
-      if (edges.at<uchar>(i, j) != 0)
-      {
-        cv::Point nearestEdgelPosition = label2position[labels.at<int>(i, j)];
-        normals.at<Vec2f>(i, j) = linearMapNormals.at<Vec2f>(nearestEdgelPosition);
-      }
+//      if (edges.at<uchar>(i, j) != 0)
+      cv::Point nearestEdgelPosition = label2position[labels.at<int>(i, j)];
+      normals.at<Vec2f>(i, j) = linearMapNormals.at<Vec2f>(nearestEdgelPosition);
+      orientationIndices.at<int>(i, j) = linearMapOrientationIndices.at<int>(nearestEdgelPosition);
+      CV_Assert(orientationIndices.at<int>(i, j) >= 0 && orientationIndices.at<int>(i, j) < directionsCount);
     }
   }
 

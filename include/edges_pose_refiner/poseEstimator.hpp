@@ -323,6 +323,8 @@ namespace transpod
     mutable PoseEstimatorParams params;
     mutable std::vector<cv::Mat> votes;
 
+    mutable cv::Mat testBgrImage;
+
     PinholeCamera kinectCamera;
   };
 }

@@ -39,6 +39,8 @@ struct LocalPoseRefinerParams
   /** \brief termination criteria of Levenberg-Marquardt in pose refinement */
   cv::TermCriteria termCriteria;
 
+  bool useEdgeOrientations;
+
   LocalPoseRefinerParams()
   {
     distanceType = CV_DIST_L2;
@@ -51,6 +53,9 @@ struct LocalPoseRefinerParams
 
     useAccurateSilhouettes = true;
     termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
+
+//    useEdgeOrientations = true;
+    useEdgeOrientations = false;
   }
 };
 
@@ -67,7 +72,7 @@ public:
    *  \param extrinsicsRt Extrinsic parameters of the test camera
    *  \param params Parameters of local optimization
    */
-  LocalPoseRefiner(const EdgeModel &edgeModel, const cv::Mat &edgesImage, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, const cv::Mat &extrinsicsRt, const LocalPoseRefinerParams &params = LocalPoseRefinerParams());
+  LocalPoseRefiner(const EdgeModel &edgeModel, const cv::Mat &bgrImage, const cv::Mat &edgesImage, const PinholeCamera &camera, const LocalPoseRefinerParams &params = LocalPoseRefinerParams());
 
   /** \brief Sets paremeters of pose refinement
    *
@@ -92,6 +97,7 @@ them. Else the function will use zero rotation and translation as initial guess.
   float refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGuess = false, const cv::Vec4f &tablePlane = cv::Vec4f::all(0.0f), cv::Mat *finalJacobian = 0);
 private:
   static void computeDistanceTransform(const cv::Mat &edges, int distanceType, int distanceMask, cv::Mat &distanceImage, cv::Mat &dx, cv::Mat &dy);
+  static void computeDerivatives(const cv::Mat &image, cv::Mat &dx, cv::Mat &dy);
   static float estimateOutlierError(const cv::Mat &distanceImage, int distanceType);
 
   //rotate_cam model points
@@ -102,10 +108,24 @@ private:
   void getObjectCoordinateSystem(cv::Mat &Rt_obj2cam) const;
 
   void computeJacobian(const cv::Mat &projectedPoints, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, cv::Mat &J);
-  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J);
+
+  //TODO: remove code duplication
+  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J) const;
+  void computeObjectJacobian(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
+                             cv::Mat &J) const;
+
   void computeWeightsObjectJacobian(const std::vector<cv::Point3f> &points, const cv::Mat &silhouetteEdges, const PoseRT &pose_obj, cv::Mat &weightsJacobian) const;
-  void computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform = cv::Mat(), const bool useInterpolation = true) const;
-  void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
+
+  //TODO: remove code duplication
+  void computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform = cv::Mat(), bool useInterpolation = true) const;
+  void computeResiduals(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const std::vector<cv::Mat> &dtImages,
+                        cv::Mat &residuals, double outlierError, bool useInterpolation = true) const;
+
+  //TODO: remove code duplication
+  void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
+  void computeResidualsWithInliersMask(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const std::vector<cv::Mat> &dtImages,
+                                       cv::Mat &residuals, double outlierError, bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
+
   double getError(const cv::Mat &residuals) const;
 
   void computeWeights(const std::vector<cv::Point2f> &projectedPointsVector, const cv::Mat &silhouetteEdges, cv::Mat &weights) const;
@@ -134,9 +154,14 @@ private:
   cv::Mat dtImage;
   cv::Mat dtDx, dtDy;
 
+  cv::Mat bgrImage, bgrImageDx, bgrImageDy;
+
   cv::Mat silhouetteEdges;
-  cv::Mat silhouetteDtImage;
+  cv::Mat silhouetteDt;
   cv::Mat silhouetteDtDx, silhouetteDtDy;
+
+  std::vector<cv::Mat> silhouetteDtImages;
+  std::vector<cv::Mat> silhouetteDtImagesDx, silhouetteDtImagesDy;
 
   cv::Mat Rt_obj2cam_cached, Rt_cam2obj_cached;
 

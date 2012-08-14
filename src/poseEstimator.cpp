@@ -25,6 +25,8 @@
 
 //#define VISUALIZE_FINAL_REFINEMENT
 
+//#define VERBOSE
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -86,6 +88,7 @@ namespace transpod
   {
     CV_Assert(kinectBgrImage.size() == glassMask.size());
     CV_Assert(kinectBgrImage.size() == getValidTestImageSize());
+    testBgrImage = kinectBgrImage;
 
     if (silhouettes.empty())
     {
@@ -110,10 +113,11 @@ namespace transpod
   void PoseEstimator::refinePosesBySupportPlane(const cv::Mat &bgrImage, const cv::Mat &glassMask, const cv::Vec4f &tablePlane,
                                                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
   {
-      Mat testEdges, silhouetteEdges;
-      computeCentralEdges(bgrImage, glassMask, testEdges, silhouetteEdges);
-      refinePosesByTableOrientation(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
-      refineFinalTablePoses(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+    testBgrImage = bgrImage;
+    Mat testEdges, silhouetteEdges;
+    computeCentralEdges(bgrImage, glassMask, testEdges, silhouetteEdges);
+    refinePosesByTableOrientation(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+    refineFinalTablePoses(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
   }
 
   void PoseEstimator::refineFinalTablePoses(const cv::Vec4f &tablePlane,
@@ -129,7 +133,7 @@ namespace transpod
     }
 
     posesQualities.resize(poses_cam.size());
-    LocalPoseRefiner localPoseRefiner(edgeModel, testEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), params.lmFinalParams);
+    LocalPoseRefiner localPoseRefiner(edgeModel, testBgrImage, testEdges, kinectCamera, params.lmFinalParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -185,7 +189,7 @@ namespace transpod
 
     LocalPoseRefinerParams lmErrorParams = params.lmInitialParams;
     lmErrorParams.termCriteria = params.lmErrorCriteria;
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), lmErrorParams);
+    LocalPoseRefiner localPoseRefiner(edgeModel, testBgrImage, centralEdges, kinectCamera, lmErrorParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -968,7 +972,7 @@ namespace transpod
       jacobians->resize(initPoses_cam.size());
     }
 
-    LocalPoseRefiner localPoseRefiner(edgeModel, centralEdges, kinectCamera.cameraMatrix, kinectCamera.distCoeffs, kinectCamera.extrinsics.getProjectiveMatrix(), lmParams);
+    LocalPoseRefiner localPoseRefiner(edgeModel, testBgrImage, centralEdges, kinectCamera, lmParams);
     localPoseRefiner.setSilhouetteEdges(silhouetteEdges);
     for (size_t initPoseIdx = 0; initPoseIdx < initPoses_cam.size(); ++initPoseIdx)
     {

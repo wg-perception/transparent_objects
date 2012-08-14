@@ -15,7 +15,11 @@ int main(int argc, char *argv[])
   RNG &rng = theRNG();
   rng.state = 0xffffffff;
 
-  CV_Assert(argc == 3);
+  if (argc != 3)
+  {
+    cout << argv[0] << " <baseFolder> <testObjectName>" << endl;
+    return -1;
+  }
   string baseFolder = argv[1];
   string testObjectName = argv[2];
 

@@ -35,8 +35,15 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
 #ifdef VISUALIZE
   Mat commonMask(rawMask.size(), CV_8UC1, Scalar(4));
 #endif
+  //TODO: move up
+  const float minArea = 40.0f;
   for(size_t i = 0; i < contours.size(); ++i)
   {
+    if (contourArea(contours[i]) < minArea)
+    {
+      continue;
+    }
+
     Rect roi = boundingRect(Mat(contours[i]));
     roi.x = std::max(0, roi.x - params.grabCutMargin);
     roi.y = std::max(0, roi.y - params.grabCutMargin);

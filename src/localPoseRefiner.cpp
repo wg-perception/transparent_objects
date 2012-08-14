@@ -10,6 +10,7 @@
 #include "edges_pose_refiner/poseRT.hpp"
 #include <iostream>
 #include "edges_pose_refiner/utils.hpp"
+#include "fdcm/fdcm.hpp"
 
 #include <opencv2/opencv.hpp>
 
@@ -20,7 +21,7 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
-LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_edgesImage, const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const cv::Mat &_extrinsicsRt, const LocalPoseRefinerParams &_params)
+LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_bgrImage, const cv::Mat &_edgesImage, const PinholeCamera &camera, const LocalPoseRefinerParams &_params)
 {
   verticalDirectionIndex = 2;
   dim = 3;
@@ -28,9 +29,9 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
   params = _params;
   edgesImage = _edgesImage.clone();
   CV_Assert(!edgesImage.empty());
-  _cameraMatrix.copyTo(cameraMatrix);
-  _distCoeffs.copyTo(distCoeffs);
-  _extrinsicsRt.copyTo(extrinsicsRt);
+  camera.cameraMatrix.copyTo(cameraMatrix);
+  camera.distCoeffs.copyTo(distCoeffs);
+  camera.extrinsics.getProjectiveMatrix().copyTo(extrinsicsRt);
 
   cameraMatrix.convertTo(cameraMatrix64F, CV_64FC1);
   computeDistanceTransform(edgesImage, params.distanceType, params.distanceMask, dtImage, dtDx, dtDy);
@@ -41,6 +42,12 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
   hasRotationSymmetry = rotatedEdgeModel.hasRotationSymmetry;
 
   setObjectCoordinateSystem(originalEdgeModel.Rt_obj2cam);
+
+  bgrImage = _bgrImage.clone();
+  //TODO: experiment with color gradients
+  Mat grayImage;
+  cvtColor(bgrImage, grayImage, CV_BGR2GRAY);
+  computeDerivatives(grayImage, bgrImageDx, bgrImageDy);
 }
 
 void LocalPoseRefiner::setParams(const LocalPoseRefinerParams &_params)
@@ -51,7 +58,19 @@ void LocalPoseRefiner::setParams(const LocalPoseRefinerParams &_params)
 void LocalPoseRefiner::setSilhouetteEdges(const cv::Mat &_silhouetteEdges)
 {
   silhouetteEdges = _silhouetteEdges;
-  computeDistanceTransform(silhouetteEdges, params.distanceType, params.distanceMask, silhouetteDtImage, silhouetteDtDx, silhouetteDtDy);
+  computeDistanceTransform(silhouetteEdges, params.distanceType, params.distanceMask, silhouetteDt, silhouetteDtDx, silhouetteDtDy);
+
+  if (params.useEdgeOrientations)
+  {
+    computeDistanceTransform3D(edgesImage, silhouetteDtImages);
+    silhouetteDtImagesDx.resize(silhouetteDtImages.size());
+    silhouetteDtImagesDy.resize(silhouetteDtImages.size());
+
+    for (int i = 0; i < silhouetteDtImages.size(); ++i)
+    {
+      computeDerivatives(silhouetteDtImages[i], silhouetteDtImagesDx[i], silhouetteDtImagesDy[i]);
+    }
+  }
 }
 
 void LocalPoseRefiner::setObjectCoordinateSystem(const cv::Mat &Rt_obj2cam)
@@ -71,6 +90,21 @@ void LocalPoseRefiner::setInitialPose(const PoseRT &pose_cam)
   setObjectCoordinateSystem(rotatedEdgeModel.Rt_obj2cam);
 }
 
+void LocalPoseRefiner::computeDerivatives(const cv::Mat &image, cv::Mat &dx, cv::Mat &dy)
+{
+  Mat kx_dx, ky_dx;
+  int ksize=3;
+  getDerivKernels(kx_dx, ky_dx, 1, 0, ksize, true);
+  Mat kx_dy, ky_dy;
+  getDerivKernels(kx_dy, ky_dy, 0, 1, ksize, true);
+
+  sepFilter2D(image, dx, CV_32F, kx_dx, ky_dx);
+  sepFilter2D(image, dy, CV_32F, kx_dy, ky_dy);
+
+  CV_Assert(dx.size() == image.size());
+  CV_Assert(dy.size() == image.size());
+}
+
 void LocalPoseRefiner::computeDistanceTransform(const cv::Mat &edges, int distanceType, int distanceMask, cv::Mat &distanceImage, cv::Mat &dx, cv::Mat &dy)
 {
   if(edges.empty())
@@ -79,18 +113,7 @@ void LocalPoseRefiner::computeDistanceTransform(const cv::Mat &edges, int distan
   }
 
   distanceTransform(~edges, distanceImage, distanceType, distanceMask);
-
-  Mat kx_dx, ky_dx;
-  int ksize=3;
-  getDerivKernels(kx_dx, ky_dx, 1, 0, ksize, true);
-  Mat kx_dy, ky_dy;
-  getDerivKernels(kx_dy, ky_dy, 0, 1, ksize, true);
-
-  sepFilter2D(distanceImage, dx, CV_32F, kx_dx, ky_dx);
-  sepFilter2D(distanceImage, dy, CV_32F, kx_dy, ky_dy);
-
-  assert(dx.size() == distanceImage.size());
-  assert(dy.size() == distanceImage.size());
+  computeDerivatives(distanceImage, dx, dy);
 
 #ifdef VERBOSE
 /*
@@ -184,7 +207,7 @@ double LocalPoseRefiner::getFilteredDistance(cv::Point2f pt, bool useInterpolati
   return dist;
 }
 
-void LocalPoseRefiner::computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation) const
+void LocalPoseRefiner::computeResiduals(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, bool useInterpolation) const
 {
   CV_Assert(projectedPoints.cols == 1);
   CV_Assert(projectedPoints.type() == CV_32FC2);
@@ -197,9 +220,44 @@ void LocalPoseRefiner::computeResiduals(const cv::Mat &projectedPoints, cv::Mat 
   }
 }
 
-void LocalPoseRefiner::computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, const bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const
+void LocalPoseRefiner::computeResiduals(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const std::vector<cv::Mat> &dtImages,
+                                        cv::Mat &residuals, double outlierError, bool useInterpolation) const
+{
+  CV_Assert(projectedPoints.cols == 1);
+  CV_Assert(projectedPoints.type() == CV_32FC2);
+  CV_Assert(orientationIndices.size() == projectedPoints.rows);
+
+  residuals.create(projectedPoints.rows, 1, CV_64FC1);
+  for(int i=0; i<projectedPoints.rows; i++)
+  {
+    Point2f pt2f = projectedPoints.at<Vec2f>(i);
+    int orIndex = orientationIndices[i];
+    residuals.at<double>(i) = getFilteredDistance(pt2f, useInterpolation, outlierError, dtImages[orIndex]);
+  }
+}
+
+void LocalPoseRefiner::computeResidualsWithInliersMask(const cv::Mat &projectedPoints, cv::Mat &residuals, double outlierError, const cv::Mat &distanceTransform, bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const
 {
   computeResiduals(projectedPoints, residuals, outlierError, distanceTransform, useInterpolation);
+
+  CV_Assert(residuals.cols == 1);
+  Mat sortedIndices;
+  sortIdx(residuals, sortedIndices, CV_SORT_EVERY_COLUMN + CV_SORT_ASCENDING);
+  int maxRow = cvRound(inliersRatio * residuals.rows);
+  CV_Assert(0 < maxRow && maxRow <= residuals.rows);
+  CV_Assert(sortedIndices.type() == CV_32SC1);
+
+  inliersMask = Mat(residuals.size(), CV_8UC1, Scalar(255));
+  for (int i = maxRow; i < residuals.rows; ++i)
+  {
+    inliersMask.at<uchar>(sortedIndices.at<int>(i)) = 0;
+  }
+}
+
+void LocalPoseRefiner::computeResidualsWithInliersMask(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const std::vector<cv::Mat> &dtImages,
+                                                       cv::Mat &residuals, double outlierError, bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const
+{
+  computeResiduals(projectedPoints, orientationIndices, dtImages, residuals, outlierError, useInterpolation);
 
   CV_Assert(residuals.cols == 1);
   Mat sortedIndices;
@@ -247,7 +305,7 @@ void LocalPoseRefiner::computeJacobian( const cv::Mat &projectedPoints, const cv
   }
 }
 
-void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J)
+void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J) const
 {
   CV_Assert(JaW.rows == 2*projectedPoints.rows);
   CV_Assert(JaW.type() == CV_64FC1);
@@ -325,6 +383,104 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
 
     double x = getInterpolatedDT(dx, pt2f);
     double y = getInterpolatedDT(dy, pt2f);
+
+    for(int j=0; j<J.cols; j++)
+    {
+        double sumX = 0., sumY = 0.;
+
+        for(int k=0; k<J.cols; k++)
+        {
+          sumX += JaW.at<double>(2*i, k) * J_camobj.at<double>(k, j);
+          sumY += JaW.at<double>(2*i+1, k) * J_camobj.at<double>(k, j);
+        }
+        J.at<double>(i, j) = x * sumX + y * sumY;
+        //J.at<double>(i, j) = x * JaW.at<double>(2*i, j) + y * JaW.at<double>(2*i + 1, j);
+        //J.at<double>(i, j) = dx.at<float>(pt) * JaW.at<double>(2*i, j) + dy.at<float>(pt) * JaW.at<double>(2*i + 1, j);
+    }
+  }
+}
+
+//TODO: remove code duplication
+void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
+                                             cv::Mat &J) const
+{
+  CV_Assert(JaW.rows == 2*projectedPoints.rows);
+  CV_Assert(JaW.type() == CV_64FC1);
+  J.create(projectedPoints.rows, JaW.cols, CV_64FC1);
+
+  Mat J_camobj(JaW.cols, JaW.cols, CV_64FC1);
+  Mat row0 = R_obj2cam.row(0);
+  Mat row1 = R_obj2cam.row(1);
+  Mat row2 = R_obj2cam.row(2);
+
+  vector<Mat> drs;
+  Mat drx = row1.cross(row2);
+  CV_Assert(drx.rows == 1 && drx.cols == dim);
+  CV_Assert(drx.type() == CV_64FC1);
+  Mat dry = row2.cross(row0);
+  Mat drz = row0.cross(row1);
+
+  drs.push_back(drx);
+  drs.push_back(dry);
+  drs.push_back(drz);
+  for(int ridx_cam=0; ridx_cam<dim; ridx_cam++)
+  {
+    for(int ridx_obj=0; ridx_obj<dim; ridx_obj++)
+    {
+      J_camobj.at<double>(ridx_cam, ridx_obj) = drs[ridx_cam].at<double>(0, ridx_obj);
+    }
+    for(int tidx_obj=0; tidx_obj<dim; tidx_obj++)
+    {
+      J_camobj.at<double>(ridx_cam, dim+tidx_obj) = 0;
+    }
+  }
+
+  Mat R_obj, J_rodrigues;
+  Rodrigues(rvec_obj, R_obj, J_rodrigues);
+  CV_Assert(J_rodrigues.rows == 3 && J_rodrigues.cols == 9);
+  Mat t_cam2obj = -R_obj2cam.t()*t_obj2cam;
+
+  for(int tidx_cam=0; tidx_cam<dim; tidx_cam++)
+  {
+    for(int ridx_obj=0; ridx_obj<dim; ridx_obj++)
+    {
+      Mat dr = R_obj2cam * J_rodrigues.row(ridx_obj).reshape(1, dim) * t_cam2obj;
+      CV_Assert(dr.type() == CV_64FC1);
+      J_camobj.at<double>(dim+tidx_cam, ridx_obj) = dr.at<double>(tidx_cam, 0);
+    }
+
+
+    for(int tidx_obj=0; tidx_obj<dim; tidx_obj++)
+    {
+      J_camobj.at<double>(dim+tidx_cam, dim+tidx_obj) = R_obj2cam.at<double>(tidx_cam, tidx_obj);
+    }
+  }
+
+  CV_Assert(inliersMask.type() == CV_8UC1);
+  const float outlierJacobian = 0.0f;
+  for(int i=0; i<projectedPoints.rows; i++)
+  {
+    if (inliersMask.at<uchar>(i) == 0)
+    {
+      Mat row = J.row(i);
+      row.setTo(outlierJacobian);
+      continue;
+    }
+
+    Point2f pt2f = projectedPoints.at<Vec2f>(i);
+    if(isOutlier(pt2f))
+    {
+      for(int j=0; j<J.cols; j++)
+      {
+        J.at<double>(i, j) = outlierJacobian;
+      }
+
+      continue;
+    }
+
+    int orIndex = orientationIndices[i];
+    double x = getInterpolatedDT(distanceImagesDx[orIndex], pt2f);
+    double y = getInterpolatedDT(distanceImagesDy[orIndex], pt2f);
 
     for(int j=0; j<J.cols; j++)
     {
@@ -560,9 +716,10 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
        cv::Mat &J, cv::Mat &error)
 {
   const vector<Point3f> &edgels = isSilhouette ? rotatedEdgeModel.points : rotatedEdgeModel.stableEdgels;
-  const Mat dt = isSilhouette ? silhouetteDtImage : dtImage;
+  const Mat dt = isSilhouette ? silhouetteDt : dtImage;
   const Mat dx = isSilhouette ? silhouetteDtDx : dtDx;
   const Mat dy = isSilhouette ? silhouetteDtDy : dtDy;
+  vector<int> orientationIndices;
 
   vector<Point2f> projectedPointsVector;
   Mat JaW;
@@ -582,12 +739,117 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
   Mat projectedPoints = Mat(projectedPointsVector);
   Mat inliersMask;
   float outlierError = estimateOutlierError(dt, params.distanceType);
-  computeResidualsWithInliersMask(projectedPoints, error, outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
+  //TODO: remove only those outliers that lie on a silhouette
+  if (params.useEdgeOrientations && isSilhouette)
+  {
+    //TODO: move up
+    float downFactor = 1.0f;
+    int closingIterationsCount = 7;
+
+    //TODO: remove code duplication with computeWeights
+    Mat pointsMask;
+    Point tl;
+    bool cropMask = false;
+    EdgeModel::computePointsMask(projectedPointsVector, silhouetteEdges.size(), downFactor, closingIterationsCount, pointsMask, tl, cropMask);
+    if (pointsMask.empty())
+    {
+        J = Mat();
+        error = Mat();
+        return;
+    }
+//    imshow("pointsMask", pointsMask);
+
+    vector<vector<Point> > contours;
+    findContours(pointsMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+    Mat footprintImage(pointsMask.size(), CV_8UC1, Scalar(0));
+    drawContours(footprintImage, contours, -1, Scalar(255));
+
+//    Mat orientationsImage;
+//    computeOrientations(footprintImage, orientationsImage);
+
+    Mat normals2d, orientationIndicesImage;
+    computeNormals(footprintImage, normals2d, orientationIndicesImage);
+    CV_Assert(orientationIndicesImage.type() == CV_32SC1);
+
+/*
+    vector<Mat> tmpDts;
+    computeDistanceTransform3D(footprintImage, tmpDts);
+    imshow("dt[0]", tmpDts[0] / 10.0);
+    imshow("dt[10]", tmpDts[10] / 10.0);
+    imshow("dt[20]", tmpDts[20] / 10.0);
+    imshow("dt[30]", tmpDts[30] / 10.0);
+    imshow("dt[40]", tmpDts[40] / 10.0);
+    imshow("dt[50]", tmpDts[50] / 10.0);
+    imshow("dt[59]", tmpDts[59] / 10.0);
+
+
+    Mat indicesViz;
+    orientationIndicesImage.convertTo(indicesViz, CV_8UC1);
+    imshow("indices", indicesViz * 4);
+    cout << orientationIndicesImage << endl;
+*/
+
+//    CV_Assert(orientationsImage.type() == CV_32FC1);
+
+//    Mat tmpViz(pointsMask.size(), CV_8UC1, Scalar(0));
+    for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+    {
+      Point pt = projectedPointsVector[i];
+//      CV_Assert(isPointInside(orientationIndicesImage, pt));
+      if (isPointInside(orientationIndicesImage, pt))
+      {
+//        if (orientationIndicesImage.at<int>(pt) < 30)
+//        {
+//          tmpViz.at<uchar>(pt) = 255;
+//        }
+
+        orientationIndices.push_back(orientationIndicesImage.at<int>(pt));
+      }
+/*
+      if (isPointInside(orientationsImage, pt))
+      {
+        //TODO: is theta the same as FDCM expected?
+        double theta = orientationsImage.at<float>(pt);
+
+        //TODO: move up
+        const int directionsCount = 60;
+        int orIndex = theta2Index(theta, directionsCount);
+        orientationIndices.push_back(orIndex);
+        if (orIndex == 2)
+        {
+          tmpViz.at<uchar>(pt) = 255;
+        }
+      }
+*/
+      else
+      {
+        //TODO: move up
+        const int defaultOrIndex = 0;
+        orientationIndices.push_back(defaultOrIndex);
+      }
+    }
+//    imshow("or = 2", tmpViz);
+//    waitKey();
+
+    computeResidualsWithInliersMask(projectedPoints, orientationIndices, silhouetteDtImages, error, outlierError, true, this->params.lmInliersRatio, inliersMask);
+  }
+  else
+  {
+    computeResidualsWithInliersMask(projectedPoints, error, outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
+  }
   error.setTo(0, ~inliersMask);
 
   if (computeJacobian)
   {
-    computeObjectJacobian(projectedPoints, inliersMask, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+    if (params.useEdgeOrientations && isSilhouette)
+    {
+      computeObjectJacobian(projectedPoints, orientationIndices, inliersMask, JaW, silhouetteDtImages, silhouetteDtImagesDx, silhouetteDtImagesDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+    }
+    else
+    {
+      computeObjectJacobian(projectedPoints, inliersMask, JaW, dt, dx, dy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+    }
+
     if (!newTranslationBasis2old.empty())
     {
       Mat newJ(J.rows, paramsCount, J.type());
@@ -781,6 +1043,10 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
     {
       return std::numeric_limits<float>::max();
     }
+
+    //TODO: move up
+//    surfaceJ *= 5;
+//    surfaceErr *= 5;
 
     if (computeJacobian)
     {

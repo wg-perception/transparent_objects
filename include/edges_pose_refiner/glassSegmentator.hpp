@@ -42,6 +42,8 @@ struct GlassSegmentatorParams
   /** \brief Refine a segmentation mask with convexity assumption or not */
   bool fillConvex;
 
+  float minContourAreaBeforeGrabCut;
+
   GlassSegmentatorParams()
   {
     closingIterations = 12;
@@ -54,6 +56,9 @@ struct GlassSegmentatorParams
     grabCutMargin = 10;
 
     fillConvex = false;
+
+    //TODO: investigate this parameter. Can you remove this?
+    minContourAreaBeforeGrabCut = 40.0f;
   }
 };
 

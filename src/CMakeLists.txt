@@ -30,7 +30,24 @@ set_target_properties(edges_pose_refiner PROPERTIES COMPILE_FLAGS "-fopenmp" LIN
 # Thanks a lot, vtk.  Why are we dependent on vtk?
 add_definitions(-Wno-deprecated)
 
+
+set(src_fdcm
+    fdcm/image/DistanceTransform.cpp
+    fdcm/fitline/LFLineFitter.cpp
+    fdcm/fitline/LFLineSegment.cpp
+    fdcm/fdcm/LMDistanceImage.cpp
+    fdcm/fdcm/LMDirectionalIntegralDistanceImage.cpp
+    fdcm/fdcm/EIEdgeImage.cpp
+    fdcm/fdcm.cpp
+)
+
+add_library(fdcm SHARED
+    ${src_fdcm}
+    )
+
+
 target_link_libraries(edges_pose_refiner
+                      fdcm
                       ${PCL_LIBRARIES}
                       ${OpenCV_LIBS}
                       ${OpenCV_LIBRARIES}
@@ -40,6 +57,9 @@ target_link_libraries(edges_pose_refiner
 install(TARGETS edges_pose_refiner
   DESTINATION lib
   )
+
+
+
 
 add_executable(sample ../sample/sample.cpp)
 # not sure why but we need Python on Lucid
