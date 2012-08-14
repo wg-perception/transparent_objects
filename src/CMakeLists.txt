@@ -13,6 +13,7 @@ set(src
     detector.cpp
     utils.cpp
     nonMaximumSuppression.cpp
+    chamfer_matching/chamfer_matching.cpp
 )
 
 include_directories(SYSTEM

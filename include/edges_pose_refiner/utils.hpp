@@ -108,4 +108,6 @@ cv::Mat getFromCache(const std::string &name);
 
 cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registrationMask);
 
+void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage);
+
 #endif /* UTILS_HPP_ */

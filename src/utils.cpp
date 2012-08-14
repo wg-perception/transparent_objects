@@ -9,6 +9,7 @@
 //#include "opencv2/calib3d/calib3d.hpp"
 #include <opencv2/opencv.hpp>
 #include "edges_pose_refiner/poseRT.hpp"
+#include "chamfer_matching/chamfer_matching.h"
 
 #ifdef USE_3D_VISUALIZATION
 #include <boost/thread/thread.hpp>
@@ -523,4 +524,82 @@ cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registration
   CV_Assert(registrationMask.type() == CV_8UC1);
   invalidDepthMask.setTo(0, registrationMask);
   return invalidDepthMask;
+}
+
+void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
+{
+  imshow("input edges", edges);
+  waitKey();
+  //TODO: move up
+  int testM = 5;
+
+
+  Mat edgesImage = edges.clone();
+  //otherwise chamfer matching doesn't work
+  edgesImage.row(0).setTo(Scalar(0));
+  edgesImage.row(edgesImage.rows - 1).setTo(Scalar(0));
+  edgesImage.col(0).setTo(Scalar(0));
+  edgesImage.col(edgesImage.cols - 1).setTo(Scalar(0));
+
+//  Mat edgesWideImage(edgesImage.rows + 2 * margin, edgesImage.cols + 2*margin, edgesImage.type(), Scalar(0));
+//  Rect roiRect(margin, margin, edgesImage.cols, edgesImage.rows);
+//  Mat roi = edgesWideImage(roiRect);
+//  edgesImage.copyTo(roi);
+//  imshow("narrow", edgesImage);
+//  imshow("wide", edgesWideImage);
+//  waitKey();
+
+  IplImage edge_img = edgesImage;
+  IplImage *dist_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32F, 1);
+  cvSetZero(dist_img);
+  IplImage *annotated_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32S, 2);
+  cvSetZero(annotated_img);
+
+  //this param is not used because we don't use computed dist_img
+  const float dtTruncation = -1;
+  ::computeDistanceTransform(&edge_img, dist_img, annotated_img, dtTruncation);
+
+  IplImage *orientation_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32F, 1);
+  cvSetZero(orientation_img);
+  IplImage* edge_clone = cvCloneImage(&edge_img);
+  computeEdgeOrientations(edge_clone, orientation_img, testM);
+  cvReleaseImage(&edge_clone);
+  fillNonContourOrientations(annotated_img, orientation_img);
+
+  orientationsImage = Mat(orientation_img).clone();
+
+#ifdef OCM_VISUALIZE
+  Mat orView = min(orientationImage, CV_PI - orientationImage);
+
+  Mat view;
+  orView.convertTo(view, CV_8UC1, 235. / (CV_PI / 2.0), 20);
+  view.setTo(Scalar(0), ~edgesImage);
+  imshow("orientation", view);
+  waitKey();
+  cout << "Orientation: " << orientationImage(Rect(0, 0, 10, 10)) << endl;
+  cout << "Edges: " << edgesImage(Rect(0, 0, 10, 10)) << endl;
+
+  Mat nonNan = Mat(orientationImage.size(), CV_8UC1, Scalar(255));
+  for(int i=0; i<orientationImage.rows; i++)
+  {
+    for(int j=0; j<orientationImage.cols; j++)
+    {
+      if(isnan(orientationImage.at<float>(i, j)))
+      {
+        nonNan.at<uchar>(i, j) = 0;
+      }
+    }
+  }
+
+  imshow("orientation non-nan", nonNan);
+  waitKey();
+#endif
+
+  double minOrientation, maxOrientation;
+  minMaxLoc(orientationsImage, &minOrientation, &maxOrientation);
+  cout << "Orientations: " << minOrientation << " " << maxOrientation << endl;
+
+  cvReleaseImage(&annotated_img);
+  cvReleaseImage(&dist_img);
+  cvReleaseImage(&orientation_img);
 }
