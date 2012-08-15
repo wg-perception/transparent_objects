@@ -13,8 +13,9 @@ if __name__ == '__main__':
 
     backgroundValue = 127
     objects=('bank', 'bottle', 'bucket', 'glass', 'wineglass')
-    objectMasker='/home/ilysenkov/itseezMachine/home/ilysenkov/ecto/server_build/bin/createObjectMask'
-    backgroundMasker='/home/ilysenkov/itseezMachine/home/ilysenkov/ecto/recognition_kitchen/transparent_objects/src/apps/createBackgroundMask.py'
+    objectMasker='/home/ilysenkov/itseezMachine/home/ilysenkov/ecto_fuerte/server_build/bin/createObjectMask'
+    backgroundMasker='/home/ilysenkov/itseezMachine/home/ilysenkov/ecto_fuerte/recognition_kitchen/transparent_objects/src/apps/createBackgroundMask.py'
+    maskWithBackground = False
 
     baseFolder = sys.argv[1]
     trainedModelsFolder = sys.argv[2]
@@ -36,29 +37,34 @@ if __name__ == '__main__':
             fullImageIndex = match.group(1)
             imageIndex = match.group(2)
 
-            call([objectMasker, testFolder, imageIndex, modelFilename, objectMaskFilename])
+            objectExitStatus = call([objectMasker, testFolder, imageIndex, modelFilename, objectMaskFilename])
             imageFilename = testFolder + '/image_' + fullImageIndex + '.png'
-            exitStatus = call([backgroundMasker, imageFilename, backgroundMaskFilename])
-            if (exitStatus != 0):
+
+            backgroundExistStatus = call([backgroundMasker, imageFilename, backgroundMaskFilename]) if maskWithBackground else 0
+            if (objectExitStatus != 0 or backgroundExistStatus != 0):
                 continue
 
             objectMask = cv2.imread(objectMaskFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
-            backgroundMask = cv2.imread(backgroundMaskFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
 
             mask = objectMask
-            mask[np.nonzero(backgroundMask)] = backgroundValue
-            maskFilename = testFolder + '/glassMask_' + fullImageIndex + '.png'
+            if maskWithBackground:
+                backgroundMask = cv2.imread(backgroundMaskFilename, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+                mask[np.nonzero(backgroundMask)] = backgroundValue
+
+            maskFilename = testFolder + '/glassMask_' + fullImageIndex + '.png' if maskWithBackground else testFolder + '/image_' + fullImageIndex + '.png.raw_mask.png'
             cv2.imwrite(maskFilename, mask)
 
-            image = cv2.imread(imageFilename, cv2.CV_LOAD_IMAGE_UNCHANGED)
-            image[np.nonzero(mask == backgroundValue)] = 0
-            image[np.nonzero(mask == 255)] /= 1.5
-            maskedImageFilename = testFolder + '/maskedImage_' + fullImageIndex + '.png'
-            cv2.imwrite(maskedImageFilename, image)
-#            cv2.imshow('masked image', image)
-#            cv2.waitKey()
-#            cv2.imshow('mask', mask)
-#            cv2.waitKey()
+            if maskWithBackground:
+                image = cv2.imread(imageFilename, cv2.CV_LOAD_IMAGE_UNCHANGED)
+                image[np.nonzero(mask == backgroundValue)] = 0
+                image[np.nonzero(mask == 255)] /= 1.5
+                maskedImageFilename = testFolder + '/maskedImage_' + fullImageIndex + '.png'
+                cv2.imwrite(maskedImageFilename, image)
+#                cv2.imshow('masked image', image)
+#                cv2.waitKey()
+#                cv2.imshow('mask', mask)
+#                cv2.waitKey()
+
     os.close(objectMaskFD)
     os.close(backgroundMaskFD)
     os.remove(objectMaskFilename)
