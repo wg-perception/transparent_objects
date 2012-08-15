@@ -715,6 +715,9 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
        cv::Mat &rvecParams_cam, cv::Mat &tvecParams_cam, cv::Mat &RtParams_cam,
        cv::Mat &J, cv::Mat &error)
 {
+  //TODO: move up
+  const int defaultOrIndex = 0;
+
   const vector<Point3f> &edgels = isSilhouette ? rotatedEdgeModel.points : rotatedEdgeModel.stableEdgels;
   const Mat dt = isSilhouette ? silhouetteDt : dtImage;
   const Mat dx = isSilhouette ? silhouetteDtDx : dtDx;
@@ -736,102 +739,181 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
     projectPoints_obj(Mat(edgels), rvecParams, tvecParams, rvecParams_cam, tvecParams_cam, RtParams_cam,
                       projectedPointsVector);
   }
-  Mat projectedPoints = Mat(projectedPointsVector);
-  Mat inliersMask;
-  float outlierError = estimateOutlierError(dt, params.distanceType);
-  //TODO: remove only those outliers that lie on a silhouette
-  if (params.useEdgeOrientations && isSilhouette)
-  {
-    //TODO: move up
-    float downFactor = 1.0f;
-    int closingIterationsCount = 7;
 
-    //TODO: remove code duplication with computeWeights
-    Mat pointsMask;
-    Point tl;
-    bool cropMask = false;
-    EdgeModel::computePointsMask(projectedPointsVector, silhouetteEdges.size(), downFactor, closingIterationsCount, pointsMask, tl, cropMask);
-    if (pointsMask.empty())
+  Mat silhouetteWeights(edgels.size(), 1, CV_64FC1);
+  if (isSilhouette)
+  {
+    if (this->params.useAccurateSilhouettes)
+    {
+      computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
+    }
+    else
+    {
+      //TODO: compute precise Jacobian with this strategy
+      rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
+    }
+
+#ifdef VISUALIZE
+      Mat weightsImage(edgesImage.size(), CV_8UC1, Scalar(0));
+      for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+      {
+        if (silhouetteWeights.at<double>(i) > 0.1)
+        {
+//          double intensity = std::min(255.0, 1000 * silhouetteWeights.at<double>(i));
+ //         circle(weightsImage, projectedPointsVector[i], 0, Scalar(intensity));
+          circle(weightsImage, projectedPointsVector[i], 0, Scalar(255.0));
+        }
+      }
+      imshow("weights", weightsImage);
+#endif
+
+    if (silhouetteWeights.empty())
     {
         J = Mat();
         error = Mat();
         return;
     }
-//    imshow("pointsMask", pointsMask);
+  }
 
-    vector<vector<Point> > contours;
-    findContours(pointsMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-    Mat footprintImage(pointsMask.size(), CV_8UC1, Scalar(0));
-    drawContours(footprintImage, contours, -1, Scalar(255));
-
-//    Mat orientationsImage;
-//    computeOrientations(footprintImage, orientationsImage);
-
-    Mat normals2d, orientationIndicesImage;
-    computeNormals(footprintImage, normals2d, orientationIndicesImage);
-    CV_Assert(orientationIndicesImage.type() == CV_32SC1);
-
-/*
-    vector<Mat> tmpDts;
-    computeDistanceTransform3D(footprintImage, tmpDts);
-    imshow("dt[0]", tmpDts[0] / 10.0);
-    imshow("dt[10]", tmpDts[10] / 10.0);
-    imshow("dt[20]", tmpDts[20] / 10.0);
-    imshow("dt[30]", tmpDts[30] / 10.0);
-    imshow("dt[40]", tmpDts[40] / 10.0);
-    imshow("dt[50]", tmpDts[50] / 10.0);
-    imshow("dt[59]", tmpDts[59] / 10.0);
-
-
-    Mat indicesViz;
-    orientationIndicesImage.convertTo(indicesViz, CV_8UC1);
-    imshow("indices", indicesViz * 4);
-    cout << orientationIndicesImage << endl;
-*/
-
-//    CV_Assert(orientationsImage.type() == CV_32FC1);
-
-//    Mat tmpViz(pointsMask.size(), CV_8UC1, Scalar(0));
-    for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+  Mat projectedPoints = Mat(projectedPointsVector);
+  Mat inliersMask;
+  float outlierError = estimateOutlierError(dt, params.distanceType);
+  if (isSilhouette)
+  {
+    Mat silhouettePointsMask = silhouetteWeights > params.minSilhouetteWeight;
+    vector<Point2f> silhouettePointsVec;
+    vector<int> silhouettePointsIndices;
+    for (size_t i = 0; i < edgels.size(); ++i)
     {
-      Point pt = projectedPointsVector[i];
-//      CV_Assert(isPointInside(orientationIndicesImage, pt));
-      if (isPointInside(orientationIndicesImage, pt))
+      if (silhouettePointsMask.at<uchar>(i) == 255)
       {
-//        if (orientationIndicesImage.at<int>(pt) < 30)
-//        {
-//          tmpViz.at<uchar>(pt) = 255;
-//        }
-
-        orientationIndices.push_back(orientationIndicesImage.at<int>(pt));
-      }
-/*
-      if (isPointInside(orientationsImage, pt))
-      {
-        //TODO: is theta the same as FDCM expected?
-        double theta = orientationsImage.at<float>(pt);
-
-        //TODO: move up
-        const int directionsCount = 60;
-        int orIndex = theta2Index(theta, directionsCount);
-        orientationIndices.push_back(orIndex);
-        if (orIndex == 2)
-        {
-          tmpViz.at<uchar>(pt) = 255;
-        }
-      }
-*/
-      else
-      {
-        //TODO: move up
-        const int defaultOrIndex = 0;
-        orientationIndices.push_back(defaultOrIndex);
+        silhouettePointsVec.push_back(projectedPointsVector[i]);
+        silhouettePointsIndices.push_back(i);
       }
     }
-//    imshow("or = 2", tmpViz);
-//    waitKey();
 
-    computeResidualsWithInliersMask(projectedPoints, orientationIndices, silhouetteDtImages, error, outlierError, true, this->params.lmInliersRatio, inliersMask);
+    Mat silhouettePointsError, silhouettePointsInliersMask;
+    vector<int> silhouetteOrientationIndices;
+    if (!params.useEdgeOrientations)
+    {
+      computeResidualsWithInliersMask(Mat(silhouettePointsVec), silhouettePointsError, outlierError, dt, true, this->params.lmInliersRatio, silhouettePointsInliersMask);
+    }
+    else
+    {
+      //TODO: move up
+      float downFactor = 1.0f;
+      int closingIterationsCount = 7;
+
+      //TODO: remove code duplication with computeWeights
+      Mat pointsMask;
+      Point tl;
+      bool cropMask = false;
+      EdgeModel::computePointsMask(projectedPointsVector, silhouetteEdges.size(), downFactor, closingIterationsCount, pointsMask, tl, cropMask);
+      if (pointsMask.empty())
+      {
+          J = Mat();
+          error = Mat();
+          return;
+      }
+  //    imshow("pointsMask", pointsMask);
+
+      vector<vector<Point> > contours;
+      findContours(pointsMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      Mat footprintImage(pointsMask.size(), CV_8UC1, Scalar(0));
+      drawContours(footprintImage, contours, -1, Scalar(255));
+
+  //    Mat orientationsImage;
+  //    computeOrientations(footprintImage, orientationsImage);
+
+      Mat normals2d, orientationIndicesImage;
+      computeNormals(footprintImage, normals2d, orientationIndicesImage);
+      CV_Assert(orientationIndicesImage.type() == CV_32SC1);
+
+  /*
+      vector<Mat> tmpDts;
+      computeDistanceTransform3D(footprintImage, tmpDts);
+      imshow("dt[0]", tmpDts[0] / 10.0);
+      imshow("dt[10]", tmpDts[10] / 10.0);
+      imshow("dt[20]", tmpDts[20] / 10.0);
+      imshow("dt[30]", tmpDts[30] / 10.0);
+      imshow("dt[40]", tmpDts[40] / 10.0);
+      imshow("dt[50]", tmpDts[50] / 10.0);
+      imshow("dt[59]", tmpDts[59] / 10.0);
+
+
+      Mat indicesViz;
+      orientationIndicesImage.convertTo(indicesViz, CV_8UC1);
+      imshow("indices", indicesViz * 4);
+      cout << orientationIndicesImage << endl;
+  */
+
+  //    CV_Assert(orientationsImage.type() == CV_32FC1);
+
+  //    Mat tmpViz(pointsMask.size(), CV_8UC1, Scalar(0));
+      for (size_t i = 0; i < silhouettePointsVec.size(); ++i)
+      {
+        Point pt = silhouettePointsVec[i];
+  //      CV_Assert(isPointInside(orientationIndicesImage, pt));
+        if (isPointInside(orientationIndicesImage, pt))
+        {
+  //        if (orientationIndicesImage.at<int>(pt) < 30)
+  //        {
+  //          tmpViz.at<uchar>(pt) = 255;
+  //        }
+
+//          orientationIndices.push_back(orientationIndicesImage.at<int>(pt));
+          silhouetteOrientationIndices.push_back(orientationIndicesImage.at<int>(pt));
+        }
+  /*
+        if (isPointInside(orientationsImage, pt))
+        {
+          //TODO: is theta the same as FDCM expected?
+          double theta = orientationsImage.at<float>(pt);
+
+          //TODO: move up
+          const int directionsCount = 60;
+          int orIndex = theta2Index(theta, directionsCount);
+          orientationIndices.push_back(orIndex);
+          if (orIndex == 2)
+          {
+            tmpViz.at<uchar>(pt) = 255;
+          }
+        }
+  */
+        else
+        {
+//          orientationIndices.push_back(defaultOrIndex);
+          silhouetteOrientationIndices.push_back(defaultOrIndex);
+        }
+      }
+  //    imshow("or = 2", tmpViz);
+  //    waitKey();
+
+      computeResidualsWithInliersMask(Mat(silhouettePointsVec), silhouetteOrientationIndices, silhouetteDtImages, silhouettePointsError, outlierError, true, this->params.lmInliersRatio, silhouettePointsInliersMask);
+    }
+
+    error.create(edgels.size(), 1, CV_64FC1);
+    error = Scalar(0.0);
+    inliersMask.create(edgels.size(), 1, CV_8UC1);
+    inliersMask = Scalar(0);
+
+    if (params.useEdgeOrientations)
+    {
+      orientationIndices.resize(edgels.size(), defaultOrIndex);
+    }
+    for (int i = 0; i < silhouettePointsError.rows; ++i)
+    {
+      if (silhouettePointsInliersMask.at<uchar>(i))
+      {
+        int ptIndex = silhouettePointsIndices[i];
+        error.at<double>(ptIndex) = silhouettePointsError.at<double>(i);
+        inliersMask.at<uchar>(ptIndex) = 255;
+        if (params.useEdgeOrientations)
+        {
+          orientationIndices[ptIndex] = silhouetteOrientationIndices[i];
+        }
+      }
+    }
   }
   else
   {
@@ -869,38 +951,6 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
 
   if (isSilhouette)
   {
-    Mat silhouetteWeights(edgels.size(), 1, CV_64FC1);
-    if (this->params.useAccurateSilhouettes)
-    {
-      computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
-    }
-    else
-    {
-      //TODO: compute precise Jacobian with this strategy
-      rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
-    }
-
-#ifdef VISUALIZE
-      Mat weightsImage(edgesImage.size(), CV_8UC1, Scalar(0));
-      for (size_t i = 0; i < projectedPointsVector.size(); ++i)
-      {
-        if (silhouetteWeights.at<double>(i) > 0.1)
-        {
-//          double intensity = std::min(255.0, 1000 * silhouetteWeights.at<double>(i));
- //         circle(weightsImage, projectedPointsVector[i], 0, Scalar(intensity));
-          circle(weightsImage, projectedPointsVector[i], 0, Scalar(255.0));
-        }
-      }
-      imshow("weights", weightsImage);
-#endif
-
-    if (silhouetteWeights.empty())
-    {
-        J = Mat();
-        error = Mat();
-        return;
-    }
-
     if (computeJacobian)
     {
       for (int i = 0; i < J.cols; ++i)
@@ -914,6 +964,27 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
     CV_Assert(silhouetteWeights.type() == error.type());
     Mat mulError = silhouetteWeights.mul(error);
     error = mulError;
+
+/*
+    CV_Assert(error.type() == CV_64FC1);
+
+    Mat errorViz;
+    cvtColor(silhouetteEdges, errorViz, CV_GRAY2RGB);
+    for (size_t i = 0; i < projectedPointsVector.size(); ++i)
+    {
+      if (inliersMask.at<uchar>(i) != 0)
+      {
+        Point pt = projectedPointsVector[i];
+        errorViz.at<Vec3b>(pt) = Vec3b(0, 255, 0);
+      }
+//      Point pt = projectedPointsVector[i];
+//      errorViz.at<Vec3b>(pt) = Vec3b(0, error.at<double>(i) * 25, 0);
+//      circle(errorViz, pt, 2, Scalar(0, error.at<double>(i) * 15, 0), -1);
+    }
+    imshow("errorViz", errorViz);
+    waitKey();
+    exit(-1);
+*/
   }
 }
 

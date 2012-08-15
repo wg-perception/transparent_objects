@@ -85,6 +85,7 @@ int main(int argc, char *argv[])
     else
     {
       PoseRT initialPose = model2test_ground * occlusionOffsets[0];
+      cout << "initial pose[" << testImageIndex << "]: " << initialPose << endl;
 
       Mat initialVisualization = bgrImage.clone();
       occlusionPoseEstimator.visualize(initialPose, initialVisualization);

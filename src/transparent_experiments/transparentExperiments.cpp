@@ -169,6 +169,8 @@ float computeOcclusionPercentage(const PinholeCamera &camera,
     silhouette.draw(image, Scalar(occlusionColor), -1);
   }
 
+//  imshow("occlusions", image);
+//  waitKey(200);
 
   Mat edgels;
   objectSilhouette.getEdgels(edgels);
@@ -265,8 +267,6 @@ int main(int argc, char **argv)
 //  params.glassSegmentationParams.closingIterations = 8;
 // bucket
 //  params.glassSegmentationParams.openingIterations = 8;
-  //fixedOnTable
-  //params.glassSegmentationParams.finalClosingIterations = 8;
 
   //good clutter
   params.glassSegmentationParams.openingIterations = 15;
@@ -274,6 +274,9 @@ int main(int argc, char **argv)
   params.glassSegmentationParams.finalClosingIterations = 32;
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
   params.planeSegmentationMethod = FIDUCIALS;
+
+  //fixedOnTable
+  //params.glassSegmentationParams.finalClosingIterations = 8;
 
   //clutter
   //bucket

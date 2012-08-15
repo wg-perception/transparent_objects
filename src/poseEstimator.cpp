@@ -227,6 +227,7 @@ namespace transpod
       showEdgels(centralEdges, edgeModel.points, initialPose_cam, kinectCamera, "central pose refined by LM with a table plane");
       showEdgels(centralEdges, edgeModel.stableEdgels, initialPose_cam, kinectCamera, "stable edgels refined by LM with a table plane");
       cout << "quality[" << initPoseIdx << "]: " << initPosesQualities[initPoseIdx] << endl;
+      cout << "pose[" << initPoseIdx << "]: " << initialPose_cam << endl;
       waitKey();
   #endif
     }
