@@ -388,7 +388,9 @@ bool findContour(IplImage* templ_img, template_coords_t& coords)
 float getAngle(coordinate_t a, coordinate_t b, int& dx, int& dy)
 {
   dx = b.first - a.first;
-  dy = -(b.second - a.second); // in image coordinated Y axis points downward
+  //TODO: which one is better?
+//  dy = -(b.second - a.second); // in image coordinated Y axis points downward
+  dy = (b.second - a.second); // changed to match orientation of FDCM
   float angle = atan2(dy, dx);
 
   if (angle < 0)
@@ -421,7 +423,17 @@ void findContourOrientations(const template_coords_t& coords, template_orientati
     return;
   }
 
-  for (int i = M; i < coords_size - M; ++i)
+  int lastIndex = coords_size - 1;
+  CV_Assert(lastIndex >= 0);
+
+  int endsDistance_L1= abs(coords[0].first - coords[lastIndex].first) + abs(coords[0].second - coords[lastIndex].second);
+  //TODO: move up
+  const int maxEndsDistance = 3;
+  bool isClosed = endsDistance_L1 <= maxEndsDistance;
+
+  int startIndex = isClosed ? 0 : M;
+  int endBound = isClosed ? coords_size : coords_size - M;
+  for (int i = startIndex; i < endBound; ++i)
   {
     coordinate_t crt = coords[i];
     coordinate_t other;
@@ -430,13 +442,13 @@ void findContourOrientations(const template_coords_t& coords, template_orientati
     // compute previous M angles
     for (int j = M; j > 0; --j)
     {
-      other = coords[i - j];
+      other = coords[ (i - j + coords_size) % coords_size];
       angles[k++] = getAngle(other, crt, dx, dy);
     }
     // compute next M angles
     for (int j = 1; j <= M; ++j)
     {
-      other = coords[i + j];
+      other = coords[(i + j) % coords_size];
       angles[k++] = getAngle(crt, other, dx, dy);
     }
 
@@ -486,7 +498,7 @@ void findContourOrientations(const template_coords_t& coords, template_orientati
     //orientations[i] = (angles[M-1]+angles[M])/2;
     orientations[i] = (medAngle1 + medAngle2) / 2;
 
-    if (orientations[i] < 0)
+    while (orientations[i] < 0)
     {
       orientations[i] += CV_PI;
     }

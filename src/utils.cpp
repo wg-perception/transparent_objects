@@ -528,8 +528,9 @@ cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registration
 
 void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
 {
-  imshow("input edges", edges);
-  waitKey();
+//  imshow("input edges", edges);
+//  waitKey();
+
   //TODO: move up
   int testM = 5;
 
@@ -555,15 +556,31 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
   IplImage *annotated_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32S, 2);
   cvSetZero(annotated_img);
 
-  //this param is not used because we don't use computed dist_img
-  const float dtTruncation = -1;
-  ::computeDistanceTransform(&edge_img, dist_img, annotated_img, dtTruncation);
-
   IplImage *orientation_img = cvCreateImage(cvSize(edge_img.width, edge_img.height), IPL_DEPTH_32F, 1);
   cvSetZero(orientation_img);
   IplImage* edge_clone = cvCloneImage(&edge_img);
   computeEdgeOrientations(edge_clone, orientation_img, testM);
   cvReleaseImage(&edge_clone);
+
+  Mat orientation_img_mat(orientation_img);
+  CV_Assert(orientation_img_mat.type() == CV_32FC1);
+  for (int i = 0; i < orientation_img_mat.rows; ++i)
+  {
+    for (int j = 0; j < orientation_img_mat.cols; ++j)
+    {
+      if (cvIsNaN(orientation_img_mat.at<float>(i, j)))
+      {
+        edgesImage.at<uchar>(i, j) = 0;
+      }
+    }
+  }
+//  imshow("edgesImage", edgesImage);
+//  waitKey(200);
+
+  //this param is not used because we don't use computed dist_img
+  const float dtTruncation = -1;
+  ::computeDistanceTransform(&edge_img, dist_img, annotated_img, dtTruncation);
+
   fillNonContourOrientations(annotated_img, orientation_img);
 
   orientationsImage = Mat(orientation_img).clone();
@@ -595,9 +612,11 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
   waitKey();
 #endif
 
+/*
   double minOrientation, maxOrientation;
   minMaxLoc(orientationsImage, &minOrientation, &maxOrientation);
   cout << "Orientations: " << minOrientation << " " << maxOrientation << endl;
+*/
 
   cvReleaseImage(&annotated_img);
   cvReleaseImage(&dist_img);

@@ -16,6 +16,8 @@
 
 //#define VERBOSE
 //#define VISUALIZE
+//#define DEBUG_ORIENTATIONS
+
 
 using namespace cv;
 using std::cout;
@@ -191,14 +193,14 @@ double getInterpolatedDT(const Mat &dt, Point2f pt)
 
 bool LocalPoseRefiner::isOutlier(cv::Point2f pt) const
 {
-  return ( pt.x < 0 || pt.y < 0 || pt.x+1 >= dtImage.cols || pt.y+1 >= dtImage.rows);
+  return (pt.x < 0 || pt.y < 0 || pt.x+1 >= dtImage.cols || pt.y+1 >= dtImage.rows);
 }
 
 double LocalPoseRefiner::getFilteredDistance(cv::Point2f pt, bool useInterpolation, double outlierError, const cv::Mat &distanceTransform) const
 {
   Mat dt = distanceTransform.empty() ? dtImage : distanceTransform;
 
-  if( pt.x < 0 || pt.y < 0 || pt.x+1 >= dt.cols || pt.y+1 >= dt.rows)
+  if (pt.x < 0 || pt.y < 0 || pt.x+1 >= dt.cols || pt.y+1 >= dt.rows)
     return outlierError;
 
   CV_Assert(dt.type() == CV_32FC1);
@@ -807,7 +809,7 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
       //TODO: remove code duplication with computeWeights
       Mat pointsMask;
       Point tl;
-      bool cropMask = false;
+      bool cropMask = true;
       EdgeModel::computePointsMask(projectedPointsVector, silhouetteEdges.size(), downFactor, closingIterationsCount, pointsMask, tl, cropMask);
       if (pointsMask.empty())
       {
@@ -822,14 +824,22 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
       Mat footprintImage(pointsMask.size(), CV_8UC1, Scalar(0));
       drawContours(footprintImage, contours, -1, Scalar(255));
 
-  //    Mat orientationsImage;
-  //    computeOrientations(footprintImage, orientationsImage);
-
       Mat normals2d, orientationIndicesImage;
-      computeNormals(footprintImage, normals2d, orientationIndicesImage);
-      CV_Assert(orientationIndicesImage.type() == CV_32SC1);
+      Mat orientationsImage;
+      if (params.computeOrientationsByFitLine)
+      {
+        computeNormals(footprintImage, normals2d, orientationIndicesImage);
+        CV_Assert(orientationIndicesImage.type() == CV_32SC1);
+        CV_Assert(orientationIndicesImage.size() == footprintImage.size());
+      }
+      else
+      {
+        computeOrientations(footprintImage, orientationsImage);
+        CV_Assert(orientationsImage.type() == CV_32FC1);
+        CV_Assert(orientationsImage.size() == footprintImage.size());
+      }
 
-  /*
+#ifdef DEBUG_ORIENTATIONS
       vector<Mat> tmpDts;
       computeDistanceTransform3D(footprintImage, tmpDts);
       imshow("dt[0]", tmpDts[0] / 10.0);
@@ -840,54 +850,50 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
       imshow("dt[50]", tmpDts[50] / 10.0);
       imshow("dt[59]", tmpDts[59] / 10.0);
 
-
       Mat indicesViz;
       orientationIndicesImage.convertTo(indicesViz, CV_8UC1);
       imshow("indices", indicesViz * 4);
       cout << orientationIndicesImage << endl;
-  */
 
-  //    CV_Assert(orientationsImage.type() == CV_32FC1);
+      Mat tmpViz(pointsMask.size(), CV_8UC1, Scalar(0));
+#endif
 
-  //    Mat tmpViz(pointsMask.size(), CV_8UC1, Scalar(0));
       for (size_t i = 0; i < silhouettePointsVec.size(); ++i)
       {
         Point pt = silhouettePointsVec[i];
-  //      CV_Assert(isPointInside(orientationIndicesImage, pt));
-        if (isPointInside(orientationIndicesImage, pt))
+        pt -= tl;
+        if (isPointInside(footprintImage, pt))
         {
-  //        if (orientationIndicesImage.at<int>(pt) < 30)
-  //        {
-  //          tmpViz.at<uchar>(pt) = 255;
-  //        }
-
-//          orientationIndices.push_back(orientationIndicesImage.at<int>(pt));
-          silhouetteOrientationIndices.push_back(orientationIndicesImage.at<int>(pt));
-        }
-  /*
-        if (isPointInside(orientationsImage, pt))
-        {
-          //TODO: is theta the same as FDCM expected?
-          double theta = orientationsImage.at<float>(pt);
-
-          //TODO: move up
-          const int directionsCount = 60;
-          int orIndex = theta2Index(theta, directionsCount);
-          orientationIndices.push_back(orIndex);
-          if (orIndex == 2)
+          if (params.computeOrientationsByFitLine)
           {
-            tmpViz.at<uchar>(pt) = 255;
+#ifdef DEBUG_ORIENTATIONS
+            if (orientationIndicesImage.at<int>(pt) < 30)
+            {
+              tmpViz.at<uchar>(pt) = 255;
+            }
+#endif
+            silhouetteOrientationIndices.push_back(orientationIndicesImage.at<int>(pt));
+          }
+          else
+          {
+            //TODO: is theta the same as FDCM expected?
+            float theta = orientationsImage.at<float>(pt);
+
+            //TODO: move up
+            const int directionsCount = 60;
+            int orIndex = theta2Index(theta, directionsCount);
+            silhouetteOrientationIndices.push_back(orIndex);
           }
         }
-  */
         else
         {
-//          orientationIndices.push_back(defaultOrIndex);
           silhouetteOrientationIndices.push_back(defaultOrIndex);
         }
       }
-  //    imshow("or = 2", tmpViz);
-  //    waitKey();
+#ifdef DEBUG_ORIENTATIONS
+    imshow("or = 2", tmpViz);
+    waitKey();
+#endif
 
       computeResidualsWithInliersMask(Mat(silhouettePointsVec), silhouetteOrientationIndices, silhouetteDtImages, silhouettePointsError, outlierError, true, this->params.lmInliersRatio, silhouettePointsInliersMask);
     }

@@ -6,4 +6,4 @@ void computeOrientationIndices(const std::vector<cv::Point2f> &points, const cv:
 void computeDistanceTransform3D(const cv::Mat &edges,
                                 std::vector<cv::Mat> &dtImages);
 
-int theta2Index(double theta, int directionsCount);
+int theta2Index(float theta, int directionsCount);

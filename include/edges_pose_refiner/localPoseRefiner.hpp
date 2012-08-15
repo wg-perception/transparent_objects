@@ -43,6 +43,8 @@ struct LocalPoseRefinerParams
 
   float minSilhouetteWeight;
 
+  bool computeOrientationsByFitLine;
+
   LocalPoseRefinerParams()
   {
     distanceType = CV_DIST_L2;
@@ -60,6 +62,9 @@ struct LocalPoseRefinerParams
     useEdgeOrientations = false;
 
     minSilhouetteWeight = 0.1f;
+
+    computeOrientationsByFitLine = false;
+//    computeOrientationsByFitLine = true;
   }
 };
 

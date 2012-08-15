@@ -67,9 +67,11 @@ void fitLines(const cv::Mat &edges, LFLineFitter &lineFitter)
 }
 
 //TODO: remove code duplication with EIEdgeImage::Theta2Index
-int theta2Index(double theta, int directionsCount)
+int theta2Index(float theta, int directionsCount)
 {
-  return (int) floor ((theta * directionsCount) / (M_PI+1e-5));
+  int orIndex = (int) floor ((theta * directionsCount) / (M_PI+1e-5));
+  CV_Assert(orIndex >= 0 && orIndex < directionsCount);
+  return orIndex;
 }
 
 void computeOrientationIndices(const std::vector<cv::Point2f> &points, const cv::Mat &dx, const cv::Mat &dy,
@@ -133,6 +135,7 @@ void computeNormals(const cv::Mat &edges, cv::Mat &normals, cv::Mat &orientation
       linearMapOrientationIndices.at<int>(edgelsIterator.pos()) = theta2Index(lineFitter.outEdgeMap_[i].Theta(), directionsCount);
     }
   }
+//  imshow("edges", edges);
 //  imshow("linearMap", linearMap);
 //  waitKey();
 

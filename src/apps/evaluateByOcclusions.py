@@ -64,5 +64,6 @@ if __name__ == '__main__':
     plt.xlabel("Occlusion percentage")
     plt.ylabel("Success rate")
     plt.legend(['initial', 'final'])
+    plt.title('Evaluation of pose estimation accuracy')
     plt.show()
 

@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 
 runner='/home/ilysenkov/ecto_fuerte/build/bin/transparentExperiments'
 trainedModelsPath='/media/2Tb/transparentBases/trainedModels/'
@@ -30,7 +31,7 @@ if __name__ == '__main__':
         logFile = open(logFilename, 'w')
 
         command = [runner, trainedModelsPath, dataset, obj]
-        process = subprocess.Popen(command, stdout=logFile)
+        process = subprocess.Popen(command, stdout=logFile, stderr=logFile)
 
         #process = subprocess.Popen(command, stdout=subprocess.PIPE)
         #print process.stdout.read()
