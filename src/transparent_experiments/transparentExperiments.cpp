@@ -252,6 +252,7 @@ int main(int argc, char **argv)
     dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
     cout << "All points in the model: " << edgeModels[i].points.size() << endl;
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
+    EdgeModel::computeSurfaceEdgelsOrientations(edgeModels[i]);
   }
 
   vector<EdgeModel> occlusionObjects;

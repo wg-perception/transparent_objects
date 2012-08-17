@@ -162,6 +162,8 @@ private:
   cv::Mat edgesImage;
   cv::Mat dtImage;
   cv::Mat dtDx, dtDy;
+  std::vector<cv::Mat> surfaceDtImages;
+  std::vector<cv::Mat> surfaceDtImagesDx, surfaceDtImagesDy;
 
   cv::Mat bgrImage, bgrImageDx, bgrImageDy;
 

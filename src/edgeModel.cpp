@@ -162,6 +162,8 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<
     outModel = centralizedModel;
   }
 
+  computeSurfaceEdgelsOrientations(outModel);
+
   *this = outModel;
 }
 
@@ -457,7 +459,6 @@ void EdgeModel::rotate_cam(const PoseRT &transformation_cam, EdgeModel &rotatedE
 
   project3dPoints(points, rvec, tvec, rotatedEdgeModel.points);
   project3dPoints(stableEdgels, rvec, tvec, rotatedEdgeModel.stableEdgels);
-  project3dPoints(orientations, rvec, tvec, rotatedEdgeModel.orientations);
 
   Mat Rt_cam;
   createProjectiveMatrix(rvec, tvec, Rt_cam);
@@ -473,6 +474,7 @@ void EdgeModel::rotate_cam(const PoseRT &transformation_cam, EdgeModel &rotatedE
   Mat rvec_rot, tvec_rot;
   getRvecTvec(Rt_cam, rvec_rot, tvec_rot);
   project3dPoints(normals, rvec_rot, tvec_rot, rotatedEdgeModel.normals);
+  project3dPoints(orientations, rvec_rot, tvec_rot, rotatedEdgeModel.orientations);
 }
 
 Mat EdgeModel::rotate_obj(const PoseRT &transformation_obj, EdgeModel &rotatedEdgeModel) const
@@ -752,4 +754,17 @@ void computeObjectSystem(const std::vector<cv::Point3f> &points, cv::Mat &Rt_obj
   CV_Assert(t_obj2cam.rows == 3 && t_obj2cam.cols == 1);
 
   createProjectiveMatrix(R_obj2cam, t_obj2cam, Rt_obj2cam);
+}
+
+void EdgeModel::computeSurfaceEdgelsOrientations(EdgeModel &edgeModel)
+{
+  CV_Assert(edgeModel.hasRotationSymmetry);
+  edgeModel.orientations.clear();
+
+  for (size_t i = 0; i < edgeModel.stableEdgels.size(); ++i)
+  {
+    Point3f edgel = edgeModel.stableEdgels[i];
+    Point3f tangentLine = edgel.cross(edgeModel.upStraightDirection);
+    edgeModel.orientations.push_back(tangentLine);
+  }
 }

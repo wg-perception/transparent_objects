@@ -38,6 +38,18 @@ LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_
   cameraMatrix.convertTo(cameraMatrix64F, CV_64FC1);
   computeDistanceTransform(edgesImage, params.distanceType, params.distanceMask, dtImage, dtDx, dtDy);
 
+  if (params.useEdgeOrientations)
+  {
+    computeDistanceTransform3D(edgesImage, surfaceDtImages);
+    surfaceDtImagesDx.resize(surfaceDtImages.size());
+    surfaceDtImagesDy.resize(surfaceDtImages.size());
+
+    for (int i = 0; i < surfaceDtImages.size(); ++i)
+    {
+      computeDerivatives(surfaceDtImages[i], surfaceDtImagesDx[i], surfaceDtImagesDy[i]);
+    }
+  }
+
   originalEdgeModel = _edgeModel;
   //TODO: remove copy operation
   rotatedEdgeModel = _edgeModel;
@@ -64,7 +76,13 @@ void LocalPoseRefiner::setSilhouetteEdges(const cv::Mat &_silhouetteEdges)
 
   if (params.useEdgeOrientations)
   {
-    computeDistanceTransform3D(edgesImage, silhouetteDtImages);
+//    computeDistanceTransform3D(edgesImage, silhouetteDtImages);
+    silhouetteDtImages = surfaceDtImages;
+    silhouetteDtImagesDx = surfaceDtImagesDx;
+    silhouetteDtImagesDy = surfaceDtImagesDy;
+
+/*
+    computeDistanceTransform3D(silhouetteEdges, silhouetteDtImages);
     silhouetteDtImagesDx.resize(silhouetteDtImages.size());
     silhouetteDtImagesDy.resize(silhouetteDtImages.size());
 
@@ -72,6 +90,7 @@ void LocalPoseRefiner::setSilhouetteEdges(const cv::Mat &_silhouetteEdges)
     {
       computeDerivatives(silhouetteDtImages[i], silhouetteDtImagesDx[i], silhouetteDtImagesDy[i]);
     }
+*/
   }
 }
 
@@ -719,6 +738,7 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
 {
   //TODO: move up
   const int defaultOrIndex = 0;
+  const int directionsCount = 60;
 
   const vector<Point3f> &edgels = isSilhouette ? rotatedEdgeModel.points : rotatedEdgeModel.stableEdgels;
   const Mat dt = isSilhouette ? silhouetteDt : dtImage;
@@ -879,8 +899,6 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
             //TODO: is theta the same as FDCM expected?
             float theta = orientationsImage.at<float>(pt);
 
-            //TODO: move up
-            const int directionsCount = 60;
             int orIndex = theta2Index(theta, directionsCount);
             silhouetteOrientationIndices.push_back(orIndex);
           }
@@ -923,14 +941,61 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
   }
   else
   {
-    computeResidualsWithInliersMask(projectedPoints, error, outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
+    if (params.useEdgeOrientations)
+    {
+      Mat P = RtParams_cam(Rect(0, 0, 4, 3));
+      Mat P_rot = RtParams_cam(Rect(0, 0, 4, 3)).clone();
+      P_rot.col(3).setTo(0);
+
+      Mat projectedObjectPoints, projectedObjectOrientations;
+      transform(edgels, projectedObjectPoints, P);
+      transform(Mat(rotatedEdgeModel.orientations), projectedObjectOrientations, P_rot);
+
+      CV_Assert(projectedObjectPoints.type() == CV_32FC3);
+      CV_Assert(projectedObjectOrientations.type() == CV_32FC3);
+      CV_Assert(projectedObjectOrientations.rows == projectedPointsVector.size());
+      CV_Assert(cameraMatrix.type() == CV_64FC1);
+
+      double fx = cameraMatrix.at<double>(0, 0);
+      double fy = cameraMatrix.at<double>(1, 1);
+      for(int i=0; i<projectedObjectOrientations.rows; i++)
+      {
+        Vec3f pt = projectedObjectPoints.at<Vec3f>(i);
+        Vec3f ort = projectedObjectOrientations.at<Vec3f>(i);
+
+        //double dx = fx * (ort[0] * pt[2] - pt[0] * ort[2]) / (pt[2] * pt[2]);
+        //double dy = fy * (ort[1] * pt[2] - pt[1] * ort[2]) / (pt[2] * pt[2]);
+        //you need only orientation so you can ignore denominator
+        float dx = fx * (ort[0] * pt[2] - pt[0] * ort[2]);
+        float dy = fy * (ort[1] * pt[2] - pt[1] * ort[2]);
+
+        //TODO: use -dy?
+//        float theta = atan2(-dy, dx);
+        float theta = atan2(dy, dx);
+
+        while (theta < 0)
+        {
+          theta += CV_PI;
+        }
+
+        int orIndex = theta2Index(theta, directionsCount);
+        orientationIndices.push_back(orIndex);
+      }
+
+      computeResidualsWithInliersMask(Mat(projectedPoints), orientationIndices, surfaceDtImages, error, outlierError, true, this->params.lmInliersRatio, inliersMask);
+    }
+    else
+    {
+      computeResidualsWithInliersMask(projectedPoints, error, outlierError, dt, true, this->params.lmInliersRatio, inliersMask);
+    }
   }
   error.setTo(0, ~inliersMask);
 
   if (computeJacobian)
   {
-    if (params.useEdgeOrientations && isSilhouette)
+    if (params.useEdgeOrientations)
     {
+      //TODO: compute derivative with regard to orientation
       computeObjectJacobian(projectedPoints, orientationIndices, inliersMask, JaW, silhouetteDtImages, silhouetteDtImagesDx, silhouetteDtImagesDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
     }
     else

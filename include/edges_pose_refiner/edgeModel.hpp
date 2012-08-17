@@ -207,6 +207,7 @@ struct EdgeModel
 
   //TODO: move to private
   void rotateToCanonicalPose(const PinholeCamera &camera, PoseRT &model2canonicalPose, float distance = 1.0f);
+  static void computeSurfaceEdgelsOrientations(EdgeModel &edgeModel);
 private:
   EdgeModelCreationParams params;
 
