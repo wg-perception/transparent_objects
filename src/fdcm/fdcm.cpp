@@ -70,7 +70,12 @@ void fitLines(const cv::Mat &edges, LFLineFitter &lineFitter)
 int theta2Index(float theta, int directionsCount)
 {
   int orIndex = (int) floor ((theta * directionsCount) / (M_PI+1e-5));
-  CV_Assert(orIndex >= 0 && orIndex < directionsCount);
+  if (orIndex < 0 || orIndex >= directionsCount)
+  {
+    std::stringstream errorMessage;
+    errorMessage << theta << " has invalid orIndex: " << orIndex << " / " << directionsCount;
+    CV_Error(CV_StsBadArg, errorMessage.str());
+  }
   return orIndex;
 }
 

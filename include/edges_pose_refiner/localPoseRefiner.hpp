@@ -120,7 +120,7 @@ private:
 
   //TODO: remove code duplication
   void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J) const;
-  void computeObjectJacobian(const cv::Mat &projectedPoints, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
+  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &rotatedPoints, const cv::Mat &rotatedOrientations, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
                              cv::Mat &J) const;
 
   void computeWeightsObjectJacobian(const std::vector<cv::Point3f> &points, const cv::Mat &silhouetteEdges, const PoseRT &pose_obj, cv::Mat &weightsJacobian) const;
@@ -163,7 +163,7 @@ private:
   cv::Mat dtImage;
   cv::Mat dtDx, dtDy;
   std::vector<cv::Mat> surfaceDtImages;
-  std::vector<cv::Mat> surfaceDtImagesDx, surfaceDtImagesDy;
+  std::vector<cv::Mat> surfaceDtImagesDx, surfaceDtImagesDy, surfaceDtImagesDor;
 
   cv::Mat bgrImage, bgrImageDx, bgrImageDy;
 
@@ -172,7 +172,7 @@ private:
   cv::Mat silhouetteDtDx, silhouetteDtDy;
 
   std::vector<cv::Mat> silhouetteDtImages;
-  std::vector<cv::Mat> silhouetteDtImagesDx, silhouetteDtImagesDy;
+  std::vector<cv::Mat> silhouetteDtImagesDx, silhouetteDtImagesDy, silhouetteDtImagesDor;
 
   cv::Mat Rt_obj2cam_cached, Rt_cam2obj_cached;
 

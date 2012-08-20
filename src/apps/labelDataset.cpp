@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
 
   EdgeModel occlusionEdgeModel;
   baseImporter.importEdgeModel(modelsPath, occlusionName, occlusionEdgeModel);
+  EdgeModel::computeSurfaceEdgelsOrientations(occlusionEdgeModel);
 
   vector<int> testIndices;
   baseImporter.importTestIndices(testIndices);
@@ -161,8 +162,9 @@ int main(int argc, char *argv[])
     Mat initialVisualization = bgrImage.clone();
     occlusionPoseEstimator.visualize(initialPose, initialVisualization);
     imshow("sanity check", initialVisualization);
-    waitKey(100);
+    waitKey(200);
   }
+  waitKey();
 
   return 0;
 }

@@ -10,12 +10,25 @@ runnerName = 'transparentExperiments'
 trainedModelsPath='/media/2Tb/transparentBases/trainedModels/'
 experimentsCoresCount = 7
 
-dataset='/media/2Tb/transparentBases/different_clutter/base_3/'
-datasetName = 'different_clutter_3'
-allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass']
+#dataset='/media/2Tb/transparentBases/different_clutter/base_3/'
+#datasetName = 'different_clutter_3'
+#allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass']
+
+#dataset='/media/2Tb/transparentBases/different_clutter/base_ocl/'
+#datasetName = 'different_clutter_ocl'
+#allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass']
+
 #dataset='/media/2Tb/transparentBases/good_clutter/base/'
 #datasetName = 'good_clutter'
 #allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass', 'sourCream']
+
+#dataset='/media/2Tb/transparentBases/fixedOnTable/base/'
+#datasetName = 'fixed_on_table'
+#allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass', 'sourCream']
+
+dataset='/media/2Tb/transparentBases/finalClutter/base/'
+datasetName = 'finalClutter'
+allObjects = ['bank', 'bucket', 'bottle', 'glass']
 
 baseLogsPath = '/home/ilysenkov/results/occlusions/'
 bigSleepTime = 10
