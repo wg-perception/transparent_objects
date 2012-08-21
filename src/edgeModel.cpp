@@ -283,51 +283,48 @@ void EdgeModel::generateSilhouettes(const cv::Ptr<const PinholeCamera> &pinholeC
 #endif
 }
 
-static void computeDots(const Mat &mat1, const Mat &mat2, Mat &dst)
+static void computeDotProducts(const Mat &samples_1, const Mat &samples_2, Mat &dotProducts)
 {
-  Mat m1 = mat1.reshape(1);
-  Mat m2 = mat2.reshape(1);
-  CV_Assert(m1.size() == m2.size());
-  CV_Assert(m1.type() == m2.type());
+  Mat rowSamples_1 = samples_1.reshape(1);
+  Mat rowSamples_2 = samples_2.reshape(1);
 
-  Mat products = m1.mul(m2);
-  reduce(products, dst, 1, CV_REDUCE_SUM);
+  CV_Assert(rowSamples_1.size() == rowSamples_2.size());
+  CV_Assert(rowSamples_1.type() == rowSamples_2.type());
+
+  Mat products = rowSamples_1.mul(rowSamples_2);
+  reduce(products, dotProducts, 1, CV_REDUCE_SUM);
 }
 
-static void computeNormalDots(const Mat &Rt, const EdgeModel &rotatedEdgeModel, Mat &dots)
+static void computeCosinesWithNormals(const EdgeModel &edgeModel, const PoseRT &pose, Mat &cosines)
 {
-  Mat R = Rt(Range(0, 3), Range(0, 3));
-  Mat t = Rt(Range(0, 3), Range(3, 4));
+  Mat R = pose.getRotationMatrix();
+  Mat t = pose.getTvec();
 
-  Mat vec;
-  Mat(t.t() * R).reshape(3).convertTo(vec, CV_32FC1);
-  Scalar scalar = Scalar(vec.at<Vec3f>(0));
-  Mat edgelsMat = Mat(rotatedEdgeModel.points) + scalar;
+  Mat shiftMat(t.t() * R);
+  Vec3d shiftVec(shiftMat);
+  Scalar shiftScalar(shiftVec);
+
+  Mat shiftedPoints = Mat(edgeModel.points) + shiftScalar;
 
   Mat norms;
-  computeDots(edgelsMat, edgelsMat, norms);
+  computeDotProducts(shiftedPoints, shiftedPoints, norms);
   sqrt(norms, norms);
 
-  computeDots(edgelsMat, Mat(rotatedEdgeModel.normals), dots);
+  computeDotProducts(shiftedPoints, Mat(edgeModel.normals), cosines);
   float epsf = 1e-4;
-  Scalar eps = Scalar::all(epsf);
-  dots /= (norms + epsf);
+  cosines /= (norms + epsf);
 }
 
 void EdgeModel::computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const
 {
-//  EdgeModel rotatedEdgeModel;
-//  rotate_cam(pose_cam, rotatedEdgeModel);
-
-  computeNormalDots(pose_cam.getProjectiveMatrix(), *this, weights);
+  Mat cosinesWithNormals;
+  computeCosinesWithNormals(*this, pose_cam, cosinesWithNormals);
   Mat expWeights;
   //TODO: move up
-  exp(-10.0 * abs(weights), expWeights);
-  weights = 2 * expWeights;
+  exp(-10.0 * abs(cosinesWithNormals), expWeights);
+  Mat floatWeights = 2 * expWeights;
 
-  Mat doubleWeights;
-  weights.convertTo(doubleWeights, CV_64FC1);
-  weights = doubleWeights;
+  floatWeights.convertTo(weights, CV_64FC1);
 }
 
 void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera, const PoseRT &pose_cam, Silhouette &silhouette, float downFactor, int closingIterationsCount) const

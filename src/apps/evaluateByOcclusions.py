@@ -18,7 +18,19 @@ if __name__ == '__main__':
 
     assert len(sys.argv) == 2, sys.argv[0] + ' <resultsPath>'
     basePath = sys.argv[1]
-    allDatasets = ['fixedOnTable', 'good_clutter', 'different_clutter_3']
+
+#    allDatasets = ['good_clutter']
+#    allDatasets = ['different_clutter_3']
+#    allDatasets = ['different_clutter_ocl']
+#    allDatasets = ['finalClutter']
+
+#    allDatasets = ['good_clutter', 'different_clutter_3']
+#    allDatasets = ['fixedOnTable_3', 'good_clutter', 'different_clutter_3']
+#    allDatasets = ['good_clutter', 'different_clutter_3', 'finalClutter']
+
+#    allDatasets = ['fixedOnTable_3', 'fixed_on_table', 'good_clutter', 'different_clutter_3']
+    allDatasets = ['fixedOnTable_3', 'fixed_on_table', 'good_clutter', 'different_clutter_3', 'finalClutter']
+
     allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass', 'sourCream']
 
     csvData = []
@@ -67,3 +79,12 @@ if __name__ == '__main__':
     plt.title('Evaluation of pose estimation accuracy')
     plt.show()
 
+
+#    y1 = [ 0.98791019,  0.96,       0.92622951,  0.77586207,  0.784, 0.60714286,  0.30645161,  0.17910448,  0.04166667]
+#    y2 = [ 0.97769517,  0.965,       0.92622951,  0.74137931,  0.08196721, 0.  ]
+#    print validBins
+#    usedBins2 = [0, 2, 3, 4, 5, 6]
+#    usedBins1 = [0, 2, 3, 4, 5, 6, 7, 8, 9]
+#    plt.plot(bins[usedBins1, 0], y1, 'o-')
+#    plt.plot(bins[usedBins2, 0], y2, 'o-')
+#    plt.legend(['FDCM LM-ICP', 'last week results'])

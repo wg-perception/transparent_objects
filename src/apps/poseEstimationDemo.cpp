@@ -2,6 +2,12 @@
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
+//#define USE_INITIAL_GUESS
+
+#ifdef USE_INITIAL_GUESS
+#include "edges_pose_refiner/pclProcessing.hpp"
+#endif
+
 using namespace cv;
 using namespace transpod;
 using std::cout;
@@ -100,6 +106,39 @@ int main(int argc, char *argv[])
   catch(const cv::Exception &)
   {
   }
+
+#ifdef USE_INITIAL_GUESS
+  {
+    PoseRT initialPose;
+    //3
+    initialPose.rvec = (Mat_<double>(3, 1) << -0.8356714356174999, 0.08672943393358865, 0.1875608929524414);
+    initialPose.tvec = (Mat_<double>(3, 1) << -0.0308572565967134, 0.1872369696442459, 0.8105566363422957);
+
+    poses_cam.push_back(initialPose);
+    //TODO: move up
+    posesQualities.push_back(1.0f);
+
+    GlassSegmentator glassSegmentator(params.glassSegmentationParams);
+    Mat glassMask;
+    int numberOfComponents;
+    glassSegmentator.segment(kinectBgrImage, kinectDepth, registrationMask, numberOfComponents, glassMask);
+    showSegmentation(kinectBgrImage, glassMask);
+
+    transpod::PoseEstimator poseEstimator(kinectCamera);
+    poseEstimator.setModel(edgeModels[0]);
+
+    Vec4f tablePlane;
+    computeTableOrientationByFiducials(kinectCamera, kinectBgrImage, tablePlane);
+    poseEstimator.refinePosesBySupportPlane(kinectBgrImage, glassMask, tablePlane, poses_cam, posesQualities);
+
+    Mat finalVisualization = kinectBgrImage.clone();
+    poseEstimator.visualize(poses_cam[0], finalVisualization);
+
+    imshow("estimated poses", finalVisualization);
+    waitKey();
+  }
+#endif
+
   recognitionTime.stop();
   cout << "Recognition time: " << recognitionTime.getTimeSec() << "s" << endl;
 
