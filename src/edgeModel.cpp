@@ -295,7 +295,7 @@ static void computeDotProducts(const Mat &samples_1, const Mat &samples_2, Mat &
   reduce(products, dotProducts, 1, CV_REDUCE_SUM);
 }
 
-static void computeCosinesWithNormals(const EdgeModel &edgeModel, const PoseRT &pose, Mat &cosines)
+static void computeCosinesWithNormals(const EdgeModel &edgeModel, const PoseRT &pose, Mat &cosines, cv::Mat *jacobian = 0)
 {
   Mat R = pose.getRotationMatrix();
   Mat t = pose.getTvec();
@@ -313,18 +313,98 @@ static void computeCosinesWithNormals(const EdgeModel &edgeModel, const PoseRT &
   computeDotProducts(shiftedPoints, Mat(edgeModel.normals), cosines);
   float epsf = 1e-4;
   cosines /= (norms + epsf);
+
+  if (jacobian != 0)
+  {
+    Mat J_rodrigues;
+    Rodrigues(pose.getRvec(), R, J_rodrigues);
+    CV_Assert(J_rodrigues.rows == 3 && J_rodrigues.cols == 9);
+
+    vector<Point3d> dRtts;
+    const int dim = 3;
+    for (int axisIndex = 0; axisIndex < dim; ++axisIndex)
+    {
+      Mat dR = J_rodrigues.row(axisIndex).reshape(1, dim);
+      Mat dRttMat = dR.t() * t;
+      Vec3d dRttVec(dRttMat);
+      Point3d dRtt(dRttVec);
+      dRtts.push_back(dRtt);
+    }
+
+    vector<Point3f> dtRs;
+    for (int axisIndex = 0; axisIndex < dim; ++axisIndex)
+    {
+      Mat dtR_Mat = R.row(axisIndex);
+      Vec3d dtR_Vec(dtR_Mat);
+      Point3d dtR(dtR_Vec);
+      dtRs.push_back(dtR);
+    }
+
+    jacobian->create(edgeModel.points.size(), dim * 2, CV_64FC1);
+    CV_Assert(norms.type() == CV_32FC1);
+    CV_Assert(norms.rows == 1 || norms.cols == 1);
+    CV_Assert(cosines.type() == CV_32FC1);
+    CV_Assert(cosines.rows == 1 || cosines.cols == 1);
+    for (size_t pointIndex = 0; pointIndex < edgeModel.points.size(); ++pointIndex)
+    {
+      double currentNorm = norms.at<float>(pointIndex);
+      CV_Assert(fabs(currentNorm) > epsf);
+
+      //derivative with regard to rvec
+      for (int axisIndex = 0; axisIndex < dim; ++axisIndex)
+      {
+        Point3d dRtt = dRtts[axisIndex];
+        double firstTerm = edgeModel.normals[pointIndex].ddot(dRtt);
+        double secondTerm = cosines.at<float>(pointIndex) * edgeModel.points[pointIndex].ddot(dRtt) / currentNorm;
+        jacobian->at<double>(pointIndex, axisIndex) = (firstTerm - secondTerm) / currentNorm;
+      }
+
+      //derivative with regard to tvec
+      for (int axisIndex = 0; axisIndex < dim; ++axisIndex)
+      {
+        Point3d dtR = dtRs[axisIndex];
+        double firstTerm = edgeModel.normals[pointIndex].ddot(dtR);
+        double secondTerm = cosines.at<float>(pointIndex) * (edgeModel.points[pointIndex].ddot(dtR) + t.at<double>(axisIndex)) / currentNorm;
+        jacobian->at<double>(pointIndex, dim + axisIndex) = (firstTerm - secondTerm) / currentNorm;
+      }
+    }
+  }
 }
 
-void EdgeModel::computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const
+//TODO: why derivatives with regard to rvec are zero?
+void EdgeModel::computeWeights(const PoseRT &pose_cam, double decayConstant, double maxWeight, cv::Mat &weights, cv::Mat *jacobian) const
 {
-  Mat cosinesWithNormals;
-  computeCosinesWithNormals(*this, pose_cam, cosinesWithNormals);
+  Mat cosinesWithNormals, cosinesJacobian;
+  if (jacobian != 0)
+  {
+    computeCosinesWithNormals(*this, pose_cam, cosinesWithNormals, &cosinesJacobian);
+  }
+  else
+  {
+    computeCosinesWithNormals(*this, pose_cam, cosinesWithNormals);
+  }
+
   Mat expWeights;
-  //TODO: move up
-  exp(-10.0 * abs(cosinesWithNormals), expWeights);
-  Mat floatWeights = 2 * expWeights;
+  exp(-decayConstant * abs(cosinesWithNormals), expWeights);
+  //TODO: use square instead of abs
+//  exp(-decayConstant * cosinesWithNormals.mul(cosinesWithNormals), expWeights);
+  Mat floatWeights = maxWeight * expWeights;
 
   floatWeights.convertTo(weights, CV_64FC1);
+
+  if (jacobian != 0)
+  {
+    jacobian->create(cosinesJacobian.size(), cosinesJacobian.type());
+    CV_Assert(jacobian->type() == CV_64FC1);
+    CV_Assert(cosinesWithNormals.type() == CV_32FC1);
+    CV_Assert(cosinesWithNormals.rows == 1 || cosinesWithNormals.cols == 1);
+    for (int i = 0; i < cosinesJacobian.rows; ++i)
+    {
+      Mat mulRow = weights.at<double>(i) * (-decayConstant) * sgn(cosinesWithNormals.at<float>(i)) * cosinesJacobian.row(i);
+      Mat row = jacobian->row(i);
+      mulRow.copyTo(row);
+    }
+  }
 }
 
 void EdgeModel::getSilhouette(const cv::Ptr<const PinholeCamera> &pinholeCamera, const PoseRT &pose_cam, Silhouette &silhouette, float downFactor, int closingIterationsCount) const

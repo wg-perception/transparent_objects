@@ -36,6 +36,8 @@ struct LocalPoseRefinerParams
   /** \brief compute silhouettes by morhology (true) or by using normals (false) */
   bool useAccurateSilhouettes;
 
+  double decayConstant, maxWeight;
+
   /** \brief termination criteria of Levenberg-Marquardt in pose refinement */
   cv::TermCriteria termCriteria;
 
@@ -56,6 +58,9 @@ struct LocalPoseRefinerParams
     lmInliersRatio = 0.65f;
 
     useAccurateSilhouettes = true;
+    decayConstant = 10.0;
+    maxWeight = 2.0;
+
     termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
 
 //    useEdgeOrientations = true;
@@ -120,7 +125,7 @@ private:
 
   //TODO: remove code duplication
   void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &distanceImage, const cv::Mat &dx, const cv::Mat &dy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj, cv::Mat &J) const;
-  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &rotatedPoints, const cv::Mat &rotatedOrientations, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
+  void computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &rotatedPoints, const cv::Mat &rotatedOrientations, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &silhouetteWeights, const cv::Mat &silhouetteWeightsJacobian, const cv::Mat &error, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
                              cv::Mat &J) const;
 
   void computeWeightsObjectJacobian(const std::vector<cv::Point3f> &points, const cv::Mat &silhouetteEdges, const PoseRT &pose_obj, cv::Mat &weightsJacobian) const;

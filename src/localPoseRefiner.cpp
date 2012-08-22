@@ -428,15 +428,10 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
   }
 }
 
-//TODO: remove code duplication
-void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &rotatedPoints, const cv::Mat &rotatedOrientations, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
-                                             cv::Mat &J) const
+void computePoseJacobian_dCam_dObj(const cv::Mat &R_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &t_obj2cam, cv::Mat &J_camobj, cv::Mat &J_rodrigues)
 {
-  CV_Assert(JaW.rows == 2*projectedPoints.rows);
-  CV_Assert(JaW.type() == CV_64FC1);
-  J.create(projectedPoints.rows, JaW.cols, CV_64FC1);
-
-  Mat J_camobj(JaW.cols, JaW.cols, CV_64FC1);
+  const int dim = 3;
+  J_camobj.create(2 * dim, 2 * dim, CV_64FC1);
   Mat row0 = R_obj2cam.row(0);
   Mat row1 = R_obj2cam.row(1);
   Mat row2 = R_obj2cam.row(2);
@@ -463,7 +458,7 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
     }
   }
 
-  Mat R_obj, J_rodrigues;
+  Mat R_obj;
   Rodrigues(rvec_obj, R_obj, J_rodrigues);
   CV_Assert(J_rodrigues.rows == 3 && J_rodrigues.cols == 9);
   Mat t_cam2obj = -R_obj2cam.t()*t_obj2cam;
@@ -483,7 +478,18 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
       J_camobj.at<double>(dim+tidx_cam, dim+tidx_obj) = R_obj2cam.at<double>(tidx_cam, tidx_obj);
     }
   }
+}
 
+//TODO: remove code duplication
+void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, const cv::Mat &rotatedPoints, const cv::Mat &rotatedOrientations, const std::vector<int> &orientationIndices, const cv::Mat &inliersMask, const cv::Mat &JaW, const cv::Mat &silhouetteWeights, const cv::Mat &silhouetteWeightsJacobian, const cv::Mat &error, const std::vector<cv::Mat> &distanceImages, const std::vector<cv::Mat> &distanceImagesDx, const std::vector<cv::Mat> &distanceImagesDy, const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_obj, const cv::Mat &tvec_obj,
+                                             cv::Mat &J) const
+{
+  CV_Assert(JaW.rows == 2*projectedPoints.rows);
+  CV_Assert(JaW.type() == CV_64FC1);
+  J.create(projectedPoints.rows, JaW.cols, CV_64FC1);
+
+  Mat J_camobj, J_rodrigues;
+  computePoseJacobian_dCam_dObj(R_obj2cam, rvec_obj, t_obj2cam, J_camobj, J_rodrigues);
 
   bool useOrientationsInJacobian = !rotatedPoints.empty() && !rotatedOrientations.empty();
   Mat dorientations(projectedPoints.rows, 2*dim, CV_64FC1);
@@ -564,7 +570,7 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
 
     for(int j=0; j<J.cols; j++)
     {
-        double sumX = 0., sumY = 0., sumOr = 0.;
+        double sumX = 0., sumY = 0., sumOr = 0., sumWeights = 0.;
 
         for(int k=0; k<J.cols; k++)
         {
@@ -574,11 +580,24 @@ void LocalPoseRefiner::computeObjectJacobian(const cv::Mat &projectedPoints, con
           {
             sumOr += dorientations.at<double>(i, k) * J_camobj.at<double>(k, j);
           }
+          if (!silhouetteWeightsJacobian.empty())
+          {
+            sumWeights += silhouetteWeightsJacobian.at<double>(i, k) * J_camobj.at<double>(k, j);
+          }
         }
         J.at<double>(i, j) = x * sumX + y * sumY;
         if (useOrientationsInJacobian)
         {
           J.at<double>(i, j) += surfaceDtImagesDor[orIndex].at<float>(pt2f) * sumOr;
+        }
+        if (!silhouetteWeights.empty())
+        {
+          J.at<double>(i, j) *= silhouetteWeights.at<double>(i);
+
+          if (!params.useAccurateSilhouettes)
+          {
+            J.at<double>(i, j) += sumWeights * error.at<double>(i);
+          }
         }
         //J.at<double>(i, j) = x * JaW.at<double>(2*i, j) + y * JaW.at<double>(2*i + 1, j);
         //J.at<double>(i, j) = dx.at<float>(pt) * JaW.at<double>(2*i, j) + dy.at<float>(pt) * JaW.at<double>(2*i + 1, j);
@@ -796,6 +815,23 @@ void LocalPoseRefiner::computeWeightsObjectJacobian(const vector<Point3f> &point
   }
 }
 
+void reduceJacobianToNewBasis(const cv::Mat &newTranslationBasis2old, int paramsCount, bool hasRotationSymmetry, int verticalDirectionIndex,
+                              cv::Mat &J)
+{
+  const int dim = 3;
+  Mat newJ(J.rows, paramsCount, J.type());
+  if (!hasRotationSymmetry)
+  {
+    CV_Assert(verticalDirectionIndex < J.cols);
+    Mat rotationJ = J.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
+    Mat theFirstCol = newJ.col(0);
+    rotationJ.copyTo(theFirstCol);
+  }
+  Mat translationJ = J.colRange(dim, 2*dim) * newTranslationBasis2old;
+  Mat lastCols = newJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
+  translationJ.copyTo(lastCols);
+  J = newJ;
+}
 
 void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette,
        const cv::Mat R_obj2cam, const cv::Mat &t_obj2cam, bool computeJacobian,
@@ -829,17 +865,18 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
                       projectedPointsVector);
   }
 
-  Mat silhouetteWeights(edgels.size(), 1, CV_64FC1);
+  Mat silhouetteWeights;
+  Mat silhouetteWeightsJacobian;
   if (isSilhouette)
   {
     if (this->params.useAccurateSilhouettes)
     {
+      silhouetteWeights.create(edgels.size(), 1, CV_64FC1);
       computeWeights(projectedPointsVector, silhouetteEdges, silhouetteWeights);
     }
     else
     {
-      //TODO: compute precise Jacobian with this strategy
-      rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), silhouetteWeights);
+      rotatedEdgeModel.computeWeights(PoseRT(rvecParams_cam, tvecParams_cam), params.decayConstant, params.maxWeight, silhouetteWeights, &silhouetteWeightsJacobian);
     }
 
 #ifdef VISUALIZE
@@ -1124,7 +1161,7 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
   {
     if (params.useEdgeOrientations)
     {
-      computeObjectJacobian(projectedPoints, rotatedPoints, rotatedOrientations, orientationIndices, inliersMask, JaW, silhouetteDtImages, silhouetteDtImagesDx, silhouetteDtImagesDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
+      computeObjectJacobian(projectedPoints, rotatedPoints, rotatedOrientations, orientationIndices, inliersMask, JaW, silhouetteWeights, silhouetteWeightsJacobian, error, silhouetteDtImages, silhouetteDtImagesDx, silhouetteDtImagesDy, R_obj2cam, t_obj2cam, rvecParams, tvecParams, J);
     }
     else
     {
@@ -1133,33 +1170,16 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
 
     if (!newTranslationBasis2old.empty())
     {
-      Mat newJ(J.rows, paramsCount, J.type());
-      if (!hasRotationSymmetry)
+      reduceJacobianToNewBasis(newTranslationBasis2old, paramsCount, hasRotationSymmetry, verticalDirectionIndex, J);
+      if (isSilhouette)
       {
-        CV_Assert(verticalDirectionIndex < J.cols);
-        Mat rotationJ = J.colRange(verticalDirectionIndex, verticalDirectionIndex + 1);
-        Mat theFirstCol = newJ.col(0);
-        rotationJ.copyTo(theFirstCol);
+        reduceJacobianToNewBasis(newTranslationBasis2old, paramsCount, hasRotationSymmetry, verticalDirectionIndex, silhouetteWeightsJacobian);
       }
-      Mat translationJ = J.colRange(dim, 2*dim) * newTranslationBasis2old;
-      Mat lastCols = newJ.colRange(paramsCount - newTranslationBasis2old.cols, paramsCount);
-      translationJ.copyTo(lastCols);
-      J = newJ;
     }
   }
 
   if (isSilhouette)
   {
-    if (computeJacobian)
-    {
-      for (int i = 0; i < J.cols; ++i)
-      {
-        Mat col = J.col(i);
-        Mat mulCol = silhouetteWeights.mul(col);
-        mulCol.copyTo(col);
-      }
-    }
-
     CV_Assert(silhouetteWeights.type() == error.type());
     Mat mulError = silhouetteWeights.mul(error);
     error = mulError;

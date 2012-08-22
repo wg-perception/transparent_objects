@@ -110,4 +110,9 @@ cv::Mat getInvalidDepthMask(const cv::Mat &depthMat, const cv::Mat &registration
 
 void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage);
 
+template <typename T> int sgn(T val)
+{
+  return (T(0) < val) - (val < T(0));
+}
+
 #endif /* UTILS_HPP_ */

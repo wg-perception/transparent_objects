@@ -115,7 +115,7 @@ struct EdgeModel
    */
   static void computeFootprint(const std::vector<cv::Point2f> &points, const cv::Size &imageSize, cv::Mat &footprintPoints, float downFactor, int closingIterationsCount);
 
-  void computeWeights(const PoseRT &pose_cam, cv::Mat &weights) const;
+  void computeWeights(const PoseRT &pose_cam, double decayConstant, double maxWeight, cv::Mat &weights, cv::Mat *jacobian = 0) const;
 
   //TODO: remove imageSize from parameters
   /** \brief Compute a mask (that is a filled footprint) of a point set
