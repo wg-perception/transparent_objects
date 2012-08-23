@@ -388,22 +388,19 @@ void EdgeModel::computeWeights(const PoseRT &pose_cam, double decayConstant, dou
   exp(-decayConstant * abs(cosinesWithNormals), expWeights);
   //TODO: use square instead of abs
 //  exp(-decayConstant * cosinesWithNormals.mul(cosinesWithNormals), expWeights);
-  Mat floatWeights = maxWeight * expWeights;
 
-  floatWeights.convertTo(weights, CV_64FC1);
+  expWeights.convertTo(weights, CV_64FC1, maxWeight);
 
   if (jacobian != 0)
   {
-    jacobian->create(cosinesJacobian.size(), cosinesJacobian.type());
-    CV_Assert(jacobian->type() == CV_64FC1);
     CV_Assert(cosinesWithNormals.type() == CV_32FC1);
     CV_Assert(cosinesWithNormals.rows == 1 || cosinesWithNormals.cols == 1);
     for (int i = 0; i < cosinesJacobian.rows; ++i)
     {
-      Mat mulRow = weights.at<double>(i) * (-decayConstant) * sgn(cosinesWithNormals.at<float>(i)) * cosinesJacobian.row(i);
-      Mat row = jacobian->row(i);
-      mulRow.copyTo(row);
+      double factor = weights.at<double>(i) * (-decayConstant) * sgn(cosinesWithNormals.at<float>(i));
+      cosinesJacobian.row(i) *= factor;
     }
+    cosinesJacobian.copyTo(*jacobian);
   }
 }
 
