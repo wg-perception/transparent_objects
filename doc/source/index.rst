@@ -1,7 +1,7 @@
 .. _transparent_objects:
 
-Transparent Objects
-===================
+object_recognition_transparent_objects: Recognition of Transparent Objects
+==========================================================================
 
 Transparent objects is a pipeline that can detect and estimate poses of transparent objects, given a point cloud model of an object. The pipeline if fully integrated into the Recognition Kitchen so usual training and detection from Object Recognition can be used with subsequent grasping. See ROS Quick Guide or Object Recognition for details how to use it.
 
