@@ -67,6 +67,7 @@ add_executable(sample ../sample/sample.cpp)
 find_package(PythonLibs)
 target_link_libraries(sample edges_pose_refiner
                              ${PYTHON_LIBRARIES}
+                             ${PCL_LIBRARIES}
 )
 
 set(USE_ON_ROBOT False)
