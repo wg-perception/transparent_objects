@@ -169,28 +169,29 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, const std::vector<
 
 EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpsideDown, bool centralize, const EdgeModelCreationParams &_params)
 {
-  *this = EdgeModel(_points, std::vector<cv::Point3f> (), isModelUpsideDown, centralize, params);
+//  *this = EdgeModel(_points, std::vector<cv::Point3f> (), isModelUpsideDown, centralize, params);
 
-  /*
-   * Estimate normals
+  //TODO: use normals from the RGBD module
 
   pcl::PointCloud<pcl::PointXYZ> pclPoints;
-  cv2pcl(inModel.points, pclPoints);
+  cv2pcl(_points, pclPoints);
   pcl::PointCloud<pcl::Normal> pclNormals;
 
-  cout << "size: " << pclPoints.points.size() << endl;
-  estimateNormals(params.kSearch, pclPoints, pclNormals);
-  inModel.normals.resize(pclNormals.size());
+  //TODO: move up
+  const int kSearch = 10;
+  estimateNormals(kSearch, pclPoints, pclNormals);
+
+  vector<Point3f> cvNormals;
   for (size_t i = 0; i < pclNormals.points.size(); ++i)
   {
     Point3f currentNormal;
     currentNormal.x = pclNormals.points[i].normal[0];
     currentNormal.y = pclNormals.points[i].normal[1];
     currentNormal.z = pclNormals.points[i].normal[2];
-    cout << pclNormals.points[i].curvature << endl;
-    inModel.normals[i] = currentNormal;
+    cvNormals.push_back(currentNormal);
   }
-  */
+
+  *this = EdgeModel(_points, cvNormals, isModelUpsideDown, centralize, params);
 
 /*
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
