@@ -17,13 +17,13 @@ pipeline1:
       root: 'http://localhost:5984'
       collection: 'object_recognition'
 
-# Kinect VGA
+# Kinect VGA (use it to work with interactive manipulation in ROS Fuerte)
 #    D: []
 #    K: [525., 0., 319.5, 0., 525., 239.5, 0., 0., 1.]
 #    imageWidth: 640
 #    imageHeight: 480
 
-# Kinect SXGA scaled to VGA (use it to work with interactive manipulation)
+# Kinect SXGA scaled to VGA (use it to work with interactive manipulation in ROS Electric)
     D: []
     K: [525, 0, 319.75, 0, 492.1875, 224.765625, 0, 0, 1]
     imageWidth: 640
