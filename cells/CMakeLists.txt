@@ -1,6 +1,5 @@
-set_ecto_install_package_name(${PROJECT_NAME})
-
-ectomodule(transparent_objects_cells
+ectomodule(transparent_objects_cells DESTINATION ${PROJECT_NAME}
+                                     INSTALL
     module.cpp
     train.cpp
     detect.cpp
@@ -22,8 +21,6 @@ link_ecto(transparent_objects_cells
     ${object_recognition_core_LIBRARIES}
     edges_pose_refiner
 )
-
-install_ecto_module(transparent_objects_cells)
 
 set(ADD_COLLISION_OBJECTS False)
 if (ADD_COLLISION_OBJECTS)
