@@ -15,6 +15,8 @@ if (catkin_FOUND)
     find_package(object_recognition_core REQUIRED)
 else()
     find_package(PCL)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
 #this needs a stanza to prevent overwrite.
@@ -25,9 +27,6 @@ if(NOT CMAKE_BUILD_TYPE)#Only do this the on the first run, if the build type ha
 endif()
 
 find_package(OpenCV REQUIRED)
-
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(SYSTEM ${object_recognition_core_INCLUDE_DIRS})
