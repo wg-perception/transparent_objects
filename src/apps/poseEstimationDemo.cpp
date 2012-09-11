@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 //  params.glassSegmentationParams.closingIterations = 12;
 //  params.glassSegmentationParams.openingIterations = 8;
 //  params.glassSegmentationParams.finalClosingIterations = 8;
- // params.glassSegmentationParams.finalClosingIterations = 12;
+//  params.glassSegmentationParams.finalClosingIterations = 12;
 
   //good clutter
   params.glassSegmentationParams.openingIterations = 15;
@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
     dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
     cout << "All points in the model: " << edgeModels[i].points.size() << endl;
     cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
+    EdgeModel::computeSurfaceEdgelsOrientations(edgeModels[i]);
   }
 
   Detector detector(kinectCamera, params);
@@ -162,7 +163,7 @@ int main(int argc, char *argv[])
     cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
 
     Mat detectionResults = kinectBgrImage.clone();
-    vector<PoseRT> bestPose(1, poses_cam[bestDetectionIndex]);
+//    vector<PoseRT> bestPose(1, poses_cam[bestDetectionIndex]);
     vector<string> bestName(1, detectedObjectsNames[bestDetectionIndex]);
 //    detector.visualize(bestPose, bestName, detectionResults);
     detector.visualize(poses_cam, detectedObjectsNames, detectionResults);

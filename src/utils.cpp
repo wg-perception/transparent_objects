@@ -239,7 +239,6 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar
 {
   CV_Assert(!image.empty() && !mask.empty());
   Mat drawImage = image.clone();
-  CV_Assert(drawImage.channels() == 3);
 
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;

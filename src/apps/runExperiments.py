@@ -6,6 +6,8 @@ import time
 import re
 
 runner='/home/ilysenkov/ecto_fuerte/build/bin/transparentExperiments'
+#runner='/home/ilysenkov/itseezMachine/home/ilysenkov/ecto/server_build/bin/transparentExperiments'
+
 runnerName = 'transparentExperiments'
 trainedModelsPath='/media/2Tb/transparentBases/trainedModels/'
 experimentsCoresCount = 7

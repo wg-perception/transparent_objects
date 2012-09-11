@@ -141,6 +141,7 @@ void LocalPoseRefiner::computeDistanceTransform(const cv::Mat &edges, int distan
   }
 
   distanceTransform(~edges, distanceImage, distanceType, distanceMask);
+  //TODO: experiment with different kernels
   computeDerivatives(distanceImage, dx, dy);
 
 #ifdef VERBOSE
@@ -744,7 +745,7 @@ void computeProjectedOrientations(const std::vector<Point3f> &edgels, const std:
 
     if (jacobian != 0)
     {
-      double dorFactor = (fy / fx) / (dx*dx + dy*dy);
+      double dorFactor = 1.0 / (dx*dx + dy*dy);
 
       for (int axisIndex = 0; axisIndex < dim; ++axisIndex)
       {
@@ -908,7 +909,6 @@ void LocalPoseRefiner::computeLMIterationData(int paramsCount, bool isSilhouette
       Mat R_obj, J_rodrigues;
       Rodrigues(rvecParams, R_obj, J_rodrigues);
       CV_Assert(J_rodrigues.rows == 3 && J_rodrigues.cols == 9);
-
       computeProjectedOrientations(rotatedEdgeModel.stableEdgels, rotatedEdgeModel.orientations, pose_cam, cameraMatrix, projectedOrientations, &J_rodrigues, &surfaceOrientationsJacobian);
       for (size_t i = 0; i < projectedOrientations.size(); ++i)
       {

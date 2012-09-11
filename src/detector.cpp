@@ -503,10 +503,10 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
         color = cv::Scalar(0, 0, 255);
         break;
       case 2:
-        color = cv::Scalar(0, 255, 0);
+        color = cv::Scalar(255, 0, 255);
         break;
       case 3:
-        color = cv::Scalar(255, 0, 255);
+        color = cv::Scalar(0, 255, 0);
         break;
       default:
         //TODO: don't change current state of the random generator
