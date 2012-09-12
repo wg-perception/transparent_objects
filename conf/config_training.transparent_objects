@@ -6,9 +6,9 @@ sink1:
   type: publisher
 
 pipeline1:
-  method: 'transparent_objects'
-  package: 'object_recognition_transparent_objects'
-  submethod: ''
+  type: 'transparent_objects'
+  module: 'object_recognition_transparent_objects'
+  subtype: ''
   sources: [1]
   sinks: [1]
   parameters:

@@ -42,9 +42,9 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
     def processor(cls, *args, **kwargs):
         object_db = kwargs['object_db']
         object_id = kwargs.get('object_id', None)
-        submethod = kwargs['submethod']
+        subtype = kwargs['subtype']
     
-        #db_models = Models(db_params, [ object_id ], method, submethod)
+        #db_models = Models(db_params, [ object_id ], method, subtype)
         if object_id:
             #TODO these should be loaded from the database?
             json_K = kwargs['pipeline_params']['K']
@@ -64,7 +64,7 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
             imageHeight = 480
 
             db_models = []
-        return TransparentObjectsProcessor(json_submethod=dict_to_cpp_json_str(submethod), json_K=dict_to_cpp_json_str(json_K), json_D=dict_to_cpp_json_str(json_D), imageWidth=imageWidth, imageHeight=imageHeight, db_models=db_models)
+        return TransparentObjectsProcessor(json_subtype=dict_to_cpp_json_str(subtype), json_K=dict_to_cpp_json_str(json_K), json_D=dict_to_cpp_json_str(json_D), imageWidth=imageWidth, imageHeight=imageHeight, db_models=db_models)
 
     @classmethod
     def post_processor(cls, *args, **kwarg):
