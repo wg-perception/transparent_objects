@@ -57,8 +57,7 @@ struct LocalPoseRefinerParams
 
     termCriteria = cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 30, DBL_EPSILON);
 
-//    useEdgeOrientations = true;
-    useEdgeOrientations = false;
+    useEdgeOrientations = true;
 
     minSilhouetteWeight = 0.1f;
   }
