@@ -2,12 +2,18 @@ import sys
 import re
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.path as path
 import bisect
 import os.path
 
 if __name__ == '__main__':
-    boundaries = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.05]
+    boundaries = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.05]
+    left_boundaries = [0.00, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
 
+    percentile = 0.8
+#    computePercentileError = True
+    computePercentileError = False
 #final
     maxFinalTranslation = 0.02
     finalTranslationIndex = 4
@@ -32,6 +38,7 @@ if __name__ == '__main__':
     allDatasets = ['fixedOnTable_3', 'fixed_on_table', 'good_clutter', 'different_clutter_3', 'finalClutter']
 
     allObjects = ['bank', 'bucket', 'bottle', 'glass', 'wineglass', 'sourCream']
+#    allObjects = ['bank']
 
     csvData = []
     for dataset in allDatasets:
@@ -52,30 +59,51 @@ if __name__ == '__main__':
     binCardinalities = [0] * binCount
     bins = np.zeros((binCount, data.shape[1]), data.dtype)
 
-    data[:, finalTranslationIndex] = data[:, finalTranslationIndex] < maxFinalTranslation
-    data[:, initialTranslationIndex] = data[:, initialTranslationIndex] < maxInitialTranslation
+    if not computePercentileError:
+        data[:, finalTranslationIndex] = data[:, finalTranslationIndex] < maxFinalTranslation
 
+    finalAccuracies = [[] for x in xrange(binCount)]
     for row in data:
         binIndex = bisect.bisect_left(boundaries, row[0])
         binCardinalities[binIndex] += 1
         bins[binIndex] += row
-
-    print binCardinalities
-
-    for idx, val in enumerate(binCardinalities):
-        if (val != 0):
-            bins[idx] /= val
+        finalAccuracies[binIndex].append(row[finalTranslationIndex])
 
     validBins = [idx for idx, val in enumerate(binCardinalities) if val != 0]
 
-    plt.plot(bins[validBins, 0], bins[validBins, initialTranslationIndex], 'o-')
-    plt.plot(bins[validBins, 0], bins[validBins, finalTranslationIndex], 'o-')
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
+    if computePercentileError:
+        percentileAccuracies = np.zeros((1, binCount), data.dtype)
+        for idx, val in enumerate(binCardinalities):
+            if (val != 0):
+                percentileIndex = int(percentile * len(finalAccuracies[idx]))
+                percentileAccuracies[0, idx] = sorted(finalAccuracies[idx])[percentileIndex]
+        print percentileAccuracies
+    else:
+        print binCardinalities
+        for idx, val in enumerate(binCardinalities):
+            if (val != 0):
+                bins[idx] /= val
+        print bins[validBins, finalTranslationIndex]
+
+    widths = [9] * len(validBins)
+    widths[0] = 14
+
+    if computePercentileError:
+        plt.bar(np.array([left_boundaries[i] for i in validBins]) * 100, percentileAccuracies[0, validBins], width=widths)
+    else:
+        plt.bar(np.array([left_boundaries[i] for i in validBins]) * 100, bins[validBins, finalTranslationIndex], width=widths)
+
+    plt.rcParams.update({'font.size': 16})
+    plt.xlim(0, 100)
     plt.grid()
-    plt.xlabel("Occlusion percentage")
-    plt.ylabel("Success rate")
-    plt.legend(['initial', 'final'])
+    plt.xlabel("Occlusion percentage (%)")
+    if computePercentileError:
+        plt.ylabel("80th percentile of the translation error (m)")
+        plt.yticks(np.linspace(0.0, 0.10, 11))
+    else:
+        plt.ylabel("Success rate")
+        plt.ylim(0, 1)
+
     plt.title('Evaluation of pose estimation accuracy')
     plt.show()
 
@@ -85,6 +113,10 @@ if __name__ == '__main__':
 #    print validBins
 #    usedBins2 = [0, 2, 3, 4, 5, 6]
 #    usedBins1 = [0, 2, 3, 4, 5, 6, 7, 8, 9]
-#    plt.plot(bins[usedBins1, 0], y1, 'o-')
-#    plt.plot(bins[usedBins2, 0], y2, 'o-')
-#    plt.legend(['FDCM LM-ICP', 'last week results'])
+#    plt.plot(bins[usedBins1, 0] * 100, y1, 'o-', linewidth=2.0, markersize=8.0)
+#    plt.plot(bins[usedBins1, 0], y2, 'o-', linewidth=2.0, markersize=8.0)
+#    plt.legend(['DCM LM-ICP', 'LM-ICP'])
+#    plt.legend(['Proposed algorithm'])
+#    plt.xlim(0, 100)
+#    plt.ylim(0, 1)
+#    plt.show()

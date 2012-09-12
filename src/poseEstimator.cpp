@@ -704,6 +704,18 @@ namespace transpod
       cout << "after 3d: " << basisMatches.size() << endl;
 #endif
 
+
+#ifdef VISUALIZE_GEOMETRIC_HASHING
+      vector<std::pair<float, int> > sortedMatches;
+      for (size_t i = 0; i < basisMatches.size(); ++i)
+      {
+        sortedMatches.push_back(std::make_pair(basisMatches[i].confidence, i));
+      }
+
+      std::sort(sortedMatches.begin(), sortedMatches.end());
+      std::reverse(sortedMatches.begin(), sortedMatches.end());
+#endif
+
       for (size_t i = 0; i < basisMatches.size(); ++i)
       {
   //      PoseRT pose;
@@ -724,16 +736,14 @@ namespace transpod
         }
 
   #ifdef VISUALIZE_GEOMETRIC_HASHING
-        if (basisMatches[i].silhouetteIndex != 0)
-        {
-  //        continue;
-        }
+        int matchIdx = sortedMatches[i].second;
         Mat visualization = glassMask.clone();
-        silhouettes[basisMatches[i].silhouetteIndex].visualizeSimilarityTransformation(basisMatches[i].similarityTransformation_cam, visualization, Scalar(255, 0, 0));
+        silhouettes[basisMatches[matchIdx].silhouetteIndex].visualizeSimilarityTransformation(basisMatches[matchIdx].similarityTransformation_cam, visualization, Scalar(255, 0, 255));
         imshow("transformation by geometric hashing", visualization);
 
-        cout << "votes: " << basisMatches[i].confidence << endl;
-        cout << "idx: " << basisMatches[i].silhouetteIndex << endl;
+        cout << "votes: " << basisMatches[matchIdx].confidence << endl;
+        cout << "idx: " << basisMatches[matchIdx].silhouetteIndex << endl;
+        cout << "matchIdx" << matchIdx << endl;
         cout << "i: " << i << endl;
 
   /*
