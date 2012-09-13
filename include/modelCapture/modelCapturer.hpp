@@ -5,17 +5,20 @@
 class ModelCapturer
 {
   public:
+    struct Observation
+    {
+      cv::Mat bgrImage;
+      cv::Mat mask;
+      PoseRT pose;
+    };
+
     ModelCapturer(const PinholeCamera &pinholeCamera);
-    void addObservation(const cv::Mat &objectMask, const PoseRT &pose_cam);
+    void setObservations(const std::vector<Observation> &observations);
+//    void addObservation(const cv::Mat &objectMask, const PoseRT &pose_cam);
     //TODO: add clear()
 
     void createModel() const;
   private:
-    struct Observation
-    {
-      cv::Mat mask;
-      PoseRT pose;
-    };
 
     std::vector<Observation> observations;
     PinholeCamera camera;

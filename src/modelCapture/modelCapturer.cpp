@@ -9,6 +9,12 @@ ModelCapturer::ModelCapturer(const PinholeCamera &pinholeCamera)
   camera = pinholeCamera;
 }
 
+void ModelCapturer::setObservations(const std::vector<ModelCapturer::Observation> &_observations)
+{
+  observations = _observations;
+}
+
+/*
 void ModelCapturer::addObservation(const cv::Mat &objectMask, const PoseRT &pose_cam)
 {
   Observation newObservation;
@@ -17,23 +23,35 @@ void ModelCapturer::addObservation(const cv::Mat &objectMask, const PoseRT &pose
 
   observations.push_back(newObservation);
 }
+*/
 
 void initializeVolume(std::vector<cv::Point3f> &volumePoints)
 {
   //TODO: move up
-  const float min_x = -0.5f;
+//  const float min_x = -0.5f;
+//  const float max_x =  0.5f;
+//  const float min_y = -0.5f;
+//  const float max_y =  0.5f;
+//  const float min_z = -0.5f;
+//  const float max_z =  0.5f;
+
+  const float min_x =  0.1f;
   const float max_x =  0.5f;
-  const float min_y = -0.5f;
-  const float max_y =  0.5f;
-  const float min_z = -0.5f;
-  const float max_z =  0.5f;
+  const float min_y = -0.1f;
+  const float max_y =  0.2f;
+  const float min_z = -0.3f;
+  const float max_z =  0.0f;
 
 //  const float x_step = 0.01f;
 //  const float y_step = 0.01f;
 //  const float z_step = 0.01f;
-  const float x_step = 0.0025f;
-  const float y_step = 0.0025f;
-  const float z_step = 0.0025f;
+//  const float x_step = 0.0025f;
+//  const float y_step = 0.0025f;
+//  const float z_step = 0.0025f;
+
+  const float x_step = 0.001f;
+  const float y_step = 0.001f;
+  const float z_step = 0.001f;
 
   volumePoints.clear();
   for (float x = min_x; x < max_x; x += x_step)
@@ -62,13 +80,15 @@ void ModelCapturer::createModel() const
   for (size_t observationIndex = 0; observationIndex < observations.size(); ++observationIndex)
   {
     cout << "observation: " << observationIndex << endl;
+ //   showEdgels(observations[observationIndex].bgrImage, volumePoints, observations[observationIndex].pose,camera);
+//    waitKey();
+
 
     vector<Point2f> projectedVolume;
     camera.projectPoints(volumePoints, observations[observationIndex].pose, projectedVolume);
 
 
 
-//    showEdgels(glassMask)
 
 
 

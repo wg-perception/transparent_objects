@@ -40,9 +40,7 @@ int main(int argc, char *argv[])
   GlassSegmentator glassSegmentator(glassSegmentationParams);
 
   ModelCapturer modelCapturer(kinectCamera);
-  vector<Mat> bgrImages(testIndices.size());
-  vector<Mat> glassMasks(testIndices.size());
-  vector<PoseRT> fiducialPoses(testIndices.size());
+  vector<ModelCapturer::Observation> observations(testIndices.size());
 
 #pragma omp parallel for
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
@@ -57,20 +55,22 @@ int main(int argc, char *argv[])
 //    imshow("bgr", bgrImage);
 //    imshow("depth", depthImage);
 
-    dataImporter.importGroundTruth(testImageIdx, fiducialPoses[testIdx], false);
+    PoseRT fiducialPose;
+    dataImporter.importGroundTruth(testImageIdx, fiducialPose, false);
 
     int numberOfComponens;
-    glassSegmentator.segment(bgrImage, depthImage, registrationMask, numberOfComponens, glassMasks[testIdx]);
+    Mat glassMask;
+    glassSegmentator.segment(bgrImage, depthImage, registrationMask, numberOfComponens, glassMask);
 
 //    showSegmentation(bgrImage, glassMask);
 //    waitKey();
+    observations[testIdx].bgrImage = bgrImage;
+    observations[testIdx].mask = glassMask;
+    observations[testIdx].pose = fiducialPose;
   }
 
-  CV_Assert(glassMasks.size() == fiducialPoses.size());
-  for (size_t i = 0; i < glassMasks.size(); ++i)
-  {
-    modelCapturer.addObservation(glassMasks[i], fiducialPoses[i]);
-  }
+  modelCapturer.setObservations(observations);
+
 
   modelCapturer.createModel();
 
