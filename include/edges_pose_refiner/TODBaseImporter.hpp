@@ -17,7 +17,7 @@ public:
   TODBaseImporter();
   TODBaseImporter(const std::string &baseFolder, const std::string &testFolder);
 
-  void importAllData(const std::string &trainedModelsPath, const std::vector<std::string> &trainObjectNames,
+  void importAllData(const std::string *trainedModelsPath = 0, const std::vector<std::string> *trainObjectNames = 0,
                      PinholeCamera *kinectCamera = 0, cv::Mat *registrationMask = 0,
                      std::vector<EdgeModel> *edgeModels = 0, std::vector<int> *testIndices = 0,
                      std::vector<EdgeModel> *occlusionObjects = 0, std::vector<PoseRT> *occlusionOffsets = 0) const;

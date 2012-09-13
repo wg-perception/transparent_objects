@@ -29,7 +29,7 @@ TODBaseImporter::TODBaseImporter(const std::string &_baseFolder, const std::stri
   testFolder = _testFolder;
 }
 
-void TODBaseImporter::importAllData(const std::string &trainedModelsPath, const std::vector<std::string> &trainObjectNames,
+void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const std::vector<std::string> *trainObjectNames,
                                     PinholeCamera *kinectCamera, cv::Mat *registrationMask,
                                     std::vector<EdgeModel> *edgeModels, std::vector<int> *testIndices,
                                     std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets) const
@@ -46,11 +46,11 @@ void TODBaseImporter::importAllData(const std::string &trainedModelsPath, const 
 
   if (edgeModels != 0)
   {
-    edgeModels->resize(trainObjectNames.size());
-    for (size_t i = 0; i < trainObjectNames.size(); ++i)
+    edgeModels->resize(trainObjectNames->size());
+    for (size_t i = 0; i < trainObjectNames->size(); ++i)
     {
-      importEdgeModel(trainedModelsPath, trainObjectNames[i], (*edgeModels)[i]);
-      cout << "imported a model for " << trainObjectNames[i] << endl;
+      importEdgeModel(*trainedModelsPath, (*trainObjectNames)[i], (*edgeModels)[i]);
+      cout << "imported a model for " << (*trainObjectNames)[i] << endl;
       cout << "All points in the model: " << (*edgeModels)[i].points.size() << endl;
       cout << "Surface points in the model: " << (*edgeModels)[i].stableEdgels.size() << endl;
       EdgeModel::computeSurfaceEdgelsOrientations((*edgeModels)[i]);
@@ -60,7 +60,7 @@ void TODBaseImporter::importAllData(const std::string &trainedModelsPath, const 
   CV_Assert( !((occlusionObjects == 0) ^ (occlusionOffsets == 0)) );
   if (occlusionObjects != 0 && occlusionOffsets != 0)
   {
-    importOcclusionObjects(trainedModelsPath, *occlusionObjects, *occlusionOffsets);
+    importOcclusionObjects(*trainedModelsPath, *occlusionObjects, *occlusionOffsets);
   }
 
   if (testIndices != 0)

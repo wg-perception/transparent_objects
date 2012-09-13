@@ -238,7 +238,7 @@ int main(int argc, char **argv)
   vector<PoseRT> occlusionOffsets;
   vector<int> testIndices;
   Mat registrationMask;
-  dataImporter.importAllData(trainedModelsPath, objectNames,
+  dataImporter.importAllData(&trainedModelsPath, &objectNames,
                              &kinectCamera, &registrationMask, &edgeModels, &testIndices, &occlusionObjects, &occlusionOffsets);
 
   DetectorParams params;

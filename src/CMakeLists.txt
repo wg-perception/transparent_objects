@@ -14,6 +14,7 @@ set(src
     utils.cpp
     nonMaximumSuppression.cpp
     chamfer_matching/chamfer_matching.cpp
+    modelCapture/modelCapturer.cpp
 )
 
 include_directories(SYSTEM
@@ -145,6 +146,10 @@ endif()
 #target_link_libraries(poseEstimationDemo edges_pose_refiner)
 
 add_executable(captureModel apps/captureModel.cpp)
+set_target_properties(captureModel
+  PROPERTIES
+  COMPILE_FLAGS "-fopenmp"
+  )
 target_link_libraries(captureModel edges_pose_refiner
                                    ${PYTHON_LIBRARIES}
 )

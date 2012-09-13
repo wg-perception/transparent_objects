@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
   Mat registrationMask;
   PinholeCamera kinectCamera;
   vector<EdgeModel> edgeModels;
-  dataImporter.importAllData(trainedModelsPath, objectNames, &kinectCamera, &registrationMask, &edgeModels);
+  dataImporter.importAllData(&trainedModelsPath, &objectNames, &kinectCamera, &registrationMask, &edgeModels);
 
   Detector detector(kinectCamera, params);
   for (size_t i = 0; i < edgeModels.size(); ++i)

@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
   Mat registrationMask;
   vector<int> testIndices;
   vector<EdgeModel> occlusionEdgeModels;
-  baseImporter.importAllData(trainedModelsPath, occlusionObjectsNames,
+  baseImporter.importAllData(&trainedModelsPath, &occlusionObjectsNames,
                              &camera, &registrationMask, &occlusionEdgeModels, &testIndices);
 
   transpod::PoseEstimator occlusionPoseEstimator(camera);
