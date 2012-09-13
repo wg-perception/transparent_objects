@@ -143,3 +143,8 @@ endif()
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
 #target_link_libraries(poseEstimationDemo edges_pose_refiner)
+
+add_executable(captureModel apps/captureModel.cpp)
+target_link_libraries(captureModel edges_pose_refiner
+                                   ${PYTHON_LIBRARIES}
+)
