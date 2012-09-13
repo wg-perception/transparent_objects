@@ -15,11 +15,15 @@ class TODBaseImporter
 {
 public:
   TODBaseImporter();
-//  TODBaseImporter(const std::string &trainFolder, const std::string &testFolder);
-  TODBaseImporter(const std::string &testFolder);
+  TODBaseImporter(const std::string &baseFolder, const std::string &testFolder);
 
-  void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
-  void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true);
+  void importAllData(const std::string &trainedModelsPath, const std::vector<std::string> &trainObjectNames,
+                     PinholeCamera *kinectCamera = 0, cv::Mat *registrationMask = 0,
+                     std::vector<EdgeModel> *edgeModels = 0, std::vector<int> *testIndices = 0,
+                     std::vector<EdgeModel> *occlusionObjects = 0, std::vector<PoseRT> *occlusionOffsets = 0) const;
+
+//  void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
+  void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true) const;
   void readMultiCameraParams(const std::string &camerasListFilename, std::vector<PinholeCamera> &allCameras, std::vector<bool> &camerasMask);
 
   static void importCamera(const std::string &filename, PinholeCamera &camera);
@@ -48,7 +52,7 @@ public:
 private:
   void readRegisteredClouds(const std::string &configFilename, std::vector<std::vector<cv::Point3f> > &registeredClouds) const;
 
-  std::string trainFolder, testFolder;
+  std::string baseFolder, testFolder;
   cv::Mat cameraMatrix, distCoeffs;
 };
 

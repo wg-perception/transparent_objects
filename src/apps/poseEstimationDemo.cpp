@@ -29,10 +29,8 @@ int main(int argc, char *argv[])
   string baseFolder = argv[1];
   string testObjectName = argv[2];
 
-  const string modelsPath = "/media/2Tb/transparentBases/trainedModels/";
+  const string trainedModelsPath = "/media/2Tb/transparentBases/trainedModels/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
-  const string kinectCameraFilename = baseFolder + "/center.yml";
-  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
   const string imageFilename = baseFolder + "/image.png";
   const string depthFilename = baseFolder + "/depth.xml.gz";
   const string pointCloudFilename = baseFolder + "/pointCloud.pcd";
@@ -58,7 +56,7 @@ int main(int argc, char *argv[])
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
   params.planeSegmentationMethod = FIDUCIALS;
 
-  TODBaseImporter dataImporter(testFolder);
+  TODBaseImporter dataImporter(baseFolder, testFolder);
 
   Mat kinectDepth, kinectBgrImage;
   dataImporter.importBGRImage(imageFilename, kinectBgrImage);
@@ -67,28 +65,16 @@ int main(int argc, char *argv[])
   imshow("depth", kinectDepth);
   waitKey(500);
 
+  Mat registrationMask;
   PinholeCamera kinectCamera;
-  dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
-  CV_Assert(kinectCamera.imageSize == Size(640, 480));
-
-  vector<EdgeModel> edgeModels(objectNames.size());
-  for (size_t i = 0; i < objectNames.size(); ++i)
-  {
-    dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
-    cout << "All points in the model: " << edgeModels[i].points.size() << endl;
-    cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
-    EdgeModel::computeSurfaceEdgelsOrientations(edgeModels[i]);
-  }
+  vector<EdgeModel> edgeModels;
+  dataImporter.importAllData(trainedModelsPath, objectNames, &kinectCamera, &registrationMask, &edgeModels);
 
   Detector detector(kinectCamera, params);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
     detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
-
-  Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-  CV_Assert(!registrationMask.empty());
-
 
   pcl::PointCloud<pcl::PointXYZ> testPointCloud;
   dataImporter.importPointCloud(pointCloudFilename, testPointCloud);

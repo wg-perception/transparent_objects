@@ -23,19 +23,59 @@ TODBaseImporter::TODBaseImporter()
 {
 }
 
-//TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder)
-TODBaseImporter::TODBaseImporter(const std::string &_testFolder)
+TODBaseImporter::TODBaseImporter(const std::string &_baseFolder, const std::string &_testFolder)
 {
-//  trainFolder = _trainFolder;
+  baseFolder = _baseFolder;
   testFolder = _testFolder;
-
-//  PinholeCamera camera;
-//  readCameraParams(trainFolder, camera);
-//  cameraMatrix = camera.cameraMatrix;
-//  distCoeffs = camera.distCoeffs;
 }
 
-void TODBaseImporter::readCameraParams(const string &folder, PinholeCamera &camera, bool addFilename)
+void TODBaseImporter::importAllData(const std::string &trainedModelsPath, const std::vector<std::string> &trainObjectNames,
+                                    PinholeCamera *kinectCamera, cv::Mat *registrationMask,
+                                    std::vector<EdgeModel> *edgeModels, std::vector<int> *testIndices,
+                                    std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets) const
+{
+  //TODO: move up
+  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
+
+  if (kinectCamera != 0)
+  {
+    readCameraParams(baseFolder, *kinectCamera);
+    //TODO: move up
+    CV_Assert(kinectCamera->imageSize == Size(640, 480));
+  }
+
+  if (edgeModels != 0)
+  {
+    edgeModels->resize(trainObjectNames.size());
+    for (size_t i = 0; i < trainObjectNames.size(); ++i)
+    {
+      importEdgeModel(trainedModelsPath, trainObjectNames[i], (*edgeModels)[i]);
+      cout << "imported a model for " << trainObjectNames[i] << endl;
+      cout << "All points in the model: " << (*edgeModels)[i].points.size() << endl;
+      cout << "Surface points in the model: " << (*edgeModels)[i].stableEdgels.size() << endl;
+      EdgeModel::computeSurfaceEdgelsOrientations((*edgeModels)[i]);
+    }
+  }
+
+  CV_Assert( !((occlusionObjects == 0) ^ (occlusionOffsets == 0)) );
+  if (occlusionObjects != 0 && occlusionOffsets != 0)
+  {
+    importOcclusionObjects(trainedModelsPath, *occlusionObjects, *occlusionOffsets);
+  }
+
+  if (testIndices != 0)
+  {
+    importTestIndices(*testIndices);
+  }
+
+  if (registrationMask != 0)
+  {
+    *registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
+    CV_Assert(!registrationMask->empty());
+  }
+}
+
+void TODBaseImporter::readCameraParams(const string &folder, PinholeCamera &camera, bool addFilename) const
 {
   string cameraFilename = addFilename ? folder + "/camera.yml" : folder;
   camera.read(cameraFilename);
@@ -65,6 +105,7 @@ void TODBaseImporter::readMultiCameraParams(const string &camerasListFilename, s
   }
 }
 
+/*
 void TODBaseImporter::readTrainObjectsNames(const string &trainConfigFilename, std::vector<string> &trainObjectsNames)
 {
   trainObjectsNames.clear();
@@ -86,6 +127,7 @@ void TODBaseImporter::readTrainObjectsNames(const string &trainConfigFilename, s
   }
   configFile.close();
 }
+*/
 
 bool isNan(const Point3f& p)
 {
