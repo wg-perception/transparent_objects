@@ -55,7 +55,7 @@ target_link_libraries(edges_pose_refiner
                       ${ecto_opencv_LIBRARIES}
 )
 
-install(TARGETS edges_pose_refiner
+install(TARGETS edges_pose_refiner fdcm
   DESTINATION lib
   )
 
