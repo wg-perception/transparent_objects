@@ -146,10 +146,7 @@ endif()
 #target_link_libraries(poseEstimationDemo edges_pose_refiner)
 
 add_executable(captureModel apps/captureModel.cpp)
-set_target_properties(captureModel
-  PROPERTIES
-  COMPILE_FLAGS "-fopenmp"
-  )
+set_target_properties(captureModel PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(captureModel edges_pose_refiner
                                    ${PYTHON_LIBRARIES}
 )
