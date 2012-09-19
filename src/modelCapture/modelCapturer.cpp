@@ -134,22 +134,68 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
   Mat isRepeatable = visibleCounts >= modelPointVisibleCount;
 
   CV_Assert(isRepeatable.type() == CV_8UC1);
-  int previousLevelPointsCount = 0;
-  int zLevelIndex;
-  for (zLevelIndex = 0; zLevelIndex < isRepeatable.size.p[0]; ++zLevelIndex)
+  vector<float> levelCounts(isRepeatable.size.p[0]);
+  int firstLevelIndex = -1, lastLevelIndex = -1;
+  for (int zLevelIndex = 0; zLevelIndex < isRepeatable.size.p[0]; ++zLevelIndex)
   {
     Mat zSlice(isRepeatable.size.p[1], isRepeatable.size.p[2], CV_8UC1, isRepeatable.ptr(zLevelIndex, 0, 0));
-    int currentLevelPointsCount = countNonZero(zSlice);
-    if (currentLevelPointsCount > 0 && currentLevelPointsCount <= previousLevelPointsCount)
+    levelCounts[zLevelIndex] = countNonZero(zSlice);
+
+    if (levelCounts[zLevelIndex] > 0)
     {
+      lastLevelIndex = zLevelIndex;
+
+      if (firstLevelIndex < 0)
+      {
+        firstLevelIndex = zLevelIndex;
+        cout << "first level: " << zLevelIndex << endl;
+      }
+    }
+  }
+
+  Mat all_A(levelCounts.size(), 2, CV_32FC1, Scalar(1.0));
+  for (int i = 0; i < all_A.rows; ++i)
+  {
+    all_A.at<float>(i, 1) = i;
+  }
+  Mat all_b(levelCounts);
+  //TODO: move up
+  const int windowWidth = 20;
+  const int localMinWindow = windowWidth / 2;
+
+  vector<float> errors(levelCounts.size(), std::numeric_limits<float>::max());
+  const int firstLevelIndexToCheck = firstLevelIndex + max(all_A.cols, windowWidth);
+  for (int i = firstLevelIndexToCheck; i <= lastLevelIndex; ++i)
+  {
+    Mat A = all_A.rowRange(i - windowWidth, i);
+    Mat b = all_b.rowRange(i - windowWidth, i);
+    Mat x;
+    solve(A, b, x, DECOMP_SVD);
+    errors[i] = norm(A * x - b);
+    cout << i << " " << errors[i] << endl;
+  }
+
+  int modelStartLevelIndex = -1;
+  for (int i = firstLevelIndexToCheck; i <= lastLevelIndex; ++i)
+  {
+    bool isLocalMin = true;
+    for (int j = max(firstLevelIndexToCheck, i - localMinWindow); j <= min(i + localMinWindow, lastLevelIndex); ++j)
+    {
+      if (errors[j] < errors[i])
+      {
+        isLocalMin = false;
+        break;
+      }
+    }
+
+    if (isLocalMin)
+    {
+      modelStartLevelIndex = i;
       break;
     }
-    cout << zLevelIndex << ", " << currentLevelPointsCount << endl;
-
-    previousLevelPointsCount = currentLevelPointsCount;
   }
-  int modelStartLevelIndex = max(zLevelIndex - 1, 1);
-//  int modelStartLevelIndex = 210;
+  CV_Assert(modelStartLevelIndex >= 0);
+  cout << "start: " << modelStartLevelIndex << endl;
 
   modelPoints.clear();
   for (int i = modelStartLevelIndex; i < isRepeatable.size.p[0] - 1; ++i)
