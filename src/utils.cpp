@@ -120,23 +120,51 @@ void publishPoints(const std::vector<cv::Point3f>& points, cv::Scalar color, con
 
 void publishPoints(const std::vector<std::vector<cv::Point3f> >& points)
 {
-  cout << "publising..." << endl;
-  const int minVal = 128;
-  const int maxVal = 255;
-  const int colorDim = 3;
+#ifdef USE_3D_VISUALIZATION
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("id"));
+
+//  const int minVal = 128;
+//  const int maxVal = 255;
+//  const int colorDim = 3;
   for (size_t i = 0; i < points.size(); i++)
   {
     cout << "size: " << points[i].size() << endl;
     Scalar color;
+    switch (i)
+    {
+      case 0:
+        color = cv::Scalar(0, 0, 255);
+        break;
+      case 1:
+        color = cv::Scalar(0, 255, 0);
+        break;
+      case 2:
+        color = cv::Scalar(255, 0, 255);
+        break;
+      case 3:
+        color = cv::Scalar(255, 0, 0);
+        break;
+      default:
+        color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
+    }
+/*
     for (int j = 0; j < colorDim; j++)
     {
       color[j] = minVal + rand() % (maxVal - minVal + 1);
     }
+*/
 
     std::stringstream str;
     str << i;
-    publishPoints(points[i], color, str.str());
+    publishPoints(points[i], viewer, color, str.str());
   }
+
+  while (!viewer->wasStopped ())
+  {
+    viewer->spinOnce (100);
+    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+  }
+#endif
 }
 
 

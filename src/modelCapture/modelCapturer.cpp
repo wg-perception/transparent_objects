@@ -93,7 +93,7 @@ void initializeVolume(Mat &volumePoints)
 */
 }
 
-void ModelCapturer::createModel() const
+void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
 {
   cout << "creating model... " << std::flush;
   //TODO: move up
@@ -114,14 +114,7 @@ void ModelCapturer::createModel() const
 
 
     vector<Point2f> projectedVolume;
-//    camera.projectPoints(volumePoints, observations[observationIndex].pose, projectedVolume);
-//    camera.projectPoints(tmpVolume, observations[observationIndex].pose, projectedVolume);
     camera.projectPoints(volumePoints_Vector, observations[observationIndex].pose, projectedVolume);
-
-
-
-
-
 
     const Mat &mask = observations[observationIndex].mask;
     CV_Assert(mask.type() == CV_8UC1);
@@ -151,12 +144,14 @@ void ModelCapturer::createModel() const
     {
       break;
     }
+    cout << zLevelIndex << ", " << currentLevelPointsCount << endl;
 
     previousLevelPointsCount = currentLevelPointsCount;
   }
   int modelStartLevelIndex = max(zLevelIndex - 1, 1);
+//  int modelStartLevelIndex = 210;
 
-  vector<Point3f> modelPoints;
+  modelPoints.clear();
   for (int i = modelStartLevelIndex; i < isRepeatable.size.p[0] - 1; ++i)
   {
     for (int j = 1; j < isRepeatable.size.p[1] - 1; ++j)
@@ -180,60 +175,11 @@ void ModelCapturer::createModel() const
     }
   }
 
-
-
-
-/*
-  Mat plane;
-  const Mat *arrays = &isRepeatable;
-  NAryMatIterator it(&arrays, &plane, 1);
-  cout << "sz: " << isRepeatable.size.p[0] << " " << isRepeatable.size.p[1] << " " << isRepeatable.size.p[2] << endl;
-  cout << it.nplanes << endl;
-  for(int p = 0; p < it.nplanes; p++, ++it)
+  Mat modelPointsMat = Mat(modelPoints).reshape(1);
+  for (int axisIndex = 0; axisIndex < modelPointsMat.cols; ++axisIndex)
   {
-    cout << it.planes[0].dims << endl;
-    cout << it.planes[0].rows << endl;
-    cout << it.planes[0].cols << endl;
+    double minVal, maxVal;
+    minMaxLoc(modelPointsMat.col(axisIndex), &minVal, &maxVal);
+    cout << "range[" << axisIndex << "]: " << minVal << " " << maxVal << " " << maxVal - minVal << endl;
   }
-*/
-
- /*
-  CV_Assert(!modelPoints.empty());
-  float currentModelZ = modelPoints[0].z;
-  int previousLevelPointsCount = 0, currentLevelPointsCount = 0;
-  int currentLevelStart = 0;
-  int previousLevelStart = -1;
-  size_t modelPointIndex;
-
-  //TODO: move up
-  const float z_step = 0.001f;
-  for (modelPointIndex = 0; modelPointIndex < modelPoints.size(); ++modelPointIndex)
-  {
-    if (fabs(currentModelZ - modelPoints[modelPointIndex].z) < z_step / 2.0)
-    {
-      ++currentLevelPointsCount;
-    }
-    else
-    {
-      cout << currentLevelPointsCount << endl;
-      if (previousLevelPointsCount >= currentLevelPointsCount)
-      {
-        break;
-      }
-      previousLevelPointsCount = currentLevelPointsCount;
-      currentLevelPointsCount = 1;
-      currentModelZ = modelPoints[modelPointIndex].z;
-
-      previousLevelStart = currentLevelStart;
-      currentLevelStart = modelPointIndex;
-    }
-  }
-  int trueModelStart = previousLevelPointsCount;
-  vector<Point3f> trueModel;
-  std::copy(modelPoints.begin() + trueModelStart, modelPoints.end(), std::back_inserter(trueModel));
-
-  cout << "done." << endl;
-*/
-  publishPoints(modelPoints);
-//  publishPoints(trueModel);
 }

@@ -130,10 +130,14 @@ endif()
 #  PROPERTIES
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
-#target_link_libraries(transparentExperiments edges_pose_refiner)
+#target_link_libraries(transparentExperiments edges_pose_refiner
+#                                             ${PYTHON_LIBRARIES}
+#)
 
 #add_executable(createObjectMask apps/createObjectMask.cpp)
-#target_link_libraries(createObjectMask edges_pose_refiner)
+#target_link_libraries(createObjectMask edges_pose_refiner
+#                                       ${PYTHON_LIBRARIES}
+#)
 
 #add_executable(kinfuSegmentation apps/kinfuSegmentation.cpp)
 #target_link_libraries(kinfuSegmentation edges_pose_refiner)
@@ -143,10 +147,33 @@ endif()
 #  PROPERTIES
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
-#target_link_libraries(poseEstimationDemo edges_pose_refiner)
+#target_link_libraries(poseEstimationDemo edges_pose_refiner
+#                                         ${PYTHON_LIBRARIES}
+#)
+
+#add_executable(evaluateLine2D line2D/evaluation.cpp line2D/line2D.cpp)
+#set_target_properties(evaluateLine2D
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x"
+#  )
+#target_link_libraries(evaluateLine2D edges_pose_refiner
+#                                     ${PYTHON_LIBRARIES}
+#)
+
+#add_executable(labelDataset apps/labelDataset.cpp)
+#set_target_properties(labelDataset
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x"
+#  )
+#target_link_libraries(labelDataset edges_pose_refiner
+#                                   ${PYTHON_LIBRARIES}#
+#)
 
 add_executable(captureModel apps/captureModel.cpp)
-set_target_properties(captureModel PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+set_target_properties(captureModel PROPERTIES
+  COMPILE_FLAGS "-fopenmp"
+  LINK_FLAGS "-fopenmp"
+  )
 target_link_libraries(captureModel edges_pose_refiner
                                    ${PYTHON_LIBRARIES}
 )

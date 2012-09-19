@@ -17,7 +17,7 @@ class ModelCapturer
 //    void addObservation(const cv::Mat &objectMask, const PoseRT &pose_cam);
     //TODO: add clear()
 
-    void createModel() const;
+    void createModel(std::vector<cv::Point3f> &modelPoints) const;
   private:
 
     std::vector<Observation> observations;
