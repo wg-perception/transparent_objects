@@ -10,6 +10,31 @@ using namespace cv;
 using std::cout;
 using std::endl;
 
+
+float computePartialDirectionalHausdorffDistance(const std::vector<cv::Point3f> &baseCloud, const std::vector<cv::Point3f> &testCloud,
+                                                 float percentile, int neighbourIndex)
+{
+  flann::LinearIndexParams flannIndexParams;
+  flann::Index flannIndex(Mat(baseCloud).reshape(1), flannIndexParams);
+
+  vector<float> knnDists(testCloud.size());
+  for (size_t i = 0; i < testCloud.size(); ++i)
+  {
+    Mat query;
+    point2row(testCloud[i], query);
+    Mat indices, dists;
+    const int knn = neighbourIndex;
+    flannIndex.knnSearch(query, indices, dists, knn);
+    CV_Assert(dists.type() == CV_32FC1);
+    knnDists[i] = sqrt(dists.at<float>(knn - 1));
+  }
+
+  int percentileIndex = floor(percentile * (static_cast<int>(testCloud.size()) - 1));
+  CV_Assert(percentileIndex >= 0 && percentileIndex < testCloud.size());
+  std::nth_element(knnDists.begin(), knnDists.begin() + percentileIndex, knnDists.end());
+  return knnDists[percentileIndex];
+}
+
 int main(int argc, char *argv[])
 {
   omp_set_num_threads(7);
@@ -88,6 +113,17 @@ int main(int argc, char *argv[])
   vector<vector<Point3f> > allModels;
   allModels.push_back(createdEdgeModel.points);
   allModels.push_back(edgeModels[0].points);
+
+  cout << "Quantitavie comparison with the KinFu model" << endl;
+  cout << "Percentile\t SfS->KinFu\t KinFu->SfS" << endl;
+  for (float percentile = 1.0f; percentile > 0.1f; percentile -= 0.2f)
+  {
+    cout << percentile << "\t\t ";
+    cout << computePartialDirectionalHausdorffDistance(allModels[1], allModels[0], percentile, 1) << "\t ";
+    cout << computePartialDirectionalHausdorffDistance(allModels[0], allModels[1], percentile, 1) << endl;
+  }
+  cout << endl;
+
   publishPoints(allModels);
   return 0;
 }

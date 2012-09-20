@@ -161,6 +161,7 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
   Mat all_b(levelCounts);
   //TODO: move up
   const int windowWidth = 20;
+//  const int windowWidth = 5;
   const int localMinWindow = windowWidth / 2;
 
   vector<float> errors(levelCounts.size(), std::numeric_limits<float>::max());

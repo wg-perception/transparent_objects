@@ -57,6 +57,14 @@ void point2col(cv::Point3_<T> pt, cv::Mat &mat)
   mat = mat.reshape(1, dim);
 }
 
+template<class T>
+void point2row(cv::Point3_<T> pt, cv::Mat &mat)
+{
+  std::vector<cv::Point3_<T> > ptVec(1, pt);
+  mat = cv::Mat(ptVec).clone();
+  mat = mat.reshape(1, 1);
+}
+
 bool isPointInside(const cv::Mat &image, cv::Point pt);
 
 void mask2contour(const cv::Mat &mask, std::vector<cv::Point2f> &contour);
