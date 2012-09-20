@@ -291,6 +291,7 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bo
 {
   std::stringstream testPoseFilename;
   testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
+//  testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml.kf";
   FileStorage testPoseFS;
   testPoseFS.open(testPoseFilename.str(), FileStorage::READ);
   CV_Assert(testPoseFS.isOpened());

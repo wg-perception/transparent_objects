@@ -221,12 +221,4 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
       }
     }
   }
-
-  Mat modelPointsMat = Mat(modelPoints).reshape(1);
-  for (int axisIndex = 0; axisIndex < modelPointsMat.cols; ++axisIndex)
-  {
-    double minVal, maxVal;
-    minMaxLoc(modelPointsMat.col(axisIndex), &minVal, &maxVal);
-    cout << "range[" << axisIndex << "]: " << minVal << " " << maxVal << " " << maxVal - minVal << endl;
-  }
 }
