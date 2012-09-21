@@ -11,8 +11,9 @@ using std::cout;
 using std::endl;
 
 
-float computePartialDirectionalHausdorffDistance(const std::vector<cv::Point3f> &baseCloud, const std::vector<cv::Point3f> &testCloud,
-                                                 float percentile, int neighbourIndex)
+void computePartialDirectionalHausdorffDistances(const std::vector<cv::Point3f> &baseCloud, const std::vector<cv::Point3f> &testCloud,
+                                                 const std::vector<float> &percentiles, int neighbourIndex,
+                                                 std::vector<float> &distances)
 {
   flann::LinearIndexParams flannIndexParams;
   flann::Index flannIndex(Mat(baseCloud).reshape(1), flannIndexParams);
@@ -29,10 +30,14 @@ float computePartialDirectionalHausdorffDistance(const std::vector<cv::Point3f> 
     knnDists[i] = sqrt(dists.at<float>(knn - 1));
   }
 
-  int percentileIndex = floor(percentile * (static_cast<int>(testCloud.size()) - 1));
-  CV_Assert(percentileIndex >= 0 && percentileIndex < testCloud.size());
-  std::nth_element(knnDists.begin(), knnDists.begin() + percentileIndex, knnDists.end());
-  return knnDists[percentileIndex];
+  distances.clear();
+  for (size_t i = 0; i < percentiles.size(); ++i)
+  {
+    int percentileIndex = floor(percentiles[i] * (static_cast<int>(testCloud.size()) - 1));
+    CV_Assert(percentileIndex >= 0 && percentileIndex < testCloud.size());
+    std::nth_element(knnDists.begin(), knnDists.begin() + percentileIndex, knnDists.end());
+    distances.push_back(knnDists[percentileIndex]);
+  }
 }
 
 Vec3f computeModelDimensions(const std::vector<cv::Point3f> &modelPoints)
@@ -185,13 +190,22 @@ int main(int argc, char *argv[])
   {
     allModels.push_back(edgeModels[0].points);
 
-    cout << "Quantitavie comparison with the KinFu model" << endl;
-    cout << "Percentile\t SfS->KinFu\t KinFu->SfS" << endl;
+    vector<float> allPercentiles;
+    vector<float> sfsToKinfuDitances, kinfuToSfsDistances;
     for (float percentile = 1.0f; percentile > 0.1f; percentile -= 0.2f)
     {
-      cout << percentile << "\t\t ";
-      cout << computePartialDirectionalHausdorffDistance(allModels[1], allModels[0], percentile, 1) << "\t ";
-      cout << computePartialDirectionalHausdorffDistance(allModels[0], allModels[1], percentile, 1) << endl;
+      allPercentiles.push_back(percentile);
+    }
+    computePartialDirectionalHausdorffDistances(allModels[1], allModels[0], allPercentiles, 1, sfsToKinfuDitances);
+    computePartialDirectionalHausdorffDistances(allModels[0], allModels[1], allPercentiles, 1, kinfuToSfsDistances);
+
+    cout << "Quantitavie comparison with the KinFu model" << endl;
+    cout << "Percentile\t SfS->KinFu\t KinFu->SfS" << endl;
+    for (size_t i = 0; i < allPercentiles.size(); ++i)
+    {
+      cout << allPercentiles[i] << "\t\t ";
+      cout << sfsToKinfuDitances[i] << "\t ";
+      cout << kinfuToSfsDistances[i] << endl;
     }
     cout << endl;
   }
