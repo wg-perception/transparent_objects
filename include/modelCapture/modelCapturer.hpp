@@ -4,26 +4,13 @@
 
 struct VolumeParams
 {
-  float min_x, max_x;
-  float min_y, max_y;
-  float min_z, max_z;
-
-  float step_x, step_y, step_z;
+  cv::Vec3f minBound, maxBound, step;
 
   VolumeParams()
   {
-    min_x =  0.1f;
-    max_x =  0.5f;
-
-    min_y = -0.1f;
-    max_y =  0.2f;
-
-    min_z = -0.3f;
-    max_z =  0.0f;
-
-    step_x = 0.01f;
-    step_y = 0.01f;
-    step_z = 0.01f;
+    minBound = cv::Vec3f(0.1f, -0.1f, -0.3f);
+    maxBound = cv::Vec3f(0.5f,  0.2f,  0.0f);
+    step = cv::Vec3f::all(0.01f);
   }
 };
 

@@ -28,21 +28,22 @@ void ModelCapturer::addObservation(const cv::Mat &objectMask, const PoseRT &pose
 
 void initializeVolume(Mat &volumePoints, const VolumeParams &params = VolumeParams())
 {
-  int dim_z = (params.max_z - params.min_z) / params.step_z;
-  int dim_x = (params.max_x - params.min_x) / params.step_x;
-  int dim_y = (params.max_y - params.min_y) / params.step_y;
+  Vec3f dimensions = (params.maxBound - params.minBound);
+  Mat(dimensions, false) /= Mat(params.step);
+  cout << "Volume dims: " << Mat(dimensions) << endl;
 
-  int dims[] = {dim_z, dim_x, dim_y};
+  int dims[] = {dimensions[2], dimensions[0], dimensions[1]};
   const int ndims= 3;
   volumePoints.create(ndims, dims, CV_32FC3);
 
-  for (int z = 0; z < dim_z; ++z)
+  for (int z = 0; z < dims[0]; ++z)
   {
-    for (int x = 0; x < dim_x; ++x)
+    for (int x = 0; x < dims[1]; ++x)
     {
-      for (int y = 0; y < dim_y; ++y)
+      for (int y = 0; y < dims[2]; ++y)
       {
-        Vec3f pt(params.min_x + x * params.step_x, params.min_y + y * params.step_y, params.min_z + z * params.step_z);
+        Vec3f index(x, y, z);
+        Vec3f pt = params.minBound + index.mul(params.step);
         volumePoints.at<Vec3f>(z, x, y) = pt;
       }
     }
@@ -87,8 +88,6 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
 
   VolumeParams volumeParams;
   Mat volumePoints, visibleCounts;
-
-
   computeVisibleCounts(volumePoints, visibleCounts, volumeParams);
 
   //TODO: move up
@@ -96,9 +95,10 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
   int modelPointVisibleCount = observations.size() * modelPointVisibility;
   Mat isRepeatable = visibleCounts >= modelPointVisibleCount;
 
-  int min_i = std::numeric_limits<int>::max(), max_i = -1;
-  int min_j = std::numeric_limits<int>::max(), max_j = -1;
-  int min_k = std::numeric_limits<int>::max(), max_k = -1;
+  Vec3i minIndices = Vec3i::all(std::numeric_limits<int>::max());
+  Vec3i maxIndices = Vec3i::all(-1);
+  Mat minIndices_Mat(minIndices, false);
+  Mat maxIndices_Mat(maxIndices, false);
 
   for (int i = 0; i < isRepeatable.size.p[0]; ++i)
   {
@@ -108,51 +108,24 @@ void ModelCapturer::createModel(std::vector<cv::Point3f> &modelPoints) const
       {
         if (isRepeatable.at<uchar>(i, j, k))
         {
-          if (i < min_i)
-            min_i = i;
-
-          if (i > max_i)
-            max_i = i;
-
-          if (j < min_j)
-            min_j = j;
-
-          if (j > max_j)
-            max_j = j;
-
-          if (k < min_k)
-            min_k = k;
-
-          if (k > max_k)
-            max_k = k;
+          Mat indices(Vec3i(j, k, i));
+          minIndices_Mat = min(minIndices_Mat, indices);
+          maxIndices_Mat = max(maxIndices_Mat, indices);
         }
       }
     }
   }
 
-
   //TODO: move up
   const int uncertaintyWidth = 3;
+
+  Vec3f minIndices_float = minIndices;
+  Vec3f maxIndices_float = maxIndices;
+  volumeParams.maxBound = volumeParams.minBound + (maxIndices_float + Vec3f::all(uncertaintyWidth)).mul(volumeParams.step);
+  volumeParams.minBound = volumeParams.minBound + (minIndices_float - Vec3f::all(uncertaintyWidth)).mul(volumeParams.step);
+  volumeParams.step = Vec3f::all(0.001f);
   //max_z should be equal to zero
-//  volumeParams.max_z = volumeParams.min_z + (max_i + uncertaintyWidth) * volumeParams.step_z;
-  volumeParams.min_z = volumeParams.min_z + (min_i - uncertaintyWidth) * volumeParams.step_z;
-
-  volumeParams.max_x = volumeParams.min_x + (max_j + uncertaintyWidth) * volumeParams.step_x;
-  volumeParams.min_x = volumeParams.min_x + (min_j - uncertaintyWidth) * volumeParams.step_x;
-
-  volumeParams.max_y = volumeParams.min_y + (max_k + uncertaintyWidth) * volumeParams.step_y;
-  volumeParams.min_y = volumeParams.min_y + (min_k - uncertaintyWidth) * volumeParams.step_y;
-
-  cout << "new dims:" << endl;
-  cout << volumeParams.min_z << " " << volumeParams.max_z << endl;
-  cout << volumeParams.min_x << " " << volumeParams.max_x << endl;
-  cout << volumeParams.min_y << " " << volumeParams.max_y << endl;
-  cout << endl;
-
-  //TODO: move up
-  volumeParams.step_x = 0.001f;
-  volumeParams.step_y = 0.001f;
-  volumeParams.step_z = 0.001f;
+  volumeParams.maxBound[2] = 0.0f;
 
   computeVisibleCounts(volumePoints, visibleCounts, volumeParams);
   isRepeatable = visibleCounts >= modelPointVisibleCount;
