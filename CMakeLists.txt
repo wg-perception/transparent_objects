@@ -2,11 +2,16 @@ cmake_minimum_required(VERSION 2.8)
 project(object_recognition_transparent_objects)
 find_package(catkin QUIET)
 if (catkin_FOUND)
-    catkin_stack()
-    catkin_project(object_recognition_transparent_objects
-                   DEPENDS Eigen Boost OpenCV
+    if (${catkin_VERSION} VERSION_GREATER "0.5.26")
+        catkin_package()
+        catkin_package_export(INCLUDE_DIRS include)
+    else()
+        catkin_stack()
+        catkin_project(object_recognition_transparent_objects
                    INCLUDE_DIRS include
-    )
+        )
+    endif()
+
     #install targets for all things python
     catkin_python_setup()
 
