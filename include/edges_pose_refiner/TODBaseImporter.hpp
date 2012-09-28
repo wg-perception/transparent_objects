@@ -20,7 +20,8 @@ public:
   void importAllData(const std::string *trainedModelsPath = 0, const std::vector<std::string> *trainObjectNames = 0,
                      PinholeCamera *kinectCamera = 0, cv::Mat *registrationMask = 0,
                      std::vector<EdgeModel> *edgeModels = 0, std::vector<int> *testIndices = 0,
-                     std::vector<EdgeModel> *occlusionObjects = 0, std::vector<PoseRT> *occlusionOffsets = 0) const;
+                     std::vector<EdgeModel> *occlusionObjects = 0, std::vector<PoseRT> *occlusionOffsets = 0,
+                     PoseRT *offset = 0) const;
 
 //  void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
   void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true) const;
@@ -29,7 +30,8 @@ public:
   static void importCamera(const std::string &filename, PinholeCamera &camera);
   void importEdgeModel(const std::string &modelsPath, const std::string &objectName, EdgeModel &edgeModel) const;
   void importTestIndices(std::vector<int> &testIndices) const;
-  void importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset = true, PoseRT *offsetPtr = 0) const;
+  void importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset = true, PoseRT *offsetPtr = 0, bool isKeyFrame = false) const;
+  void importOffset(PoseRT &offset) const;
   void importAllGroundTruth(std::map<int, PoseRT> &allPoses) const;
   void importOcclusionObjects(const std::string &modelsPath,
                               std::vector<EdgeModel> &occlusionObjects, std::vector<PoseRT> &occlusionOffsets) const;

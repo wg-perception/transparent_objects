@@ -32,7 +32,8 @@ TODBaseImporter::TODBaseImporter(const std::string &_baseFolder, const std::stri
 void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const std::vector<std::string> *trainObjectNames,
                                     PinholeCamera *kinectCamera, cv::Mat *registrationMask,
                                     std::vector<EdgeModel> *edgeModels, std::vector<int> *testIndices,
-                                    std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets) const
+                                    std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets,
+                                    PoseRT *offset) const
 {
   //TODO: move up
   const string registrationMaskFilename = baseFolder + "/registrationMask.png";
@@ -72,6 +73,11 @@ void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const 
   {
     *registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
     CV_Assert(!registrationMask->empty());
+  }
+
+  if (offset != 0)
+  {
+    importOffset(*offset);
   }
 }
 
@@ -287,11 +293,24 @@ void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
   CV_Assert(mask.channels() == 1);
 }
 
-void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset, PoseRT *offsetPtr) const
+void TODBaseImporter::importOffset(PoseRT &offset) const
+{
+  //TODO: move up
+  const string offsetFilename = "offset.xml";
+  offset.read(testFolder + "/" + offsetFilename);
+}
+
+void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset, PoseRT *offsetPtr, bool isKeyFrame) const
 {
   std::stringstream testPoseFilename;
-  testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
-//  testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml.kf";
+  if (isKeyFrame)
+  {
+    testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml.kf";
+  }
+  else
+  {
+    testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
+  }
   FileStorage testPoseFS;
   testPoseFS.open(testPoseFilename.str(), FileStorage::READ);
   CV_Assert(testPoseFS.isOpened());
@@ -302,10 +321,8 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bo
 
   if (shiftByOffset || offsetPtr != 0)
   {
-    //TODO: move up
-    const string offsetFilename = "offset.xml";
     PoseRT offset;
-    offset.read(testFolder + "/" + offsetFilename);
+    importOffset(offset);
     if (shiftByOffset)
     {
       model2test = model2test * offset;
