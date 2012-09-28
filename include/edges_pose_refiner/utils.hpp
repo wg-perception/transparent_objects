@@ -89,6 +89,7 @@ std::vector<cv::Mat> showEdgels(const std::vector<cv::Mat> &images, const std::v
                                 cv::Scalar color = cv::Scalar(0, 0, 255));
 
 void project3dPoints(const std::vector<cv::Point3f>& points, const cv::Mat& rvec, const cv::Mat& tvec, std::vector<cv::Point3f>& modif_points);
+void project3dPoints(const std::vector<cv::Point3f>& points, const PoseRT &pose, std::vector<cv::Point3f>& modif_points);
 
 template<class T>
 void drawPoints(const std::vector<cv::Point_<T> > &points, cv::Mat &image, cv::Scalar color = cv::Scalar::all(255), int radius = 1)
@@ -122,5 +123,8 @@ template <typename T> int sgn(T val)
 {
   return (T(0) < val) - (val < T(0));
 }
+
+void imshow3d(const std::string &windowName, const cv::Mat &image3d);
+void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code);
 
 #endif /* UTILS_HPP_ */

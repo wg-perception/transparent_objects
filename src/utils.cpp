@@ -266,7 +266,15 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar &color, int thickness)
 {
   CV_Assert(!image.empty() && !mask.empty());
-  Mat drawImage = image.clone();
+  Mat drawImage;
+  if (image.channels() == 3)
+  {
+    drawImage = image.clone();
+  }
+  else
+  {
+    cvtColor(image, drawImage, CV_GRAY2BGR);
+  }
 
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;
@@ -495,6 +503,11 @@ void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &point
   }
 }
 
+void project3dPoints(const std::vector<cv::Point3f>& points, const PoseRT &pose, std::vector<cv::Point3f>& modif_points)
+{
+  project3dPoints(points, pose.getRvec(), pose.getTvec(), modif_points);
+}
+
 void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& tvec, vector<Point3f>& modif_points)
 {
   modif_points.clear();
@@ -648,4 +661,55 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
   cvReleaseImage(&annotated_img);
   cvReleaseImage(&dist_img);
   cvReleaseImage(&orientation_img);
+}
+
+struct Imshow3dData
+{
+  cv::Mat image3d;
+  std::string windowName;
+};
+
+void onTrackbarChange(int position, void *rawData)
+{
+  Imshow3dData *data = static_cast<Imshow3dData*>(rawData);
+
+  Mat image3d = data->image3d;
+  CV_Assert(image3d.isContinuous());
+  CV_Assert(image3d.dims == 3);
+  CV_Assert(position >= 0 && position < image3d.size.p[0]);
+
+  //TODO: support different types
+  CV_Assert(image3d.type() == CV_8UC3);
+  void *slice = image3d.ptr<Vec3b>(position, 0, 0);
+  Mat image2d(image3d.size.p[1], image3d.size.p[2], image3d.type(), slice);
+  imshow(data->windowName, image2d);
+}
+
+void imshow3d(const std::string &windowName, const cv::Mat &image3d)
+{
+  namedWindow(windowName); //QT backend crashes when destroying non-existent window
+  destroyWindow(windowName);
+
+  CV_Assert(image3d.dims == 3);
+  namedWindow(windowName, CV_WINDOW_NORMAL);
+  int count = image3d.size.p[2] - 1;
+
+  //TODO: use std::map or hash_table so several imshow3d can be used simultaneously
+  static Imshow3dData data;
+  static int position;
+  position = 0;
+  data.image3d = image3d;
+  data.windowName = windowName;
+  createTrackbar("z", windowName, &position, count, onTrackbarChange, &data);
+  onTrackbarChange(position, &data);
+}
+
+void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code)
+{
+  CV_Assert(src.dims == 3);
+  Mat src_vector(1, src.total(), src.type(), src.data);
+  Mat dst_vector;
+  cvtColor(src_vector, dst_vector, code);
+  //TODO: eliminate copy
+  Mat(src.dims, src.size.p, dst_vector.type(), dst_vector.data).copyTo(dst);
 }
