@@ -6,6 +6,8 @@
 
 #include <omp.h>
 
+//#define CHECK_QUALITY_OF_POSES
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -94,15 +96,19 @@ void createGroundTruthModel(vector<Point3f> &model)
 int main(int argc, char *argv[])
 {
 /*
-  vector<Point3f> model;
-  createGroundTruthModel(model);
+  vector<Point3f> groundTruthModel;
+  createGroundTruthModel(groundTruthModel);
   EdgeModel edgeModel(model, true, false);
   edgeModel.write("idealModel.xml");
   exit(-1);
 */
 
-  omp_set_num_threads(7);
-//  omp_set_num_threads(1);
+  int omp_num_threads = 7;
+#ifdef CHECK_QUALITY_OF_POSES
+  omp_num_threads = 1;
+#endif
+
+  omp_set_num_threads(omp_num_threads);
 
   std::system("date");
 
@@ -116,7 +122,9 @@ int main(int argc, char *argv[])
   const string modelsPath = argv[2];
   const string objectName = argv[3];
   const string testFolder = baseFolder + "/" + objectName + "/";
-  bool compareWithKinFu = true;
+  const bool compareWithKinFu = true;
+  const bool useOdometryPoses = false;
+  const bool useKeyFrames = false;
 
   vector<string> trainObjectNames;
   trainObjectNames.push_back(objectName);
@@ -126,9 +134,10 @@ int main(int argc, char *argv[])
   Mat registrationMask;
   vector<EdgeModel> edgeModels;
   TODBaseImporter dataImporter(baseFolder, testFolder);
+  PoseRT objectOffset;
   if (compareWithKinFu)
   {
-    dataImporter.importAllData(&modelsPath, &trainObjectNames, &kinectCamera, &registrationMask, &edgeModels, &testIndices);
+    dataImporter.importAllData(&modelsPath, &trainObjectNames, &kinectCamera, &registrationMask, &edgeModels, &testIndices, 0, 0, &objectOffset);
   }
   else
   {
@@ -141,11 +150,28 @@ int main(int argc, char *argv[])
 //  glassSegmentationParams.finalClosingIterations = 22;
   glassSegmentationParams.finalClosingIterations = 25;
 //  glassSegmentationParams.grabCutErosionsIterations = 4;
-  glassSegmentationParams.grabCutErosionsIterations = 3;
+
+//fullModelCapture
+//  glassSegmentationParams.grabCutErosionsIterations = 3;
+//  glassSegmentationParams.grabCutDilationsIterations = 9;
+//  glassSegmentationParams.grabCutMargin = 20;
+
+//textureWithCircles
+  glassSegmentationParams.grabCutErosionsIterations = 4;
+  glassSegmentationParams.grabCutDilationsIterations = 4;
+
   GlassSegmentator glassSegmentator(glassSegmentationParams);
 
   ModelCapturer modelCapturer(kinectCamera);
   vector<ModelCapturer::Observation> observations(testIndices.size());
+  vector<bool> isObservationValid(testIndices.size(), true);
+
+  PoseRT zeroPose;
+  if (useOdometryPoses)
+  {
+    const int zeroIndex = 99999;
+    dataImporter.importGroundTruth(zeroIndex, zeroPose, false);
+  }
 
 #pragma omp parallel for
   for(size_t testIdx = 0; testIdx < testIndices.size(); testIdx++)
@@ -161,8 +187,34 @@ int main(int argc, char *argv[])
 //    imshow("depth", depthImage);
 
     PoseRT fiducialPose;
-    dataImporter.importGroundTruth(testImageIdx, fiducialPose, false);
-//    fiducialPose = fiducialPose.inv() * zeroPose;
+    try
+    {
+      dataImporter.importGroundTruth(testImageIdx, fiducialPose, false, 0, useKeyFrames);
+    }
+    catch (cv::Exception ex)
+    {
+      isObservationValid[testIdx] = false;
+      continue;
+    }
+
+    if (useOdometryPoses)
+    {
+      fiducialPose = fiducialPose.inv() * zeroPose;
+    }
+
+
+#ifdef CHECK_QUALITY_OF_POSES
+    fiducialPose = fiducialPose * objectOffset;
+
+    Mat mask;
+    Point tl;
+    vector<Point2f> projectedGroundTruthModel;
+    kinectCamera.projectPoints(edgeModels[0].points, fiducialPose, projectedGroundTruthModel);
+    EdgeModel::computePointsMask(projectedGroundTruthModel, bgrImage.size(), 1.0, 3, mask, tl, false);
+    showSegmentation(bgrImage, mask, "rgb");
+    showSegmentation(depthImage, mask, "depth");
+    waitKey();
+#endif
 
     int numberOfComponens;
     Mat glassMask;
@@ -170,13 +222,15 @@ int main(int argc, char *argv[])
 //    dataImporter.importRawMask(testImageIdx, glassMask);
 
 //    showSegmentation(bgrImage, glassMask);
+//    imshow("mask", glassMask);
 //    waitKey(200);
+//    waitKey();
     observations[testIdx].bgrImage = bgrImage;
     observations[testIdx].mask = glassMask;
     observations[testIdx].pose = fiducialPose;
   }
 
-  modelCapturer.setObservations(observations);
+  modelCapturer.setObservations(observations, &isObservationValid);
 
 
   vector<Point3f> modelPoints;
@@ -184,6 +238,7 @@ int main(int argc, char *argv[])
   writePointCloud("model.asc", modelPoints);
   EdgeModel createdEdgeModel(modelPoints, true, true);
 
+  //evaluation
   vector<vector<Point3f> > allModels;
   allModels.push_back(createdEdgeModel.points);
   if (compareWithKinFu)

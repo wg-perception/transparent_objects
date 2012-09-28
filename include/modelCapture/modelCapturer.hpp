@@ -25,7 +25,8 @@ class ModelCapturer
     };
 
     ModelCapturer(const PinholeCamera &pinholeCamera);
-    void setObservations(const std::vector<Observation> &observations);
+    void setObservations(const std::vector<Observation> &observations, const std::vector<bool> *isObservationValid = 0);
+    void setGroundTruthModel(const std::vector<cv::Point3f> &groundTruthModel);
 //    void addObservation(const cv::Mat &objectMask, const PoseRT &pose_cam);
     //TODO: add clear()
 
@@ -36,4 +37,5 @@ class ModelCapturer
 
     std::vector<Observation> observations;
     PinholeCamera camera;
+    std::vector<cv::Point3f> groundTruthModel;
 };

@@ -9,9 +9,30 @@ ModelCapturer::ModelCapturer(const PinholeCamera &pinholeCamera)
   camera = pinholeCamera;
 }
 
-void ModelCapturer::setObservations(const std::vector<ModelCapturer::Observation> &_observations)
+void ModelCapturer::setObservations(const std::vector<ModelCapturer::Observation> &_observations, const std::vector<bool> *isObservationValid)
 {
-  observations = _observations;
+  if (isObservationValid == 0)
+  {
+    observations = _observations;
+  }
+  else
+  {
+    observations.clear();
+    CV_Assert(_observations.size() == isObservationValid->size());
+    for (size_t i = 0; i < isObservationValid->size(); ++i)
+    {
+      if ((*isObservationValid)[i])
+      {
+        observations.push_back(_observations[i]);
+      }
+    }
+  }
+}
+
+
+void ModelCapturer::setGroundTruthModel(const std::vector<cv::Point3f> &_groundTruthModel)
+{
+  groundTruthModel = _groundTruthModel;
 }
 
 /*
