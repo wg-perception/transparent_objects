@@ -1,3 +1,5 @@
+:orphan:
+
 .. _transparent_objects:
 
 object_recognition_transparent_objects: Recognition of Transparent Objects
