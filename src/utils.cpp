@@ -667,6 +667,7 @@ struct Imshow3dData
 {
   cv::Mat image3d;
   std::string windowName;
+  int position;
 };
 
 void onTrackbarChange(int position, void *rawData)
@@ -679,9 +680,20 @@ void onTrackbarChange(int position, void *rawData)
   CV_Assert(position >= 0 && position < image3d.size.p[0]);
 
   //TODO: support different types
-  CV_Assert(image3d.type() == CV_8UC3);
-  void *slice = image3d.ptr<Vec3b>(position, 0, 0);
+  void *slice = 0;
+  switch(image3d.type())
+  {
+    case CV_8UC3:
+      slice = image3d.ptr<Vec3b>(position, 0, 0);
+      break;
+    case CV_8UC1:
+      slice = image3d.ptr<uchar>(position, 0, 0);
+      break;
+    default:
+      CV_Assert(false);
+  }
   Mat image2d(image3d.size.p[1], image3d.size.p[2], image3d.type(), slice);
+
   imshow(data->windowName, image2d);
 }
 
@@ -692,16 +704,17 @@ void imshow3d(const std::string &windowName, const cv::Mat &image3d)
 
   CV_Assert(image3d.dims == 3);
   namedWindow(windowName, CV_WINDOW_NORMAL);
-  int count = image3d.size.p[2] - 1;
+  int count = image3d.size.p[0] - 1;
 
-  //TODO: use std::map or hash_table so several imshow3d can be used simultaneously
-  static Imshow3dData data;
-  static int position;
-  position = 0;
+  //TODO: clear data when closing a window
+  static std::map<std::string, Imshow3dData> allWindows;
+  Imshow3dData &data = allWindows[windowName];
+  data.position = 0;
   data.image3d = image3d;
   data.windowName = windowName;
-  createTrackbar("z", windowName, &position, count, onTrackbarChange, &data);
-  onTrackbarChange(position, &data);
+
+  createTrackbar("z", windowName, &data.position, count, onTrackbarChange, &data);
+  onTrackbarChange(data.position, &data);
 }
 
 void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code)
