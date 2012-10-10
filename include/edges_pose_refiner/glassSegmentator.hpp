@@ -34,6 +34,7 @@ struct GlassSegmentatorParams
 
   /** \brief Width of the region where grab cut will be used */
   int grabCutErosionsIterations;
+  int grabCutDilationsIterations;
 
   //TODO: do you need this parameter?
   /** \brief Additional width of grub cut ROI */
@@ -53,7 +54,8 @@ struct GlassSegmentatorParams
     useGrabCut = true;
     grabCutIterations = 2;
     grabCutErosionsIterations = 6;
-    grabCutMargin = 10;
+    grabCutDilationsIterations = 12;
+    grabCutMargin = 20;
 
     fillConvex = false;
 
@@ -83,8 +85,13 @@ private:
 };
 
 void showSegmentation(const cv::Mat &image, const cv::Mat &mask, const std::string &title = "glass segmentation");
-void refineSegmentationByGrabCut(const cv::Mat &bgrImage, const cv::Mat &rawMask, cv::Mat &refinedMask, const GlassSegmentatorParams &params = GlassSegmentatorParams());
+void refineSegmentationByGrabCut(const cv::Mat &bgrImage, const cv::Mat &rawMask, cv::Mat &refinedMask, const GlassSegmentatorParams &params = GlassSegmentatorParams(),
+                                 const cv::Mat *computedBgdModel = 0, const cv::Mat *computedFgdModel = 0,
+                                 cv::Mat *bgdProbabilities = 0, cv::Mat *fgdProbabilities = 0);
 
 void segmentGlassManually(const cv::Mat &image, cv::Mat &glassMask);
+
+void createModels(const std::vector<cv::Mat> &images, const std::vector<cv::Mat> &initMasks,
+                  cv::Mat &bgdModel, cv::Mat &fgdModel, const GlassSegmentatorParams &params = GlassSegmentatorParams());
 
 #endif
