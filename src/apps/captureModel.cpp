@@ -163,6 +163,12 @@ int main(int argc, char *argv[])
   GlassSegmentator glassSegmentator(glassSegmentationParams);
 
   ModelCapturer modelCapturer(kinectCamera);
+  if (compareWithKinFu)
+  {
+    vector<Point3f> groundTruthModel;
+    project3dPoints(edgeModels[0].points, objectOffset, groundTruthModel);
+    modelCapturer.setGroundTruthModel(groundTruthModel);
+  }
   vector<ModelCapturer::Observation> observations(testIndices.size());
   vector<bool> isObservationValid(testIndices.size(), true);
 
@@ -235,6 +241,112 @@ int main(int argc, char *argv[])
 
   vector<Point3f> modelPoints;
   modelCapturer.createModel(modelPoints);
+#if 1
+for (size_t iter = 0; iter < 1; ++iter)
+{
+  cout << "final iteration #" << iter << endl;
+#pragma omp parallel for
+  for (size_t i = 0; i < observations.size(); ++i)
+  {
+    if (!isObservationValid[i])
+    {
+      continue;
+    }
+
+    vector<Point2f> projectedPoints;
+    kinectCamera.projectPoints(modelPoints, observations[i].pose, projectedPoints);
+    Mat newMask;
+    Point tl;
+    EdgeModel::computePointsMask(projectedPoints, observations[i].mask.size(), 1.0, 7, newMask, tl, false);
+    observations[i].initMask = newMask;
+
+//    showEdgels(observations[i].bgrImage, modelPoints, observations[i].pose, kinectCamera);
+//    showSegmentation(observations[i].bgrImage, observations[i].mask);
+//    waitKey();
+    Mat refinedMask;
+    glassSegmentationParams.grabCutErosionsIterations = 2;
+    glassSegmentationParams.grabCutDilationsIterations = 2;
+//    glassSegmentationParams.grabCutDilationsIterations = 6;
+    glassSegmentationParams.grabCutIterations = 1;
+//    glassSegmentationParams.grabCutIterations = 6;
+    Mat bgdProbabilities, fgdProbabilities;
+    refineSegmentationByGrabCut(observations[i].bgrImage, newMask, refinedMask, glassSegmentationParams,
+                                  0, 0,
+                                &bgdProbabilities, &fgdProbabilities);
+    observations[i].mask = refinedMask;
+    observations[i].bgdProbabilities = bgdProbabilities;
+    observations[i].fgdProbabilities = fgdProbabilities;
+
+//    showSegmentation(observations[i].bgrImage, newMask, "new mask");
+//    showSegmentation(observations[i].bgrImage, observations[i].mask, "refined mask");
+//    waitKey();
+  }
+
+/*
+  vector<Mat> images, initMasks;
+  for (size_t i = 0; i < 1; ++i)
+  {
+    CV_Assert(isObservationValid[i]);
+    images.push_back(observations[i].bgrImage);
+    initMasks.push_back(observations[i].initMask);
+  }
+  Mat bgdModel, fgdModel;
+  glassSegmentationParams.grabCutErosionsIterations = 3;
+  glassSegmentationParams.grabCutDilationsIterations = 6;
+  createModels(images, initMasks, bgdModel, fgdModel, glassSegmentationParams);
+
+  for (size_t i = 0; i < 50; ++i)
+  {
+    glassSegmentationParams.grabCutErosionsIterations = 2;
+    glassSegmentationParams.grabCutDilationsIterations = 4;
+    Mat refinedMask;
+    refineSegmentationByGrabCut(images[i], initMasks[i], refinedMask, glassSegmentationParams, false, &bgdModel, &fgdModel);
+
+    imshow("nm", refinedMask);
+    showSegmentation(images[i], refinedMask, "new mask");
+    imshow("sm", observations[i].mask);
+    showSegmentation(images[i], observations[i].mask, "simple mask");
+    waitKey();
+  }
+*/
+
+
+
+
+  modelCapturer.setObservations(observations, &isObservationValid);
+  vector<Point3f> confidentModelPoints;
+  std::swap(confidentModelPoints, modelPoints);
+  modelCapturer.createModel(modelPoints, &confidentModelPoints);
+
+  vector<Point3f> newPoints;
+  for (size_t i = 0; i < modelPoints.size(); ++i)
+  {
+    bool isNew = true;
+    for (size_t j = 0; j < confidentModelPoints.size(); ++j)
+    {
+      if (modelPoints[i] == confidentModelPoints[j])
+      {
+          isNew = false;
+          break;
+      }
+    }
+
+    if (isNew)
+    {
+      newPoints.push_back(modelPoints[i]);
+//      cout << modelPoints[i] << endl;
+    }
+  }
+
+  vector<vector<Point3f> > allPoints;
+  allPoints.push_back(confidentModelPoints);
+  allPoints.push_back(newPoints);
+
+  publishPoints(allPoints);
+//  exit(-1);
+}
+#endif
+
   writePointCloud("model.asc", modelPoints);
   EdgeModel createdEdgeModel(modelPoints, true, true);
 
