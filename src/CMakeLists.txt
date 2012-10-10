@@ -1,6 +1,7 @@
 #TDS: dont glob together sources.
 set(src 
     edgeModel.cpp
+    gmm.cpp
     glassSegmentator.cpp
     localPoseRefiner.cpp
     pclProcessing.cpp
@@ -14,7 +15,6 @@ set(src
     utils.cpp
     nonMaximumSuppression.cpp
     chamfer_matching/chamfer_matching.cpp
-    modelCapture/modelCapturer.cpp
 )
 
 include_directories(SYSTEM
@@ -47,6 +47,24 @@ add_library(fdcm SHARED
     ${src_fdcm}
     )
 
+set(src_mrf
+    mrf/BP-S.cpp
+    mrf/GCoptimization.cpp
+    mrf/ICM.cpp
+    mrf/maxflow.cpp
+    mrf/mrf.cpp
+    mrf/TRW-S.cpp
+    mrf/graph.cpp
+    mrf/LinkedBlockList.cpp
+    mrf/MaxProdBP.cpp
+    mrf/regions-maxprod.cpp
+)
+
+add_library(mrf SHARED
+    ${src_mrf}
+    )
+set_target_properties(mrf PROPERTIES COMPILE_FLAGS "-W -Wall -DUSE_64_BIT_PTR_CAST")
+
 
 target_link_libraries(edges_pose_refiner
                       fdcm
@@ -59,6 +77,16 @@ target_link_libraries(edges_pose_refiner
 install(TARGETS edges_pose_refiner
   DESTINATION lib
   )
+
+set(src_model_capture
+    modelCapture/modelCapturer.cpp
+)
+add_library(model_capture SHARED
+    ${src_model_capture}
+    )
+target_link_libraries(model_capture
+                      edges_pose_refiner
+)
 
 
 
@@ -175,5 +203,7 @@ set_target_properties(captureModel PROPERTIES
   LINK_FLAGS "-fopenmp"
   )
 target_link_libraries(captureModel edges_pose_refiner
+                                   model_capture
+                                   mrf
                                    ${PYTHON_LIBRARIES}
 )
