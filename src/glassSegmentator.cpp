@@ -129,6 +129,7 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
 
 #ifdef VISUALIZE
     showGrabCutResults(bgrImage(roi), roiMask, "grab cut segmentation");
+    waitKey();
 #endif
 
     if (bgdProbabilities != 0 && fgdProbabilities != 0)

@@ -116,6 +116,8 @@ void ModelCapturer::supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &sup
 {
   //TODO: move up
   const Vec3b groundTruthColor(0, 255, 0);
+  const float groundTruthWeight = 0.2f;
+
   CV_Assert(image3d.channels() == 1);
   Mat image3d_uchar = image3d;
   if (image3d.type() == CV_32FC1)
@@ -146,10 +148,48 @@ void ModelCapturer::supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &sup
 
     if (isInside)
     {
-      supperimposedImage.at<Vec3b>(indices) = groundTruthColor;
+      supperimposedImage.at<Vec3b>(indices) *= 1.0 - groundTruthWeight;
+      supperimposedImage.at<Vec3b>(indices) += groundTruthWeight * groundTruthColor;
     }
   }
 }
+
+void ModelCapturer::computeGroundTruthEnergy(MRF* mrf, const cv::Mat &volumePoints,
+                                             const VolumeParams &volumeParams) const
+{
+  mrf->clearAnswer();
+  Vec3f inverseStep;
+  for (int i = 0; i < volumeParams.step.channels; ++i)
+  {
+    inverseStep[i] = 1.0 / volumeParams.step[i];
+  }
+
+  for (size_t i = 0; i < groundTruthModel.size(); ++i)
+  {
+    Vec3f pt(groundTruthModel[i]);
+    Vec3i raw_indices = (pt - volumeParams.minBound).mul(inverseStep);
+    Vec3i indices(raw_indices[2], raw_indices[0], raw_indices[1]);
+
+    bool isInside = true;
+    for (int j = 0; j < indices.channels; ++j)
+    {
+      isInside = isInside && indices[j] >= 0 && indices[j] < volumePoints.size.p[j];
+    }
+
+    if (isInside)
+    {
+      int currentIndex = indices[2] + indices[1] * volumePoints.size.p[2] + indices[0] * volumePoints.size.p[1] * volumePoints.size.p[2];
+      mrf->setLabel(currentIndex, 1);
+    }
+  }
+  cout << "Ground truth energy:" << endl;
+  MRF::EnergyVal E_smooth = mrf->smoothnessEnergy();
+  MRF::EnergyVal E_data   = mrf->dataEnergy();
+  cout << "Total Energy = " << E_smooth + E_data << endl;
+  cout << "Smoothness Energy = " << E_smooth << endl;
+  cout << "Data Energy = " << E_data << endl;
+}
+
 
 void ModelCapturer::findRepeatableVoxels(const cv::Mat &insideOfObjectRatios_Vector,
                                          cv::Mat &isRepeatable,
@@ -216,6 +256,9 @@ void ModelCapturer::findRepeatableVoxels(const cv::Mat &insideOfObjectRatios_Vec
   Mat vizImage;
   supperimposeGroundTruth(isRepeatable, vizImage, volumeParams);
   imshow3d("isRepeatable", vizImage);
+
+  //TODO: pass size instead of isRepeatable
+  computeGroundTruthEnergy(mrf, isRepeatable, volumeParams);
   waitKey(0);
 
   delete mrf;

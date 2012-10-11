@@ -59,6 +59,8 @@ Vec3f computeModelDimensions(const std::vector<cv::Point3f> &modelPoints)
 void createGroundTruthModel(vector<Point3f> &model)
 {
   model.clear();
+//  const bool isDense = true;
+  const bool isDense = false;
 
   //TODO: move up
   const double b = 0.0650 / 2.0;
@@ -80,13 +82,31 @@ void createGroundTruthModel(vector<Point3f> &model)
   for (double h = 0.0; h >= -H; h -= 0.001)
   {
     double r = a + (-h) * tanAlpha;
-//    for (double phi = 0.0; phi < 2 * CV_PI; phi += CV_PI / 100)
-    for (double phi = 0.0; phi < 2 * CV_PI; phi += CV_PI / 500)
-    {
-      double x = r * cos(phi);
-      double y = r * sin(phi);
 
-      model.push_back(Point3f(x, y, h));
+    if (isDense)
+    {
+      for (double x = -r; x <= r; x += 0.0005)
+      {
+        for (double y = -r; y <= r; y += 0.0005)
+        {
+          if (x*x + y*y <= r*r)
+          {
+            model.push_back(Point3f(x, y, h));
+          }
+        }
+      }
+    }
+    else
+    {
+
+  //    for (double phi = 0.0; phi < 2 * CV_PI; phi += CV_PI / 100)
+      for (double phi = 0.0; phi < 2 * CV_PI; phi += CV_PI / 500)
+      {
+        double x = r * cos(phi);
+        double y = r * sin(phi);
+
+        model.push_back(Point3f(x, y, h));
+      }
     }
   }
 
@@ -95,9 +115,9 @@ void createGroundTruthModel(vector<Point3f> &model)
 
 int main(int argc, char *argv[])
 {
-/*
   vector<Point3f> groundTruthModel;
   createGroundTruthModel(groundTruthModel);
+/*
   EdgeModel edgeModel(model, true, false);
   edgeModel.write("idealModel.xml");
   exit(-1);
@@ -160,14 +180,18 @@ int main(int argc, char *argv[])
   glassSegmentationParams.grabCutErosionsIterations = 4;
   glassSegmentationParams.grabCutDilationsIterations = 4;
 
+//textureWithCircles_hand
+  glassSegmentationParams.openingIterations = 10;
+
   GlassSegmentator glassSegmentator(glassSegmentationParams);
 
   ModelCapturer modelCapturer(kinectCamera);
   if (compareWithKinFu)
   {
-    vector<Point3f> groundTruthModel;
-    project3dPoints(edgeModels[0].points, objectOffset, groundTruthModel);
-    modelCapturer.setGroundTruthModel(groundTruthModel);
+    vector<Point3f> rotatedGroundTruthModel;
+//    project3dPoints(edgeModels[0].points, objectOffset, rotatedGroundTruthModel);
+    project3dPoints(groundTruthModel, objectOffset, rotatedGroundTruthModel);
+    modelCapturer.setGroundTruthModel(rotatedGroundTruthModel);
   }
   vector<ModelCapturer::Observation> observations(testIndices.size());
   vector<bool> isObservationValid(testIndices.size(), true);
@@ -209,18 +233,6 @@ int main(int argc, char *argv[])
     }
 
 
-#ifdef CHECK_QUALITY_OF_POSES
-    fiducialPose = fiducialPose * objectOffset;
-
-    Mat mask;
-    Point tl;
-    vector<Point2f> projectedGroundTruthModel;
-    kinectCamera.projectPoints(edgeModels[0].points, fiducialPose, projectedGroundTruthModel);
-    EdgeModel::computePointsMask(projectedGroundTruthModel, bgrImage.size(), 1.0, 3, mask, tl, false);
-    showSegmentation(bgrImage, mask, "rgb");
-    showSegmentation(depthImage, mask, "depth");
-    waitKey();
-#endif
 
     int numberOfComponens;
     Mat glassMask;
@@ -234,6 +246,21 @@ int main(int argc, char *argv[])
     observations[testIdx].bgrImage = bgrImage;
     observations[testIdx].mask = glassMask;
     observations[testIdx].pose = fiducialPose;
+
+#ifdef CHECK_QUALITY_OF_POSES
+    fiducialPose = fiducialPose * objectOffset;
+
+    Mat mask;
+    Point tl;
+    vector<Point2f> projectedGroundTruthModel;
+    kinectCamera.projectPoints(edgeModels[0].points, fiducialPose, projectedGroundTruthModel);
+    EdgeModel::computePointsMask(projectedGroundTruthModel, bgrImage.size(), 1.0, 3, mask, tl, false);
+    showSegmentation(bgrImage, mask, "rgb");
+    showSegmentation(depthImage, mask, "depth");
+
+    showSegmentation(bgrImage, glassMask, "grab cut");
+    waitKey();
+#endif
   }
 
   modelCapturer.setObservations(observations, &isObservationValid);
@@ -241,6 +268,7 @@ int main(int argc, char *argv[])
 
   vector<Point3f> modelPoints;
   modelCapturer.createModel(modelPoints);
+
 #if 1
 for (size_t iter = 0; iter < 1; ++iter)
 {

@@ -1,6 +1,7 @@
 #include <opencv2/core/core.hpp>
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
+#include "../../src/mrf/GCoptimization.h"
 
 struct VolumeParams
 {
@@ -41,6 +42,8 @@ class ModelCapturer
     void computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepeatable,
                               const VolumeParams &volumeParams,
                               const std::vector<cv::Point3f> *confidentModelPoints = 0) const;
+    void computeGroundTruthEnergy(MRF* mrf, const cv::Mat &volumePoints,
+                                            const VolumeParams &volumeParams) const;
 
     std::vector<Observation> observations;
     PinholeCamera camera;
