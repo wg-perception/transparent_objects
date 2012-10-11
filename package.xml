@@ -10,15 +10,15 @@
   <copyright>Willow Garage</copyright>
   <url>http://ecto.willowgarage.com</url>
 
-  <build_depends>catkin</build_depends>
-  <build_depends>ecto</build_depends>
-  <build_depends>object_recognition_core</build_depends>
-  <build_depends>openni-dev</build_depends>
-  <build_depends>pcl</build_depends>
+  <build_depend>catkin</build_depend>
+  <build_depend>ecto</build_depend>
+  <build_depend>object_recognition_core</build_depend>
+  <build_depend>openni-dev</build_depend>
+  <build_depend>pcl</build_depend>
 
-  <depends>ecto</depends>
-  <depends>ecto_opencv</depends>
-  <depends>object_recognition_core</depends>
-  <depends>openni-dev</depends>
-  <depends>pcl</depends>
+  <run_depend>ecto</run_depend>
+  <run_depend>ecto_opencv</run_depend>
+  <run_depend>object_recognition_core</run_depend>
+  <run_depend>openni-dev</run_depend>
+  <run_depend>pcl</run_depend>
 </package>
