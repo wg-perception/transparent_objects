@@ -127,4 +127,20 @@ template <typename T> int sgn(T val)
 void imshow3d(const std::string &windowName, const cv::Mat &image3d);
 void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code);
 
+template <typename T>
+T getInterpolatedValue(const cv::Mat &mat, cv::Point2f pt)
+{
+  int xFloor = cvFloor(pt.x);
+  int yFloor = cvFloor(pt.y);
+  float x = pt.x - xFloor;
+  float y = pt.y - yFloor;
+  //bilinear interpolation
+  T result = mat.at<T>(yFloor    , xFloor    ) * (1.0 - x) * (1.0 - y) +
+             mat.at<T>(yFloor    , xFloor + 1) * x * (1.0 - y) +
+             mat.at<T>(yFloor + 1, xFloor    ) * (1.0 - x) * y +
+             mat.at<T>(yFloor + 1, xFloor + 1) * x * y;
+  return result;
+}
+
+
 #endif /* UTILS_HPP_ */
