@@ -72,14 +72,17 @@ void initializeVolume(Mat &volumePoints, const VolumeParams &params = VolumePara
   }
 }
 
-//TODO: remove the global variable
+//TODO: remove the global variables
 Mat global_insideOfObjectRatios_Vector;
+std::map<std::pair<int, int>, float> pairwiseCosts;
 
 MRF::CostVal dCost(int pix, int label)
 {
   CV_Assert(global_insideOfObjectRatios_Vector.type() == CV_32FC1);
   //TODO: move up
-  const float powIndex = 4.67;
+//  const float powIndex = 4.67f;
+  //textureWithCircles_hand
+  const float powIndex = 2.0f;
   float ratio = global_insideOfObjectRatios_Vector.at<float>(pix);
   float cost;
   if (label == 0)
@@ -102,12 +105,11 @@ MRF::CostVal fnCost(int pix_1, int pix_2, int label_1, int label_2)
     return 0;
   }
 
-  float ratio_1 = global_insideOfObjectRatios_Vector.at<float>(pix_1);
-  float ratio_2 = global_insideOfObjectRatios_Vector.at<float>(pix_2);
+  int pix_min = std::min(pix_1, pix_2);
+  int pix_max = std::max(pix_1, pix_2);
 
-  //TODO: move up
-  const float smoothnessWeight = 0.5f;
-  float cost = smoothnessWeight * exp(-fabs(ratio_1 - ratio_2));
+  float beta = 0.05f;
+  float cost = 0.5 * exp(-beta * pairwiseCosts[std::make_pair(pix_min, pix_max)]);
   return cost;
 }
 
@@ -264,6 +266,17 @@ void ModelCapturer::findRepeatableVoxels(const cv::Mat &insideOfObjectRatios_Vec
   delete mrf;
 }
 
+
+void getBiggerNeighbors_NotSafe(const cv::Mat &volume,
+                                int index, std::vector<int> &biggerNeighbors)
+{
+  CV_Assert(volume.dims == 3);
+  biggerNeighbors.clear();
+  biggerNeighbors.push_back(index + 1);
+  biggerNeighbors.push_back(index + volume.size.p[2]);
+  biggerNeighbors.push_back(index + volume.size.p[2] * volume.size.p[1]);
+}
+
 void ModelCapturer::computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepeatable,
                                          const VolumeParams &volumeParams,
                                          const std::vector<cv::Point3f> *confidentModelPoints) const
@@ -279,9 +292,37 @@ void ModelCapturer::computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepea
   Mat insideOfObjectCounts_Vector(1, isRepeatable.total(), CV_32SC1, Scalar(0));
 
   Mat volumePoints_Vector(1, volumePoints.total(), CV_32FC3, volumePoints.data);
+
+
+  //TODO: move up
+  const float discriminativeObservationsRatio = 0.1f;
+  const int discriminativeObservationsCount = cvFloor(discriminativeObservationsRatio * observations.size());
+
+  //TODO: use hash table
+  std::map<std::pair<int, int>, std::vector<std::pair<float, float> > > pairwiseProjections;
+  for (int i = 0; i < isRepeatable.size.p[0] - 1; ++i)
+  {
+    for (int j = 0; j < isRepeatable.size.p[1] - 1; ++j)
+    {
+      for (int k = 0; k < isRepeatable.size.p[2] - 1; ++k)
+      {
+        int currentIndex = k + j * isRepeatable.size.p[2] + i * isRepeatable.size.p[2] * isRepeatable.size.p[1];
+        vector<int> biggerNeighbors;
+        getBiggerNeighbors_NotSafe(volumePoints, currentIndex, biggerNeighbors);
+        for (size_t neighborIndex = 0; neighborIndex < biggerNeighbors.size(); ++neighborIndex)
+        {
+          pairwiseProjections[std::make_pair<int, int>(currentIndex, biggerNeighbors[neighborIndex])].resize(discriminativeObservationsCount, std::make_pair(0.0f, 0.0f));
+        }
+      }
+    }
+  }
+
   for (size_t observationIndex = 0; observationIndex < observations.size(); ++observationIndex)
   {
     cout << "observation: " << observationIndex << endl;
+    Mat bgrImage_float;
+    observations[observationIndex].bgrImage.convertTo(bgrImage_float, CV_32F);
+    CV_Assert(bgrImage_float.type() == CV_32FC3);
 
     vector<Point2f> projectedVolume;
     vector<Point3f> rotatedVolume;
@@ -289,6 +330,74 @@ void ModelCapturer::computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepea
     camera.projectPoints(rotatedVolume, PoseRT(), projectedVolume);
 
 
+
+#pragma omp parallel for
+    for (int i = 0; i < isRepeatable.size.p[0] - 1; ++i)
+    {
+      for (int j = 0; j < isRepeatable.size.p[1] - 1; ++j)
+      {
+        for (int k = 0; k < isRepeatable.size.p[2] - 1; ++k)
+        {
+          int currentIndex = k + j * isRepeatable.size.p[2] + i * isRepeatable.size.p[2] * isRepeatable.size.p[1];
+          vector<int> biggerNeighbors;
+          getBiggerNeighbors_NotSafe(volumePoints, currentIndex, biggerNeighbors);
+
+          for (size_t neighborIndex = 0; neighborIndex < biggerNeighbors.size(); ++neighborIndex)
+          {
+            Point2f pt1 = projectedVolume[currentIndex];
+            Point2f pt2 = projectedVolume[biggerNeighbors[neighborIndex]];
+
+            Point pt1_floor(cvFloor(pt1.x), cvFloor(pt1.y));
+            Point pt2_floor(cvFloor(pt2.x), cvFloor(pt2.y));
+            if (!isPointInside(bgrImage_float, pt1_floor) ||
+                !isPointInside(bgrImage_float, pt2_floor) ||
+                !isPointInside(bgrImage_float, pt1_floor + Point(1, 1)) ||
+                !isPointInside(bgrImage_float, pt2_floor + Point(1, 1)))
+            {
+              continue;
+            }
+
+            float geometricDistance = norm(pt1 - pt2);
+
+            Vec3f color1 = getInterpolatedValue<Vec3f>(bgrImage_float, pt1);
+            Vec3f color2 = getInterpolatedValue<Vec3f>(bgrImage_float, pt2);
+            float colorDistance = norm(color1 - color2);
+
+            std::vector<std::pair<float, float> > &distances = pairwiseProjections[std::make_pair<int, int>(currentIndex, biggerNeighbors[neighborIndex])];
+            std::pair<float, float> value(geometricDistance, colorDistance);
+
+/*
+            if (distances.size() < discriminativeObservationsCount)
+            {
+              distances.push_back(value);
+
+              if (distances.size() == discriminativeObservationsCount)
+              {
+                std::sort(distances.begin(), distances.end());
+                std::reverse(distances.begin(), distances.end());
+              }
+            }
+            else
+*/
+            {
+              int lastIndex = static_cast<int>(distances.size()) - 1;
+              if (value.first < distances[lastIndex].first)
+              {
+                continue;
+              }
+              int currentIndex = lastIndex - 1;
+
+              while (currentIndex >= 0 && distances[currentIndex].first < value.first)
+              {
+                distances[currentIndex + 1] = distances[currentIndex];
+                --currentIndex;
+              }
+              distances[currentIndex + 1] = value;
+            }
+          }
+        }
+      }
+    }
 
 /*
     vector<Point2f> projectedConfidentModelPoints;
@@ -372,6 +481,20 @@ void ModelCapturer::computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepea
     }
   }
 
+  pairwiseCosts.clear();
+  for (std::map<std::pair<int, int>, std::vector<std::pair<float, float> > >::iterator it = pairwiseProjections.begin();
+       it != pairwiseProjections.end(); ++it)
+  {
+    double meanColorDistance = 0.0;
+    for (size_t i = 0; i < it->second.size(); ++i)
+    {
+      meanColorDistance += it->second[i].second;
+    }
+    meanColorDistance /= it->second.size();
+
+    pairwiseCosts[it->first] = meanColorDistance;
+  }
+
 #if 0
   //TODO: move up
 //  const float minModelPointRepeatability = 0.9f;
@@ -388,10 +511,12 @@ void ModelCapturer::computeVisibleCounts(cv::Mat &volumePoints, cv::Mat &isRepea
 
     for (int j = width / 2; j < isInsideOfObject.cols - width / 2; ++j)
     {
+/*
       if (i == 817788)
       {
         cout << int(isInsideOfObject.at<uchar>(i, j)) << " " << int(curSum > width / 2) << " " << curSum << endl;
       }
+*/
       if (curSum > width / 2)
       {
         insideOfObjectCount += 1;
