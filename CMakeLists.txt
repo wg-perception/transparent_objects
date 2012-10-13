@@ -16,7 +16,7 @@ if (catkin_FOUND)
 
     find_package(ecto REQUIRED)
     find_package(ecto_opencv REQUIRED)
-    find_pcl_package()
+    find_package(PCL REQUIRED)
     find_package(object_recognition_core REQUIRED)
 else()
     find_package(PCL)

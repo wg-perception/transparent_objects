@@ -7,7 +7,7 @@ ectomodule(transparent_objects_cells DESTINATION ${PROJECT_NAME}
     modelFiller.cpp
     )
 
-find_pcl_package()
+find_package(PCL REQUIRED)
 find_package(object_recognition_core REQUIRED)
 
 include_directories(SYSTEM
