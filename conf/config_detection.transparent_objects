@@ -1,9 +1,11 @@
 source1:
   type: ros_kinect
+  module: 'object_recognition_ros.io'
   rgb_frame_id: '/camera_rgb_optical_frame'
 
 sink1:
   type: publisher
+  module: 'object_recognition_ros.io'
 
 pipeline1:
   type: 'transparent_objects'
