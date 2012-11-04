@@ -40,7 +40,6 @@ add_subdirectory(src)
 
 if (${ecto_FOUND} AND ${object_recognition_core_FOUND})    
     add_subdirectory(cells)
-    add_subdirectory(python)
 endif()
 
 # deal with the tests
