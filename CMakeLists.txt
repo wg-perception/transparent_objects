@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 2.8)
 project(object_recognition_transparent_objects)
+
+find_package(PCL REQUIRED)
 find_package(catkin QUIET)
 if (catkin_FOUND)
     if (${catkin_VERSION} VERSION_GREATER "0.5.28")
+    find_package(catkin REQUIRED ecto ecto_opencv object_recognition_core opencv_candidate)
         catkin_package(INCLUDE_DIRS include)
     else()
+        find_package(catkin REQUIRED opencv_candidate)
+        find_package(ecto REQUIRED)
+        find_package(ecto_opencv REQUIRED)
+        find_package(object_recognition_core REQUIRED)
         catkin_stack()
         catkin_project(object_recognition_transparent_objects
                    INCLUDE_DIRS include
@@ -16,19 +23,10 @@ if (catkin_FOUND)
 
     find_package(ecto REQUIRED)
     find_package(ecto_opencv REQUIRED)
-    find_package(PCL REQUIRED)
     find_package(object_recognition_core REQUIRED)
 else()
-    find_package(PCL)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-endif()
-
-#this needs a stanza to prevent overwrite.
-if(NOT CMAKE_BUILD_TYPE)#Only do this the on the first run, if the build type hasn't been set prior
-  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
-    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-  FORCE)
 endif()
 
 find_package(OpenCV REQUIRED)

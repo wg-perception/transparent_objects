@@ -45,14 +45,16 @@ set(src_fdcm
 add_library(fdcm SHARED
     ${src_fdcm}
     )
-
+target_link_libraries(fdcm
+                      ${PCL_LIBRARIES}
+                      ${OpenCV_LIBRARIES}
+)
 
 target_link_libraries(edges_pose_refiner
                       fdcm
                       ${PCL_LIBRARIES}
-                      ${OpenCV_LIBS}
                       ${OpenCV_LIBRARIES}
-                      ${ecto_opencv_LIBRARIES}
+                      ${opencv_candidate_LIBRARIES}
 )
 
 install(TARGETS edges_pose_refiner fdcm
