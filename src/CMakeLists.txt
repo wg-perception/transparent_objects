@@ -46,6 +46,10 @@ set(src_fdcm
 add_library(fdcm SHARED
     ${src_fdcm}
     )
+target_link_libraries(fdcm
+                      ${OpenCV_LIBS}
+                      ${OpenCV_LIBRARIES}
+)
 
 set(src_mrf
     mrf/BP-S.cpp
@@ -87,6 +91,7 @@ add_library(model_capture SHARED
 set_target_properties(model_capture PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
 target_link_libraries(model_capture
                       edges_pose_refiner
+                      mrf
 )
 
 

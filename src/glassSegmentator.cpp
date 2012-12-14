@@ -117,11 +117,15 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     {
       bgdModel = computedBgdModel->clone();
       fgdModel = computedFgdModel->clone();
-      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_EVAL, gamma);
+      //TODO: use gamma
+      //grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_EVAL, gamma);
+      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_EVAL);
     }
     else
     {
-      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK, gamma);
+      //TODO: use gamma
+      //grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK, gamma);
+      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
     }
 
     Mat refinedMaskRoi = refinedMask(roi);

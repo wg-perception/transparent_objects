@@ -4,6 +4,8 @@
 #include "../mrf/GCoptimization.h"
 
 using namespace cv;
+using std::cout;
+using std::endl;
 
 ModelCapturer::ModelCapturer(const PinholeCamera &pinholeCamera)
 {

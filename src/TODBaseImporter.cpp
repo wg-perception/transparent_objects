@@ -137,7 +137,7 @@ void TODBaseImporter::readTrainObjectsNames(const string &trainConfigFilename, s
 
 bool isNan(const Point3f& p)
 {
- return isnan(p.x) || isnan(p.y) || isnan(p.z);
+ return cvIsNaN(p.x) || cvIsNaN(p.y) || cvIsNaN(p.z);
 }
 
 void TODBaseImporter::readRegisteredClouds(const string &configFilename, vector<vector<cv::Point3f> > &registeredClouds) const

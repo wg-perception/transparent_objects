@@ -15,8 +15,6 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <opencv2/rgbd/rgbd.hpp>
-
 //#define VISUALIZE_DETECTION
 
 using namespace cv;

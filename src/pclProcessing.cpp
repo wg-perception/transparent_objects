@@ -40,7 +40,10 @@
 #endif
 
 #include "edges_pose_refiner/utils.hpp"
+
+#ifdef USE_RGBD_MODULE
 #include <opencv2/rgbd/rgbd.hpp>
+#endif
 
 using namespace cv;
 
@@ -263,7 +266,7 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
 {
   CV_Assert(false);
   //TODO: fix compilation with Jenkins
-#if 0
+#ifdef USE_RGBD_MODULE
   Mat points3d;
   depthTo3d(depth, camera.cameraMatrix, points3d);
   RgbdNormals normalsEstimator(depth.rows, depth.cols, depth.depth(), camera.cameraMatrix);

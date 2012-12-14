@@ -549,8 +549,8 @@ void LocalPoseRefiner::computeWeights(const vector<Point2f> &projectedPointsVect
   for (size_t i = 0; i < projectedPointsVector.size(); ++i)
   {
     Point2f pt = projectedPointsVector[i];
-    CV_Assert(!isnan(pt.x));
-    CV_Assert(!isnan(pt.y));
+    CV_Assert(!cvIsNaN(pt.x));
+    CV_Assert(!cvIsNaN(pt.y));
   }
   CV_Assert(!weights.empty());
 
