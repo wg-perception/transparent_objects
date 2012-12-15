@@ -321,36 +321,26 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
 }
 
 
-bool computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane)
+int computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Mat &centralBgrImage, Vec4f &tablePlane)
 {
   Mat blackBlobsObject, whiteBlobsObject, allBlobsObject;
   //TODO: move up parameters
-  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
+  const string fiducialFilename = "fiducial.yml";
+//  const string fiducialFilename = "/media/2Tb/transparentBases/fiducial.yml";
 //  const string fiducialFilename = "/u/ilysenkov/transparentBases/base/fiducial.yml";
   readFiducial(fiducialFilename, blackBlobsObject, whiteBlobsObject, allBlobsObject);
 
-  SimpleBlobDetector::Params params;
-  params.filterByInertia = true;
-  params.minArea = 10;
-  params.minDistBetweenBlobs = 5;
-
-  params.blobColor = 0;
-  Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
-
-  params.blobColor = 255;
-  Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
-
-  const Size boardSize(4, 11);
-
   Mat blackBlobs, whiteBlobs;
-  bool isBlackFound = findCirclesGrid(centralBgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
-  bool isWhiteFound = findCirclesGrid(centralBgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
+  detectFiducial(centralBgrImage, blackBlobs, whiteBlobs);
+  bool isBlackFound = !blackBlobs.empty();
+  bool isWhiteFound = !whiteBlobs.empty();
+
   if (!isBlackFound && !isWhiteFound)
   {
     cout << isBlackFound << " " << isWhiteFound << endl;
     imshow("can't estimate", centralBgrImage);
     waitKey();
-    return false;
+    return 0;
   }
 
   Mat rvec, tvec;
@@ -423,5 +413,6 @@ bool computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::M
   }
   tablePlane[dim] = -tableNormal.ddot(tableAnchor);
 
-  return true;
+  int numberOfPatternsFound = static_cast<int>(isBlackFound) + static_cast<int>(isWhiteFound);
+  return numberOfPatternsFound;
 }

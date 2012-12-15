@@ -293,6 +293,14 @@ void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
   CV_Assert(mask.channels() == 1);
 }
 
+void TODBaseImporter::importUserMask(int testImageIdx, cv::Mat &userMask) const
+{
+  std::stringstream imageFilename;
+  imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.user_mask.png";
+  importBGRImage(imageFilename.str(), userMask);
+  CV_Assert(userMask.channels() == 1);
+}
+
 void TODBaseImporter::importOffset(PoseRT &offset) const
 {
   //TODO: move up

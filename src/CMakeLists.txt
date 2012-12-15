@@ -213,3 +213,8 @@ target_link_libraries(captureModel edges_pose_refiner
                                    mrf
                                    ${PYTHON_LIBRARIES}
 )
+
+add_executable(labelSegmentation apps/labelSegmentation.cpp)
+target_link_libraries(labelSegmentation edges_pose_refiner
+                                        ${PYTHON_LIBRARIES}
+)

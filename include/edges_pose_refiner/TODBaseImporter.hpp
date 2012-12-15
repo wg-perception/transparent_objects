@@ -42,9 +42,10 @@ public:
   static void importDepth(const std::string &filename, cv::Mat &depth);
 
   void importBGRImage(int testImageIdx, cv::Mat &bgrImage) const;
-  static void importBGRImage(const std::string &filename, cv::Mat &depth);
+  static void importBGRImage(const std::string &filename, cv::Mat &bgrImage);
 
-  void importRawMask(int testImageIdx, cv::Mat &bgrImage) const;
+  void importRawMask(int testImageIdx, cv::Mat &rawMask) const;
+  void importUserMask(int testImageIdx, cv::Mat &userMask) const;
 
   void importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const;
   static void importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud);

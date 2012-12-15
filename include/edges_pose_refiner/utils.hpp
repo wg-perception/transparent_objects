@@ -72,6 +72,7 @@ void mask2contour(const cv::Mat &mask, std::vector<cv::Point2f> &contour);
 void hcat(const cv::Mat &A, const cv::Mat &B, cv::Mat &result);
 
 void readFiducial(const std::string &filename, cv::Mat &blackBlobsObject, cv::Mat &whiteBlobsObject, cv::Mat &allBlobsObject);
+void detectFiducial(const cv::Mat &bgrImage, cv::Mat &blackBlobs, cv::Mat &whiteBlobs);
 
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const cv::Scalar &color = cv::Scalar(0, 255, 0), int thickness = 1);
 

@@ -263,6 +263,35 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
   CV_Assert(!blackBlobsObject.empty() && !whiteBlobsObject.empty());
 }
 
+void detectFiducial(const cv::Mat &bgrImage, cv::Mat &blackBlobs, cv::Mat &whiteBlobs)
+{
+  //TODO: move up
+  const Size boardSize(4, 11);
+  SimpleBlobDetector::Params params;
+  params.filterByInertia = true;
+  params.minArea = 10;
+  params.minDistBetweenBlobs = 5;
+
+  params.blobColor = 0;
+  Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
+
+  params.blobColor = 255;
+  Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
+
+  bool isBlackFound = findCirclesGrid(bgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
+  bool isWhiteFound = findCirclesGrid(bgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
+
+  if (!isBlackFound)
+  {
+      blackBlobs = Mat();
+  }
+
+  if (!isWhiteFound)
+  {
+      whiteBlobs = Mat();
+  }
+}
+
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar &color, int thickness)
 {
   CV_Assert(!image.empty() && !mask.empty());

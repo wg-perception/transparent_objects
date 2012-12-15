@@ -432,7 +432,7 @@ void segmentGlassManually(const cv::Mat &image, cv::Mat &glassMask)
   data.displayedImage = image.clone();
   data.windowName = "manual glass segmentation";
 
-  namedWindow(data.windowName);
+  namedWindow(data.windowName, WINDOW_NORMAL);
   setMouseCallback(data.windowName, onMouse, &data);
   imshow(data.windowName, data.displayedImage);
   waitKey();
