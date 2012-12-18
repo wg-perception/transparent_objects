@@ -14,3 +14,4 @@ build/
 .pydevproject
 linemod
 mmod
+.DS_Store

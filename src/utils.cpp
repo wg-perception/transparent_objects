@@ -271,6 +271,8 @@ void detectFiducial(const cv::Mat &bgrImage, cv::Mat &blackBlobs, cv::Mat &white
   params.filterByInertia = true;
   params.minArea = 10;
   params.minDistBetweenBlobs = 5;
+//  params.minArea = 6;
+//  params.minDistBetweenBlobs = 3;
 
   params.blobColor = 0;
   Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
@@ -337,6 +339,8 @@ vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
       circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
+
+//    drawImages[i] = 0.3 * drawImages[i] + 0.7 * images[i];
   }
 
   return drawImages;

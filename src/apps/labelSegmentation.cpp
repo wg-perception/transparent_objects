@@ -4,6 +4,7 @@
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
 
+//#include <opencv2/rgbd/rgbd.hpp>
 #include <iomanip>
 
 using namespace cv;
@@ -41,6 +42,11 @@ void onTrackbar(int, void*)
     Mat bgrImage;
     dataImporter.importBGRImage(testIndices[imageIndex], bgrImage);
     imshow(mainWindowName, bgrImage);
+/*
+    Mat depth;
+    dataImporter.importDepth(testIndices[imageIndex], depth);
+    imshow(mainWindowName + "_depth", depth);
+*/
 
     int key = waitKey();
     if (key == segmentationKey)
@@ -97,6 +103,7 @@ void onTrackbar(int, void*)
         imagePoints.push_back(whiteBlobs.at<Point2f>(yIndex));
         imagePoints.push_back(offsetPt);
 
+
         vector<Point3f> reprojectedPoints;
         camera.reprojectPointsOnTable(imagePoints, tablePlane, reprojectedPoints);
         Point3f xAxis = reprojectedPoints[1] - reprojectedPoints[0];
@@ -107,12 +114,31 @@ void onTrackbar(int, void*)
         float y = offsetVector.dot(yAxis) / norm(yAxis);
 
         cout << "Offset: " << x << " " << y << endl;
+
+/*
+        Mat drawImage = bgrImage.clone();
+        circle(drawImage, imagePoints[0], 2, Scalar(255, 0, 255), -1);
+        circle(drawImage, imagePoints[2], 2, Scalar(255, 0, 255), -1);
+        circle(drawImage, blackBlobs.at<Point2f>(0), 2, Scalar(0, 255, 0), -1);
+        imshow("circle", drawImage);
+        Mat points3d;
+        depthTo3d(depth, camera.cameraMatrix, points3d);
+        cout << points3d.at<Point3f>(imagePoints[0]) << endl;
+        cout << points3d.at<Point3f>(imagePoints[2]) << endl;
+        cout << "distance: " << norm(points3d.at<Point3f>(imagePoints[0]) - points3d.at<Point3f>(imagePoints[2])) << endl;
+        cout << "distance between patterns: " << norm(points3d.at<Point3f>(imagePoints[0]) - points3d.at<Point3f>(blackBlobs.at<Point2f>(0))) << endl;
+        //cout << "distance: " << norm(reprojectedPoints[0] - reprojectedPoints[1]) << endl;
+
+        vector<Point3f> cvCloud = points3d.reshape(3, points3d.total());
+        writePointCloud("test.asc", cvCloud);
+
+        waitKey();
+*/
     }
 }
 
 int main(int argc, char *argv[])
 {
-
     CV_Assert(argc == 3);
     const string baseFolder = argv[1];
     const string objectName = argv[2];
@@ -121,7 +147,6 @@ int main(int argc, char *argv[])
 
     Mat registrationMask;
     dataImporter.importAllData(0, 0, &camera, &registrationMask, 0, &testIndices);
-
     namedWindow(mainWindowName, WINDOW_NORMAL);
     int lastIndex = static_cast<int>(testIndices.size()) - 1;
     createTrackbar("image index", mainWindowName, &imageIndex, lastIndex, onTrackbar);

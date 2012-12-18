@@ -97,14 +97,43 @@ void EdgeModel::setStableEdgels(EdgeModel &edgeModel, float stableEdgelsRatio)
   nth_element(projections.begin(), projections.begin() + thredholdIdx, projections.end());
   float proj = projections[thredholdIdx];
 
+/*
+//  int bottomThredholdIdx = (1.0 - stableEdgelsRatio) * projections.size();
+  int bottomThredholdIdx = 0.15 * projections.size();
+  nth_element(projections.begin(), projections.begin() + bottomThredholdIdx, projections.end());
+  float bottomProj = projections[bottomThredholdIdx];
+*/
+
   edgeModel.stableEdgels.clear();
+/*
+  vector<Point3f> bottom;
+  vector<Point3f> boundary;
+*/
   for (size_t i = 0; i < edgeModel.points.size(); ++i)
   {
+/*
+    if (projectionsBackup[i] < bottomProj)
+    {
+        cout << edgeModel.points[i] << " " << edgeModel.normals[i] << endl;
+        bottom.push_back(edgeModel.points[i]);
+        if (norm(edgeModel.normals[i] - Point3f(0.0f, 0.0f, 1.0f)) > 1e-4)
+        {
+            edgeModel.stableEdgels.push_back(edgeModel.points[i]);
+            boundary.push_back(edgeModel.points[i]);
+        }
+    }
+*/
+
     if (projectionsBackup[i] > proj)
     {
       edgeModel.stableEdgels.push_back(edgeModel.points[i]);
     }
   }
+/*
+  writePointCloud("bottom.asc", bottom);
+  writePointCloud("boundary.asc", boundary);
+  writePointCloud("all.asc", edgeModel.points);
+*/
 }
 
 EdgeModel::EdgeModel()

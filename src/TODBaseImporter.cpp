@@ -205,7 +205,8 @@ void TODBaseImporter::importEdgeModel(const std::string &modelsPath, const std::
     cout << "Cannot read edge model: " << modelFilename << endl;
     vector<Point3f> points, normals;
     readPointCloud(modelsPath + "/downPointClouds/" + objectName + ".ply", points, &normals);
-    edgeModel = EdgeModel(points, normals, true, true);
+//    edgeModel = EdgeModel(points, normals, true, true);
+    edgeModel = EdgeModel(points, normals, false, true);
 
 /*  uncomment for obsolete models (sourCream)
 

@@ -2,6 +2,10 @@
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
+#ifdef SHOW_CLOUD
+#include <opencv2/rgbd/rgbd.hpp>
+#endif
+
 //#define USE_INITIAL_GUESS
 
 #ifdef USE_INITIAL_GUESS
@@ -21,15 +25,15 @@ int main(int argc, char *argv[])
   RNG &rng = theRNG();
   rng.state = 0xffffffff;
 
-  if (argc != 3)
+  if (argc != 4)
   {
-    cout << argv[0] << " <baseFolder> <testObjectName>" << endl;
+    cout << argv[0] << " <baseFolder> <modelsPath> <testObjectName>" << endl;
     return -1;
   }
   string baseFolder = argv[1];
-  string testObjectName = argv[2];
+  string trainedModelsPath = argv[2];
+  string testObjectName = argv[3];
 
-  const string trainedModelsPath = "/media/2Tb/transparentBases/trainedModels/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
   const string imageFilename = baseFolder + "/image.png";
   const string depthFilename = baseFolder + "/depth.xml.gz";
@@ -50,11 +54,18 @@ int main(int argc, char *argv[])
 //  params.glassSegmentationParams.finalClosingIterations = 12;
 
   //good clutter
+  /*
   params.glassSegmentationParams.openingIterations = 15;
   params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.finalClosingIterations = 32;
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
   params.planeSegmentationMethod = FIDUCIALS;
+  */
+
+  //test_planar_glass
+  params.planeSegmentationMethod = RGBD;
+  params.glassSegmentationParams.grabCutErosionsIterations = 3;
+  params.glassSegmentationParams.grabCutDilationsIterations = 3;
 
   TODBaseImporter dataImporter(baseFolder, testFolder);
 
@@ -77,7 +88,13 @@ int main(int argc, char *argv[])
   }
 
   pcl::PointCloud<pcl::PointXYZ> testPointCloud;
-  dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
+  //dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
+#ifdef SHOW_CLOUD
+  Mat points3d;
+  depthTo3d(kinectDepth, kinectCamera.cameraMatrix, points3d);
+  vector<Point3f> cloud = points3d.reshape(3, points3d.total());
+  cv2pcl(cloud, testPointCloud);
+#endif
 
   vector<PoseRT> poses_cam;
   vector<float> posesQualities;
@@ -159,6 +176,9 @@ int main(int argc, char *argv[])
     waitKey();
   }
 
+#ifdef SHOW_CLOUD
+  detector.visualize(poses_cam, detectedObjectsNames, testPointCloud);
+#endif
 
   std::system("date");
   return 0;
