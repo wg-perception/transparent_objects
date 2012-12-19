@@ -24,10 +24,11 @@ public:
                      PoseRT *offset = 0) const;
 
 //  void readTrainObjectsNames(const std::string &trainConfigFilename, std::vector<std::string> &trainObjectsNames);
-  void readCameraParams(const std::string &folder, PinholeCamera &camera, bool addFilename = true) const;
   void readMultiCameraParams(const std::string &camerasListFilename, std::vector<PinholeCamera> &allCameras, std::vector<bool> &camerasMask);
 
   static void importCamera(const std::string &filename, PinholeCamera &camera);
+  void importCamera(PinholeCamera &camera) const;
+
   void importEdgeModel(const std::string &modelsPath, const std::string &objectName, EdgeModel &edgeModel) const;
   void importTestIndices(std::vector<int> &testIndices) const;
   void importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset = true, PoseRT *offsetPtr = 0, bool isKeyFrame = false) const;
@@ -36,6 +37,7 @@ public:
   void importOcclusionObjects(const std::string &modelsPath,
                               std::vector<EdgeModel> &occlusionObjects, std::vector<PoseRT> &occlusionOffsets) const;
 
+  void importRegistrationMask(cv::Mat &registrationMask) const;
   static void importRegistrationMask(const std::string &filename, cv::Mat &registrationMask);
 
   void importDepth(int testImageIdx, cv::Mat &depth) const;

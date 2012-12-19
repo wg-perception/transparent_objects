@@ -392,53 +392,11 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
 #endif
 }
 
-struct ManualGlassSegmentationData
-{
-  bool isLButtonPressed;
-  std::vector<cv::Point> glassContour;
-  cv::Mat displayedImage;
-  std::string windowName;
-};
-
-static void onMouse(int event, int x, int y, int, void *srcData)
-{
-  ManualGlassSegmentationData *data = static_cast<ManualGlassSegmentationData*>(srcData);
-  if (event == CV_EVENT_LBUTTONUP)
-  {
-    data->isLButtonPressed = false;
-  }
-
-  if (event == CV_EVENT_LBUTTONDOWN)
-  {
-    data->isLButtonPressed = true;
-  }
-
-  if (!data->isLButtonPressed)
-  {
-    return;
-  }
-
-  Point pt(x, y);
-  data->glassContour.push_back(pt);
-  circle(data->displayedImage, pt, 1, Scalar(255, 0, 0), -1);
-  imshow(data->windowName, data->displayedImage);
-}
-
 void segmentGlassManually(const cv::Mat &image, cv::Mat &glassMask)
 {
-  ManualGlassSegmentationData data;
-  //TODO: what if button is pressed already?
-  data.isLButtonPressed = false;
-  data.displayedImage = image.clone();
-  data.windowName = "manual glass segmentation";
+  vector<vector<Point> > contours(1);
+  markContourByUser(image, contours[0], "manual glass segmentation");
 
-  namedWindow(data.windowName, WINDOW_NORMAL);
-  setMouseCallback(data.windowName, onMouse, &data);
-  imshow(data.windowName, data.displayedImage);
-  waitKey();
-  destroyWindow(data.windowName);
-
-  vector<vector<Point> > contours(1, data.glassContour);
   glassMask = Mat(image.size(), CV_8UC1, Scalar(0));
   drawContours(glassMask, contours, -1, Scalar::all(255), -1);
 }

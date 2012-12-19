@@ -17,8 +17,13 @@ struct PinholeCamera
   PinholeCamera(const PinholeCamera &camera);
   PinholeCamera& operator=(const PinholeCamera &camera);
 
+  cv::Point2f projectPoints(cv::Point3f point, const PoseRT &pose) const;
   void projectPoints(const std::vector<cv::Point3f> &points, const PoseRT &pose, std::vector<cv::Point2f> &projectedPoints) const;
 
+  cv::Point3f reprojectPoints(cv::Point2f point) const;
+  void reprojectPoints(const std::vector<cv::Point2f> &points, std::vector<cv::Point3f> &rays) const;
+
+  cv::Point3f reprojectPointsOnTable(cv::Point2f point, const cv::Vec4f &tablePlane) const;
   void reprojectPointsOnTable(const std::vector<cv::Point2f> &points, const cv::Vec4f &tablePlane,
                               std::vector<cv::Point3f> &reprojectedPoints) const;
 

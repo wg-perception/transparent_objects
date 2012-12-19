@@ -43,6 +43,42 @@ void PinholeCamera::projectPoints(const std::vector<cv::Point3f> &points, const 
   cv::projectPoints(Mat(points), fullPose.getRvec(), fullPose.getTvec(), cameraMatrix, distCoeffs, projectedPoints);
 }
 
+cv::Point2f PinholeCamera::projectPoints(cv::Point3f point, const PoseRT &pose) const
+{
+    vector<Point2f> projectedPoints;
+    projectPoints(vector<Point3f>(1, point), pose, projectedPoints);
+    return projectedPoints[0];
+}
+
+void PinholeCamera::reprojectPoints(const std::vector<cv::Point2f> &points, std::vector<cv::Point3f> &rays) const
+{
+  const float eps = 1e-4;
+  CV_Assert(norm(distCoeffs) < eps);
+
+  Mat homogeneousPoints;
+  convertPointsToHomogeneous(points, homogeneousPoints);
+  Mat cameraMatrixFloat;
+  cameraMatrix.convertTo(cameraMatrixFloat, CV_32FC1);
+  Mat reprojectedRaysMat = homogeneousPoints.reshape(1) * cameraMatrixFloat.inv().t();
+  CV_Assert(reprojectedRaysMat.type() == CV_32FC1);
+
+  //TODO: check that it is a deep copy
+  rays = reprojectedRaysMat.reshape(3);
+
+  //TODO: remove
+  for (size_t i = 0; i < rays.size(); ++i)
+  {
+      CV_Assert(fabs(rays[i].z - 1.0) < eps);
+  }
+}
+
+cv::Point3f PinholeCamera::reprojectPoints(cv::Point2f point) const
+{
+    vector<Point3f> allRays;
+    reprojectPoints(vector<Point2f>(1, point), allRays);
+    return allRays[0];
+}
+
 PinholeCamera::PinholeCamera(const PinholeCamera &camera)
 {
   *this = camera;
@@ -133,16 +169,8 @@ void PinholeCamera::resize(cv::Size destinationSize)
 void PinholeCamera::reprojectPointsOnTable(const std::vector<cv::Point2f> &points, const cv::Vec4f &tablePlane,
                                            std::vector<cv::Point3f> &reprojectedPoints) const
 {
-  const float eps = 1e-4;
-  CV_Assert(norm(distCoeffs) < eps);
-
-  Mat homogeneousPoints;
-  convertPointsToHomogeneous(points, homogeneousPoints);
-  Mat cameraMatrixFloat;
-  cameraMatrix.convertTo(cameraMatrixFloat, CV_32FC1);
-  Mat reprojectedRaysMat = homogeneousPoints.reshape(1) * cameraMatrixFloat.inv().t();
-  CV_Assert(reprojectedRaysMat.type() == CV_32FC1);
-  vector<Point3f> reprojectedRays = reprojectedRaysMat.reshape(3);
+  vector<Point3f> reprojectedRays;
+  reprojectPoints(points, reprojectedRays);
 
   reprojectedPoints.clear();
   reprojectedPoints.reserve(points.size());
@@ -152,9 +180,17 @@ void PinholeCamera::reprojectPointsOnTable(const std::vector<cv::Point2f> &point
     double denominator = tablePlane[0] * ray.x +
                          tablePlane[1] * ray.y +
                          tablePlane[2] * ray.z;
+    const float eps = 1e-4;
     CV_Assert(fabs(denominator) > eps);
     double t = -tablePlane[3] / denominator;
     Point3f finalPoint = ray * t;
     reprojectedPoints.push_back(finalPoint);
   }
+}
+
+cv::Point3f PinholeCamera::reprojectPointsOnTable(cv::Point2f point, const cv::Vec4f &tablePlane) const
+{
+    vector<Point3f> reprojectedPoints;
+    reprojectPointsOnTable(vector<Point2f>(1, point), tablePlane, reprojectedPoints);
+    return reprojectedPoints[0];
 }

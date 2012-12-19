@@ -9,9 +9,6 @@
 #define GLASSDETECTOR_HPP_
 
 #include <opencv2/core/core.hpp>
-#include <pcl/pcl_base.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
 
 #include "edges_pose_refiner/pinholeCamera.hpp"
 

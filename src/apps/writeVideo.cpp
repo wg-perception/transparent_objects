@@ -15,7 +15,8 @@ using std::endl;
 
 void readQualities(const std::string &path, int endIndex, std::vector<float> &allQualities)
 {
-    std::ifstream log(path + "/qualities.txt");
+    std::string qualitiesFilename = path + "/qualities.txt";
+    std::ifstream log(qualitiesFilename.c_str());
     CV_Assert(log.is_open());
     allQualities.resize(endIndex, std::numeric_limits<float>::max());
     while (!log.eof())
@@ -42,6 +43,9 @@ int main(int argc, char *argv[])
     const float maxQuality = atof(argv[5]); //1.2f
 
     const int fps = 10;
+
+    std::vector<float> allQualities;
+    readQualities(path, endIndex, allQualities);
 
     VideoWriter writer;
     for (int i = startIndex; i < endIndex; ++i)

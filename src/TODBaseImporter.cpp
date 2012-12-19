@@ -35,12 +35,9 @@ void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const 
                                     std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets,
                                     PoseRT *offset) const
 {
-  //TODO: move up
-  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
-
   if (kinectCamera != 0)
   {
-    readCameraParams(baseFolder, *kinectCamera);
+    importCamera(*kinectCamera);
     //TODO: move up
     CV_Assert(kinectCamera->imageSize == Size(640, 480));
   }
@@ -71,8 +68,7 @@ void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const 
 
   if (registrationMask != 0)
   {
-    *registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-    CV_Assert(!registrationMask->empty());
+    importRegistrationMask(*registrationMask);
   }
 
   if (offset != 0)
@@ -81,9 +77,11 @@ void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const 
   }
 }
 
-void TODBaseImporter::readCameraParams(const string &folder, PinholeCamera &camera, bool addFilename) const
+void TODBaseImporter::importCamera(PinholeCamera &camera) const
 {
-  string cameraFilename = addFilename ? folder + "/camera.yml" : folder;
+//  string cameraFilename = addFilename ? folder + "/camera.yml" : folder;
+  //TODO: move up
+  string cameraFilename = baseFolder + "/camera.yml";
   camera.read(cameraFilename);
 }
 
@@ -105,7 +103,8 @@ void TODBaseImporter::readMultiCameraParams(const string &camerasListFilename, s
   {
     if(camerasMask[i])
     {
-      readCameraParams(intrinsicsFilenames[i], allCameras[cameraIdx], false);
+      CV_Assert(false);
+      //readCameraParams(intrinsicsFilenames[i], allCameras[cameraIdx], false);
       cameraIdx++;
     }
   }
@@ -292,6 +291,7 @@ void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
   imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.raw_mask.png";
   importBGRImage(imageFilename.str(), mask);
   CV_Assert(mask.channels() == 1);
+  CV_Assert(mask.type() == CV_8UC1);
 }
 
 void TODBaseImporter::importUserMask(int testImageIdx, cv::Mat &userMask) const
@@ -300,6 +300,7 @@ void TODBaseImporter::importUserMask(int testImageIdx, cv::Mat &userMask) const
   imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.user_mask.png";
   importBGRImage(imageFilename.str(), userMask);
   CV_Assert(userMask.channels() == 1);
+  CV_Assert(userMask.type() == CV_8UC1);
 }
 
 void TODBaseImporter::importOffset(PoseRT &offset) const
@@ -376,6 +377,13 @@ void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &clo
   fs["cloud"] >> cloud;
   fs.release();
   CV_Assert(!cloud.empty());
+}
+
+void TODBaseImporter::importRegistrationMask(cv::Mat &registrationMask) const
+{
+  //TODO: move up
+  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
+  importRegistrationMask(registrationMaskFilename, registrationMask);
 }
 
 void TODBaseImporter::importRegistrationMask(const std::string &filename, cv::Mat &registrationMask)

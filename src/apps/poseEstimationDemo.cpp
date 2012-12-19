@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
   const string depthFilename = baseFolder + "/depth.xml.gz";
   const string pointCloudFilename = baseFolder + "/pointCloud.pcd";
 
-  const vector<string> objectNames = {testObjectName};
+  const vector<string> objectNames(1, testObjectName);
 //  const vector<string> objectNames = {"bank", "bottle", "glass", "sourCream", "wineglass"};
 //  const vector<string> objectNames = {"bank", "bottle", "sourCream", "wineglass"};
 //  const vector<string> objectNames = {"bank", "bottle", "wineglass"};
@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
 
   if (!posesQualities.empty())
   {
+    cout << "quality: " << posesQualities[0] << endl;
     std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
     int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
     cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;

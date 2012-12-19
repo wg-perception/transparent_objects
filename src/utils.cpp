@@ -759,3 +759,63 @@ void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code)
   //TODO: eliminate copy
   Mat(src.dims, src.size.p, dst_vector.type(), dst_vector.data).copyTo(dst);
 }
+
+struct ManualContourMarkingData
+{
+  bool isLButtonPressed;
+  std::vector<cv::Point> *contour;
+  cv::Mat displayedImage;
+  std::string windowName;
+};
+
+static void onMouse(int event, int x, int y, int, void *srcData)
+{
+  ManualContourMarkingData *data = static_cast<ManualContourMarkingData*>(srcData);
+  if (event == CV_EVENT_LBUTTONUP)
+  {
+    data->isLButtonPressed = false;
+  }
+
+  if (event == CV_EVENT_LBUTTONDOWN)
+  {
+    data->isLButtonPressed = true;
+  }
+
+  if (!data->isLButtonPressed)
+  {
+    return;
+  }
+
+  Point pt(x, y);
+  data->contour->push_back(pt);
+  circle(data->displayedImage, pt, 1, Scalar(255, 0, 0), -1);
+  imshow(data->windowName, data->displayedImage);
+}
+
+void markContourByUser(const cv::Mat &image, std::vector<cv::Point> &contour,
+                       const std::string &windowName)
+{
+  const char resetKey = 'r';
+  contour.clear();
+
+  ManualContourMarkingData data;
+  data.contour = &contour;
+  //TODO: what if button is pressed already?
+  data.isLButtonPressed = false;
+  data.displayedImage = image.clone();
+  data.windowName = windowName;
+
+  namedWindow(data.windowName, WINDOW_NORMAL);
+  setMouseCallback(data.windowName, onMouse, &data);
+  imshow(data.windowName, data.displayedImage);
+  int key = waitKey();
+  while (key == resetKey)
+  {
+    data.displayedImage = image.clone();
+    data.contour->clear();
+    key = waitKey();
+  }
+  destroyWindow(data.windowName);
+
+  CV_Assert(!contour.empty());
+}

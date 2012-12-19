@@ -144,4 +144,8 @@ T getInterpolatedValue(const cv::Mat &mat, cv::Point2f pt)
 }
 
 
+void markContourByUser(const cv::Mat &image, std::vector<cv::Point> &contour,
+                       const std::string &windowName = "manual contour marking");
+
+
 #endif /* UTILS_HPP_ */
