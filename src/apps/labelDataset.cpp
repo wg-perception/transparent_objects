@@ -3,7 +3,7 @@
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/poseEstimator.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 
 using namespace cv;
 using std::cout;

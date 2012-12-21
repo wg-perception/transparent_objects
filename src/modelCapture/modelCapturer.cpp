@@ -1,6 +1,7 @@
 #include "modelCapture/modelCapturer.hpp"
 
 #include "edges_pose_refiner/utils.hpp"
+#include <iostream>
 #include "../mrf/GCoptimization.h"
 
 using namespace cv;

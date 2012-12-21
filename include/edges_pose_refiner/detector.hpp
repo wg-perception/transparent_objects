@@ -126,14 +126,14 @@ namespace transpod
      * \param objectNames names of the corresponding detected objects
      * \param debugInfo optional information for debugging
      */
-    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud,
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const std::vector<cv::Point3f> &sceneCloud,
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
-
+/*
     void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const cv::Mat &sceneCloud,
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
-
+*/
     /** \brief Visualize detected poses
      *
      * \param poses detected poses to be visualized
@@ -160,7 +160,7 @@ namespace transpod
      * \param cloud point cloud to add detected poses
      */
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
-                   pcl::PointCloud<pcl::PointXYZ> &cloud) const;
+                   const std::vector<cv::Point3f> &sceneCloud) const;
   private:
     DetectorParams params;
     PinholeCamera srcCamera;

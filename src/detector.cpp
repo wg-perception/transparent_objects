@@ -7,7 +7,7 @@
 
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/utils.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 
 #ifdef USE_3D_VISUALIZATION
 #include <boost/thread/thread.hpp>
@@ -298,7 +298,7 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
 */
 #endif
 }
-
+/*
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   pcl::PointCloud<pcl::PointXYZ> pclCloud;
@@ -308,8 +308,9 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   }
   detect(srcBgrImage, srcDepth, srcRegistrationMask, pclCloud, poses_cam, posesQualities, detectedObjectNames, debugInfo);
 }
+*/
 
-void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const std::vector<cv::Point3f> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -357,7 +358,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   switch(params.planeSegmentationMethod)
   {
     case PCL:
-      isEstimated = computeTableOrientation(params.pclPlaneSegmentationParams.downLeafSize,
+      isEstimated = computeTableOrientationByPCL(params.pclPlaneSegmentationParams.downLeafSize,
                       params.pclPlaneSegmentationParams.kSearch, params.pclPlaneSegmentationParams.distanceThreshold,
                       sceneCloud, tablePlane, &validTestCamera, &tableHull, params.pclPlaneSegmentationParams.clusterTolerance, params.pclPlaneSegmentationParams.verticalDirection);
       break;
@@ -523,9 +524,11 @@ void Detector::showResults(const std::vector<PoseRT> &poses, const std::vector<s
   imshow(title, visualization);
 }
 
-void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, const std::vector<cv::Point3f> &sceneCloud) const
 {
 #ifdef USE_3D_VISUALIZATION
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  cv2pcl(sceneCloud, cloud);
   CV_Assert(poses.size() == objectNames.size());
 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));

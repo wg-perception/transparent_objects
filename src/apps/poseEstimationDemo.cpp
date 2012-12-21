@@ -9,7 +9,7 @@
 //#define USE_INITIAL_GUESS
 
 #ifdef USE_INITIAL_GUESS
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #endif
 
 using namespace cv;
@@ -87,13 +87,12 @@ int main(int argc, char *argv[])
     detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
 
-  pcl::PointCloud<pcl::PointXYZ> testPointCloud;
+  vector<Point3f> testPointCloud;
   //dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
 #ifdef SHOW_CLOUD
   Mat points3d;
   depthTo3d(kinectDepth, kinectCamera.cameraMatrix, points3d);
-  vector<Point3f> cloud = points3d.reshape(3, points3d.total());
-  cv2pcl(cloud, testPointCloud);
+  testPointCloud = points3d.reshape(3, points3d.total());
 #endif
 
   vector<PoseRT> poses_cam;

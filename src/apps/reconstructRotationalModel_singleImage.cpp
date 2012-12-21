@@ -6,7 +6,7 @@
  */
 
 #include <opencv2/opencv.hpp>
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include <opencv2/rgbd/rgbd.hpp>

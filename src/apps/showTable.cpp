@@ -7,7 +7,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "edges_pose_refiner/TODBaseImporter.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #include "edges_pose_refiner/detector.hpp"
 
 #include <opencv2/rgbd/rgbd.hpp>
@@ -57,14 +57,12 @@ int main(int argc, char *argv[])
             Mat points3d;
             depthTo3d(depth, camera.cameraMatrix, points3d);
             vector<Point3f> cvCloud = points3d.reshape(3, points3d.total());
-            pcl::PointCloud<pcl::PointXYZ> pclCloud;
-            cv2pcl(cvCloud, pclCloud);
 
             transpod::PCLPlaneSegmentationParams params;
             Vec4f tablePlane;
             vector<Point2f> tableHull;
-            computeTableOrientation(params.downLeafSize, params.kSearch, params.distanceThreshold,
-                                    pclCloud, tablePlane, &camera, &tableHull);
+            computeTableOrientationByPCL(params.downLeafSize, params.kSearch, params.distanceThreshold,
+                                         cvCloud, tablePlane, &camera, &tableHull);
             Mat tableHull_int;
             Mat(tableHull).convertTo(tableHull_int, CV_32SC2);
 

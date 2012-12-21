@@ -7,7 +7,7 @@
 
 #include "edges_pose_refiner/poseEstimator.hpp"
 #include "edges_pose_refiner/localPoseRefiner.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #include "edges_pose_refiner/nonMaximumSuppression.hpp"
 
 #ifdef USE_3D_VISUALIZATION

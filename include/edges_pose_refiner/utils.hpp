@@ -12,14 +12,14 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
 //#define USE_3D_VISUALIZATION
 
 #ifdef USE_3D_VISUALIZATION
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #endif
 
@@ -40,9 +40,6 @@ void publishPoints(const std::vector<std::vector<cv::Point3f> >& points);
 void writePointCloud(const std::string &filename, const std::vector<cv::Point3f> &pointCloud);
 void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &pointCloud, std::vector<cv::Point3f> *normals = 0);
 void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &pointCloud, std::vector<cv::Point3i> &colors, std::vector<cv::Point3f> &normals);
-
-void pcl2cv(const pcl::PointCloud<pcl::PointXYZ> &pclCloud, std::vector<cv::Point3f> &cvCloud);
-void cv2pcl(const std::vector<cv::Point3f> &cvCloud, pcl::PointCloud<pcl::PointXYZ> &pclCloud);
 
 void transformPoint(const cv::Mat &Rt, const cv::Point3d &point, cv::Point3d &transformedPoint);
 

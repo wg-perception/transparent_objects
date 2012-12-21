@@ -15,6 +15,8 @@ set(src
     utils.cpp
     nonMaximumSuppression.cpp
     chamfer_matching/chamfer_matching.cpp
+    tableSegmentation.cpp
+    pcl.cpp
 )
 
 include_directories(SYSTEM

@@ -8,8 +8,6 @@
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 #include <fstream>
 #include <iomanip>
-#include "pcl/io/pcd_io.h"
-#include "pcl/point_types.h"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -256,7 +254,10 @@ void TODBaseImporter::importTestIndices(vector<int> &testIndices) const
 void TODBaseImporter::importDepth(const std::string &filename, cv::Mat &depth)
 {
   FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
+  if (!fs.isOpened())
+  {
+    CV_Error(CV_StsBadArg, "Cannot open the file " + filename);
+  }
   fs["depth_image"] >> depth;
   fs.release();
   CV_Assert(!depth.empty());
@@ -358,18 +359,20 @@ void TODBaseImporter::importAllGroundTruth(std::map<int, PoseRT> &allPoses) cons
   }
 }
 
-void TODBaseImporter::importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud)
+void TODBaseImporter::importPointCloud(const std::string &filename, std::vector<cv::Point3f> &cloud)
 {
-  pcl::io::loadPCDFile(filename, cloud);
+  CV_Assert(false);
+//  pcl::io::loadPCDFile(filename, cloud);
 }
 
-void TODBaseImporter::importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void TODBaseImporter::importPointCloud(int testImageIdx, std::vector<cv::Point3f> &cloud) const
 {
   std::stringstream pointCloudFilename;
   pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
   importPointCloud(pointCloudFilename.str(), cloud);
 }
 
+/*
 void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud)
 {
   FileStorage fs(filename, FileStorage::READ);
@@ -378,6 +381,7 @@ void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &clo
   fs.release();
   CV_Assert(!cloud.empty());
 }
+*/
 
 void TODBaseImporter::importRegistrationMask(cv::Mat &registrationMask) const
 {
