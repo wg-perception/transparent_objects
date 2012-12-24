@@ -139,6 +139,9 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
 #ifndef USE_RGBD_MODULE
   CV_Assert(false);
 #else
+  //TODO: move up
+  const uchar nonPlanarMark = 255;
+
   Mat points3d;
   depthTo3d(depth, camera.cameraMatrix, points3d);
   RgbdNormals normalsEstimator(depth.rows, depth.cols, depth.depth(), camera.cameraMatrix);
@@ -155,7 +158,10 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
   {
     for (int j = 0; j < planesMask.cols; ++j)
     {
-      pixelCounts[planesMask.at<uchar>(i, j)] += 1;
+      if (planesMask.at<uchar>(i, j) != nonPlanarMark)
+      {
+        pixelCounts[planesMask.at<uchar>(i, j)] += 1;
+      }
     }
   }
   std::vector<int>::iterator largestPlaneIt = std::max_element(pixelCounts.begin(), pixelCounts.end());
