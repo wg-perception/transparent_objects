@@ -12,6 +12,7 @@
 
 #include <opencv2/rgbd/rgbd.hpp>
 #include <iomanip>
+#include <omp.h>
 
 using namespace cv;
 using std::cout;
@@ -32,11 +33,15 @@ int main(int argc, char *argv[])
     Mat registrationMask;
     dataImporter.importAllData(0, 0, &camera, &registrationMask, 0, &testIndices);
 
+
+    omp_set_num_threads(7);
+#pragma omp parallel for
     for(size_t _testIdx = 0; _testIdx < testIndices.size(); ++_testIdx)
     {
-        std::stringstream filename;
+        std::cout << _testIdx << std::endl;
         int testImageIndex = testIndices[_testIdx];
 
+        std::stringstream filename;
         filename << "table_" << std::setw(5) << std::setfill('0') << testImageIndex << ".png";
 
         Mat bgrImage, depth;
@@ -47,12 +52,11 @@ int main(int argc, char *argv[])
             Vec4f tablePlane;
             vector<Point> tableHull;
             computeTableOrientationByRGBD(depth, camera, tablePlane, &tableHull);
-
             Mat rgbdVisualization = bgrImage.clone();
             polylines(rgbdVisualization, tableHull, true, Scalar(255, 0, 255));
             imwrite(filename.str() + ".rgbd.png", rgbdVisualization);
         }
-
+/*
         {
             Mat points3d;
             depthTo3d(depth, camera.cameraMatrix, points3d);
@@ -70,5 +74,6 @@ int main(int argc, char *argv[])
             polylines(pclVisualization, tableHull_int, true, Scalar(255, 0, 255));
             imwrite(filename.str() + ".pcl.png", pclVisualization);
         }
+*/
     }
 }
