@@ -12,6 +12,8 @@
 #include <opencv2/rgbd/rgbd.hpp>
 
 //#define VISUALIZE_MODEL_CONSTRUCTION_3D
+#define SAVE_USER_INPUT
+//#define LOAD_USER_INPUT
 
 using namespace cv;
 using std::cout;
@@ -20,8 +22,18 @@ using std::endl;
 void collectUserInput(const cv::Mat &image,
                       std::vector<cv::Point> &topEllipseContour, std::vector<cv::Point> &bottomEllipseContour)
 {
+#ifndef LOAD_USER_INPUT
     markContourByUser(image, topEllipseContour, "mark the top ellipse");
     markContourByUser(image, bottomEllipseContour, "mark the bottom ellipse");
+#else
+    topEllipseContour = getFromCache("userInput_top");
+    bottomEllipseContour = getFromCache("userInput_bottom");
+#endif
+
+#ifdef SAVE_USER_INPUT
+    saveToCache("userInput_top", Mat(topEllipseContour));
+    saveToCache("userInput_bottom", Mat(bottomEllipseContour));
+#endif
 }
 
 int main(int argc, char *argv[])
@@ -46,7 +58,15 @@ int main(int argc, char *argv[])
     int numberOfComponents;
     glassSegmentator.segment(image, depth, registrationMask, numberOfComponents, glassMask);
 #else
+
+#ifndef LOAD_USER_INPUT
     segmentGlassManually(image, glassMask);
+#else
+    glassMask = getFromCache("userMask");
+#endif
+#ifdef SAVE_USER_INPUT
+    saveToCache("userMask", glassMask);
+#endif
     Mat refinedGlassMask;
     GlassSegmentatorParams params;
     params.grabCutDilationsIterations = 1;
@@ -248,17 +268,21 @@ int main(int argc, char *argv[])
             circlesModelPoints.push_back(basePoint + x * basis_x + y * basis_y);
         }
     }
-#ifdef VISUALIZE_MODEL_CONSTRUCTION_3D
-//    visualizationPoints.push_back(allBasePoints);
-//    publishPoints(visualizationPoints);
-//    publishPoints(modelPoints);
-#endif
-
     writePointCloud("model_singleImage.asc", modelPoints);
 
     Mat projectedModel = drawEdgels(image, circlesModelPoints, PoseRT(), camera);
     imshow("final model", projectedModel);
     waitKey();
+
+#ifdef VISUALIZE_MODEL_CONSTRUCTION_3D
+    Mat projectedNormal = drawEdgels(drawImage, allBasePoints, PoseRT(), camera);
+    imshow("projectedNormal", projectedNormal);
+    waitKey();
+
+    visualizationPoints.push_back(allBasePoints);
+    publishPoints(visualizationPoints);
+//    publishPoints(modelPoints);
+#endif
 
     return 0;
 }
