@@ -173,8 +173,8 @@ int main(int argc, char *argv[])
     imshow("detection", detectionResults);
     imwrite("detection_" + bestName[0] + ".png", detectionResults);
     imwrite("testImage_" + bestName[0] + ".png", kinectBgrImage);
-    waitKey();
   }
+  waitKey();
 
 #ifdef SHOW_CLOUD
   detector.visualize(poses_cam, detectedObjectsNames, testPointCloud);

@@ -17,6 +17,7 @@ set(src
     chamfer_matching/chamfer_matching.cpp
     tableSegmentation.cpp
     pcl.cpp
+    pclVisualization.cpp
 )
 
 include_directories(SYSTEM

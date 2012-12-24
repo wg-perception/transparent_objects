@@ -15,14 +15,6 @@
 #include "edges_pose_refiner/poseRT.hpp"
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
-//#define USE_3D_VISUALIZATION
-
-#ifdef USE_3D_VISUALIZATION
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#endif
-
 void createProjectiveMatrix(const cv::Mat &R, const cv::Mat &t, cv::Mat &Rt);
 void getRvecTvec(const cv::Mat &projectiveMatrix, cv::Mat &rvec, cv::Mat &tvec);
 void getTransformationMatrix(const cv::Mat &R_obj2cam, const cv::Mat &t_obj2cam, const cv::Mat &rvec_Object, const cv::Mat &tvec_Object, cv::Mat &transformationMatrix);
@@ -30,9 +22,6 @@ void getTransformationMatrix(const cv::Mat &Rt_obj2cam, const cv::Mat &rvec_Obje
 
 void getRotationTranslation(const cv::Mat &projectiveMatrix, cv::Mat &R, cv::Mat &t);
 
-#ifdef USE_3D_VISUALIZATION
-void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color = cv::Scalar(0, 0, 255), const std::string &title = "", const PoseRT &pose = PoseRT());
-#endif
 void publishPoints(const std::vector<cv::Point3f>& points, cv::Scalar color = cv::Scalar(0, 255, 0), const std::string &id = "", const PoseRT &pose = PoseRT());
 void publishPoints(const std::vector<std::vector<cv::Point3f> >& points);
 //void publishTable(const cv::Vec4f &tablePlane, int id, cv::Scalar color, ros::Publisher *pt_pub = 0);
