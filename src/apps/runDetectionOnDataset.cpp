@@ -12,7 +12,9 @@
 #include "edges_pose_refiner/tableSegmentation.hpp"
 
 #include <iomanip>
-//#include <omp.h>
+#include <fstream>
+#include <omp.h>
+#include <sys/stat.h>
 
 //#define RUN_ONLY_SEGMENTATION
 
@@ -23,26 +25,51 @@ using std::endl;
 
 int main(int argc, char *argv[])
 {
-    std::system("date");
-
-    if (argc != 6)
+    if (argc < 5)
     {
-        cout << argv[0] << " <modelsPath> <baseFoldler> <testObjectName> <startIndex> <endIndex>" << endl;
+        cout << "Use the following format to run the program:" << endl << endl;
+        cout << '\t' << argv[0] << " [-j numberOfThreads] <modelsFolder> <testFolder> <resultsFolder> objectName..."<< endl << endl;
+        cout << "numberOfThreads\t\tNumber of OpenMP threads to use" << endl;
+        cout << "modelsFolder\t\tFolder where trained models are stored" << endl;
+        cout << "testFolder\t\tFolder with test data" << endl;
+        cout << "resultsFolder\t\tFolder where results should be saved" << endl;
+        cout << "objectName\t\tOne or several names of objects (separated by spaces) to detect" << endl;
+
         return -1;
     }
+    std::system("date");
 
-    const string trainedModelsPath = argv[1];
-    const string baseFolder = argv[2];
-    const string testObjectName = argv[3];
-    const int startIndex = atoi(argv[4]);
-    const int endIndex = atoi(argv[5]);
+    bool isNumberOfThreadsPassed = strcmp(argv[1], "-j") == 0;
+    const int numberOfThreads = isNumberOfThreadsPassed ? atoi(argv[2]) : 1;
+    CV_Assert(numberOfThreads > 0);
+    const int optionsShift = isNumberOfThreadsPassed ? 3 : 1;
 
-    const string testFolder = baseFolder + "/" + testObjectName + "/";
-    const string visualizationPath = "/shared/hotels/visualized_results/";
+    const string trainedModelsPath = argv[0 + optionsShift];
+    const string testFolder        = argv[1 + optionsShift];
+    const string visualizationPath = argv[2 + optionsShift];
     vector<string> objectNames;
-    objectNames.push_back(testObjectName);
+    for (int i = 3 + optionsShift; i < argc; ++i)
+    {
+        objectNames.push_back(argv[i]);
+    }
+    //TODO: add detection for several objects
+    CV_Assert(objectNames.size() == 1);
+    const string baseFolder = testFolder + "/../";
+    const string qualitiesFilename = visualizationPath + "/qualities.txt";
+    omp_set_num_threads(numberOfThreads);
 
-    cout << "writing to " << visualizationPath << endl;
+    cout << "Results will be stored at " << visualizationPath << endl;
+    struct stat st = {0};
+    if (stat(visualizationPath.c_str(), &st) == -1)
+    {
+        const mode_t visualizationPathAccess = 0744;
+
+        int errorStatus = mkdir(visualizationPath.c_str(), visualizationPathAccess);
+        if (errorStatus == -1)
+        {
+            CV_Error(CV_StsBadArg, "Cannot create the results folder: " + visualizationPath);
+        }
+    }
 
     TODBaseImporter dataImporter(baseFolder, testFolder);
 
@@ -65,13 +92,18 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    for(size_t _testIdx = startIndex; _testIdx < endIndex; ++_testIdx)
+    vector<float> allQualities(testIndices.size(), std::numeric_limits<float>::max());
+    cout << "Started detection" << endl;
+    const int numberOfChunksPerThread = 20;
+    int chunkSize = std::max(1, static_cast<int>(testIndices.size()) / (numberOfThreads * numberOfChunksPerThread));
+#pragma omp parallel for schedule(dynamic, chunkSize)
+    for(size_t _testIdx = 0; _testIdx < testIndices.size(); ++_testIdx)
     {
         int testImageIndex = testIndices[_testIdx];
-        cout << "Test: " << _testIdx << " " << testImageIndex << endl;
         Mat bgrImage, depth;
         dataImporter.importBGRImage(testImageIndex, bgrImage);
         dataImporter.importDepth(testImageIndex, depth);
+        vector<Point3f> cloud;
 
         TickMeter recognitionTime;
         recognitionTime.start();
@@ -98,35 +130,70 @@ int main(int argc, char *argv[])
         Detector::DebugInfo debugInfo;
         try
         {
-            detector.detect(bgrImage, depth, registrationMask, Mat(), poses_cam, posesQualities, detectedObjectsNames, &debugInfo);
+            detector.detect(bgrImage, depth, registrationMask, cloud, poses_cam, posesQualities, detectedObjectsNames, &debugInfo);
         }
         catch(const cv::Exception &)
         {
         }
         recognitionTime.stop();
-        cout << "Recognition time: " << recognitionTime.getTimeSec() << "s" << endl;
+
+        std::stringstream statusMessage;
+        const int imageIndexWidth = 5;
+        const int precision = 3;
+        const int timeWidth = precision + 4;
+        statusMessage << "Proccessed image " << std::setw(imageIndexWidth) << testImageIndex <<
+                         " in " << std::fixed << std::setprecision(precision) << std::setw(timeWidth) << recognitionTime.getTimeSec() << " seconds" << endl;
+        statusMessage << "Object errors:";
+        //TODO: for several objects print +inf if one of them was not detected
+        for (size_t i = 0; i < posesQualities.size(); ++i)
+        {
+            statusMessage << " " << posesQualities[i];
+        }
+        cout << statusMessage.str() << endl << endl;
+
         if (!posesQualities.empty())
         {
-            cout << "quality: " << posesQualities[0] << endl;
+            CV_Assert(objectNames.size() == 1);
+            allQualities[_testIdx] = posesQualities[0];
         }
 
         Mat glassMask = debugInfo.glassMask;
+        if (glassMask.empty())
+        {
+            glassMask = Mat(bgrImage.size(), CV_8UC1, Scalar(0));
+        }
 #endif
         std::stringstream str;
         str << std::setw(5) << std::setfill('0') << testImageIndex;
         Mat segmentation = drawSegmentation(bgrImage, glassMask);
-        imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_mask.png", segmentation);
+        imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_segmentation.png", segmentation);
 
 #ifndef RUN_ONLY_SEGMENTATION
-        Mat poseImage = bgrImage.clone();
-        detector.visualize(poses_cam, detectedObjectsNames, poseImage);
-        imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_pose.png", poseImage);
+        Mat detectionImage = bgrImage.clone();
+        detector.visualize(poses_cam, detectedObjectsNames, detectionImage);
+        string detectionFilename = visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_detection.png";
+        bool isSuccess = imwrite(detectionFilename, detectionImage);
+        if (!isSuccess)
+        {
+            CV_Error(CV_StsBadArg, "Cannot write to " + detectionFilename);
+        }
 #endif
 
         const float depthNormalizationFactor = 100;
         imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_depth.png", depth * depthNormalizationFactor);
     }
 
+    std::ofstream fout(qualitiesFilename.c_str());
+    if (!fout.is_open())
+    {
+        CV_Error(CV_StsBadArg, "Cannot write to " + qualitiesFilename);
+    }
+    for(size_t _testIdx = 0; _testIdx < testIndices.size(); ++_testIdx)
+    {
+        int testImageIndex = testIndices[_testIdx];
+        fout << testImageIndex << " " << allQualities[_testIdx] << '\n';
+    }
+    fout.close();
+
     std::system("date");
 }
-
