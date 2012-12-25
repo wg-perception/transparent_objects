@@ -307,24 +307,19 @@ namespace transpod
     void getInitialPoses(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities) const;
     void getInitialPosesByGeometricHashing(const cv::Mat &glassMask, std::vector<PoseRT> &initialPoses, std::vector<float> &initialPosesQualities, std::vector<cv::Mat> *initialSilhouettes) const;
 
-    void refineInitialPoses(const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+    void refineInitialPoses(const cv::Mat &testBgrImage, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
                             std::vector<PoseRT> &initPoses_cam, std::vector<float> &initPosesQualities,
                             const LocalPoseRefinerParams &lmParams = LocalPoseRefinerParams(), std::vector<cv::Mat> *jacobians = 0) const;
     void findTransformationToTable(PoseRT &pose_cam, const cv::Vec4f &tablePlane, float &rotationAngle, const cv::Mat finalJacobian = cv::Mat()) const;
-    void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
-    void refineFinalTablePoses(const cv::Vec4f &tablePlane, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+    void refinePosesByTableOrientation(const cv::Vec4f &tablePlane, const cv::Mat &testBgrImage, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges, std::vector<PoseRT> &poses_cam, std::vector<float> &initPosesQualities) const;
+    void refineFinalTablePoses(const cv::Vec4f &tablePlane, const cv::Mat &testBgrImage, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
                       std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const;
 
     EdgeModel edgeModel;
     std::vector<Silhouette> silhouettes;
     std::vector<cv::Mat> canonicScales;
-    //TODO: remove mutable
-    mutable cv::Ptr<GHTable> ghTable;
-    mutable PoseEstimatorParams params;
-    mutable std::vector<cv::Mat> votes;
-
-    mutable cv::Mat testBgrImage;
-
+    cv::Ptr<GHTable> ghTable;
+    PoseEstimatorParams params;
     PinholeCamera kinectCamera;
   };
 }

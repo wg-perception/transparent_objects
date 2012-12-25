@@ -29,6 +29,7 @@ using std::endl;
 bool computeTableOrientationByPCL(float downLeafSize, int kSearch, float distanceThreshold, const std::vector<cv::Point3f> &cvFullSceneCloud,
                                   cv::Vec4f &tablePlane, const PinholeCamera *camera, std::vector<cv::Point2f> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)
 {
+  CV_Assert(!cvFullSceneCloud.empty());
   pcl::PointCloud<pcl::PointXYZ> fullSceneCloud;
   cv2pcl(cvFullSceneCloud, fullSceneCloud);
 #ifdef VERBOSE

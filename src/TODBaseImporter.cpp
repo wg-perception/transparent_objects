@@ -46,9 +46,8 @@ void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const 
     for (size_t i = 0; i < trainObjectNames->size(); ++i)
     {
       importEdgeModel(*trainedModelsPath, (*trainObjectNames)[i], (*edgeModels)[i]);
-      cout << "imported a model for " << (*trainObjectNames)[i] << endl;
-      cout << "All points in the model: " << (*edgeModels)[i].points.size() << endl;
-      cout << "Surface points in the model: " << (*edgeModels)[i].stableEdgels.size() << endl;
+      cout << ("Imported a model for " + (*trainObjectNames)[i] + ": ") <<
+              (*edgeModels)[i].points.size() << " points (" << (*edgeModels)[i].stableEdgels.size() << " surface edgels)" << endl;
       EdgeModel::computeSurfaceEdgelsOrientations((*edgeModels)[i]);
     }
   }

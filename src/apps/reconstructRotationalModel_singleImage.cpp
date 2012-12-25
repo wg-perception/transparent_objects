@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 #ifdef USE_AUTOMATIC_SEGMENTATION
     Mat registrationMask;
     baseImporter.importRegistrationMask(registrationMask);
-    GlassSegmentator glassSegmentator(params);
+    GlassSegmentator glassSegmentator;
     int numberOfComponents;
     glassSegmentator.segment(image, depth, registrationMask, numberOfComponents, glassMask);
 #else
