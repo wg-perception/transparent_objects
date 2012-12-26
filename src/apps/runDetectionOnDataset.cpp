@@ -60,10 +60,9 @@ int main(int argc, char *argv[])
     struct stat st = {0};
     if (stat(visualizationPath.c_str(), &st) == -1)
     {
-        const mode_t visualizationPathAccess = 0744;
-
-        int errorStatus = mkdir(visualizationPath.c_str(), visualizationPathAccess);
-        if (errorStatus == -1)
+        string mkdirCommand = "mkdir -p " + visualizationPath;
+        int returnCode = std::system(mkdirCommand.c_str());
+        if (returnCode != 0)
         {
             CV_Error(CV_StsBadArg, "Cannot create the results folder: " + visualizationPath);
         }
