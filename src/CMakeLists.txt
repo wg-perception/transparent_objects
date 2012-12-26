@@ -234,10 +234,10 @@ endif()
 #                                ${PYTHON_LIBRARIES}
 #)
 
-add_executable(reconstructRotationalModel_singleImage apps/reconstructRotationalModel_singleImage.cpp)
-target_link_libraries(reconstructRotationalModel_singleImage edges_pose_refiner
-                                                 ${OpenCV_LIBRARIES}
-)
+#add_executable(reconstructRotationalModel_singleImage apps/reconstructRotationalModel_singleImage.cpp)
+#target_link_libraries(reconstructRotationalModel_singleImage edges_pose_refiner
+#                                                 ${OpenCV_LIBRARIES}
+#)
 
 add_executable(runDetectionOnDataset apps/runDetectionOnDataset.cpp)
 set_target_properties(runDetectionOnDataset PROPERTIES
@@ -249,8 +249,7 @@ target_link_libraries(runDetectionOnDataset edges_pose_refiner)
 #add_executable(writeVideo apps/writeVideo.cpp)
 #target_link_libraries(writeVideo ${OpenCV_LIBRARIES})
 
-set(WITH_ROS False)
-if (WITH_ROS)
+if (${WITH_ROS})
     #TODO: remove hard-coded paths
     include_directories(/opt/ros/fuerte/stacks/vision_opencv/cv_bridge/include/)
     add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
