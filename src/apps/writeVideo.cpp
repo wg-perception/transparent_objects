@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
         Mat bgrImage = imread(path + "/image_" + index.str() + ".png");
         CV_Assert(!bgrImage.empty());
-        Mat detection = imread(path + "/" + objectName + "_" + index.str() + "_pose.png");
+        Mat detection = imread(path + "/image_" + index.str() + "_detection.png");
         CV_Assert(!detection.empty());
 
         if (allQualities[i] > maxQuality)
