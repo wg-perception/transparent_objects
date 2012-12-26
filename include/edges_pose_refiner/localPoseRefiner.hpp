@@ -129,6 +129,8 @@ private:
                                        cv::Mat &residuals, double outlierError, bool useInterpolation, float inliersRatio, cv::Mat &inliersMask) const;
 
   double getError(const cv::Mat &residuals) const;
+  //TODO: incorporate normalization into optimization?
+  double normalizeError(const PoseRT &pose_cam, double error) const;
 
   void computeWeights(const std::vector<cv::Point2f> &projectedPointsVector, const cv::Mat &silhouetteEdges, cv::Mat &weights) const;
 
