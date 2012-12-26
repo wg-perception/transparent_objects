@@ -418,6 +418,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   {
     debugInfo->glassMask = glassMask;
     debugInfo->tablePlane = tablePlane;
+    debugInfo->tableHull = tableHull;
   }
 #ifdef VERBOSE
   std::cout << "glass is segmented" << std::endl;
@@ -482,12 +483,18 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   }
 }
 
-void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image,
+                         const DebugInfo *debugInfo) const
 {
   CV_Assert(poses.size() == objectNames.size());
   if (image.size() != validTestImageSize)
   {
     resize(image, image, validTestImageSize);
+  }
+
+  if (debugInfo != 0)
+  {
+      drawTable(debugInfo->tableHull, image);
   }
 
   for (size_t i = 0; i < poses.size(); ++i)

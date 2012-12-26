@@ -295,3 +295,23 @@ int computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Ma
   int numberOfPatternsFound = static_cast<int>(isBlackFound) + static_cast<int>(isWhiteFound);
   return numberOfPatternsFound;
 }
+
+void drawTable(const std::vector<cv::Point2f> &tableHull, cv::Mat &image,
+               cv::Scalar color, int thickness)
+{
+    if (image.channels() == 1)
+    {
+        Mat drawImage;
+        cvtColor(image, drawImage, CV_GRAY2BGR);
+        image = drawImage;
+    }
+    CV_Assert(image.channels() == 3);
+
+    if (!tableHull.empty())
+    {
+        Mat tableHull_int;
+        Mat(tableHull).convertTo(tableHull_int, CV_32SC2);
+        bool isClosed = true;
+        polylines(image, tableHull_int, isClosed, color, thickness);
+    }
+}

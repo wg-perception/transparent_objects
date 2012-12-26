@@ -141,7 +141,7 @@ namespace transpod
      * \param image image to draw visualized poses
      */
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
-                   cv::Mat &image) const;
+                   cv::Mat &image, const DebugInfo *debugInfo = 0) const;
 
     /** \brief Visualize and show detected poses
      *
@@ -174,6 +174,7 @@ namespace transpod
       std::vector<cv::Mat> initialSilhouettes;
       std::vector<PoseRT> initialPoses;
       cv::Vec4f tablePlane;
+      std::vector<cv::Point2f> tableHull;
   };
 
   void reconstructCollisionMap(const PinholeCamera &validTestCamera,

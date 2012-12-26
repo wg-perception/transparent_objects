@@ -21,4 +21,7 @@ bool computeTableOrientationByRGBD(const cv::Mat &depth, const PinholeCamera &ca
 int computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Mat &bgrImage,
                                         cv::Vec4f &tablePlane);
 
+void drawTable(const std::vector<cv::Point2f> &tableHull, cv::Mat &image,
+               cv::Scalar color = cv::Scalar(0, 255, 0), int thickness = 2);
+
 #endif // TABLESEGMENTATION_HPP
