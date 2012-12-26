@@ -103,11 +103,6 @@ namespace transparent_objects
       fs.release();
 #endif
 
-      assert(cloud_->channels() == 3);
-      std::vector<cv::Point3f> cvCloud = cloud_->reshape(3, cloud_->total());
-      pcl::PointCloud<pcl::PointXYZ> pclCloud;
-      cv2pcl(cvCloud, pclCloud);
-
       std::vector<PoseRT> poses;
       PinholeCamera camera(*K_, cv::Mat(), PoseRT(), color_->size());
       detector_->initialize(camera);
@@ -118,7 +113,7 @@ namespace transparent_objects
       transpod::Detector::DebugInfo debugInfo;
       try
       {
-        detector_->detect(*color_, *depth_, registrationMask, pclCloud, poses, posesQualities, detectedObjects, &debugInfo);
+        detector_->detect(*color_, *depth_, registrationMask, poses, posesQualities, detectedObjects, &debugInfo);
       }
       catch(const cv::Exception &)
       {
@@ -132,7 +127,8 @@ namespace transparent_objects
         imshow("all detected objects", visualization);
         cv::waitKey(300);
 #ifdef USE_3D_VISUALIZATION
-        detector_->visualize(poses, detectedObjects, pclCloud);
+        CV_Assert(false);
+        //detector_->visualize(poses, detectedObjects, pclCloud);
 #endif
       }
 
