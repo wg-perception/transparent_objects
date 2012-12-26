@@ -1,7 +1,6 @@
 #TDS: dont glob together sources.
 set(src 
     edgeModel.cpp
-    gmm.cpp
     glassSegmentator.cpp
     localPoseRefiner.cpp
     pclProcessing.cpp
