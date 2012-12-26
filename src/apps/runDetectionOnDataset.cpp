@@ -52,8 +52,6 @@ int main(int argc, char *argv[])
     {
         objectNames.push_back(argv[i]);
     }
-    //TODO: add detection for several objects
-    CV_Assert(objectNames.size() == 1);
     const string baseFolder = testFolder + "/../";
     const string qualitiesFilename = visualizationPath + "/qualities.txt";
     omp_set_num_threads(numberOfThreads);
@@ -88,7 +86,9 @@ int main(int argc, char *argv[])
     Detector detector(kinectCamera, params);
     for (size_t i = 0; i < edgeModels.size(); ++i)
     {
+        cout << "Training the detector for " << objectNames[i] << "...  " << std::flush;
         detector.addTrainObject(objectNames[i], edgeModels[i]);
+        cout << "done." << endl;
     }
 #endif
 
@@ -151,9 +151,8 @@ int main(int argc, char *argv[])
         }
         cout << statusMessage.str() << endl << endl;
 
-        if (!posesQualities.empty())
+        if (!posesQualities.empty() && objectNames.size() == 1)
         {
-            CV_Assert(objectNames.size() == 1);
             allQualities[_testIdx] = posesQualities[0];
         }
 
@@ -163,15 +162,16 @@ int main(int argc, char *argv[])
             glassMask = Mat(bgrImage.size(), CV_8UC1, Scalar(0));
         }
 #endif
-        std::stringstream str;
-        str << std::setw(5) << std::setfill('0') << testImageIndex;
+        std::stringstream imageIndex;
+        const int indexWidth = 5;
+        imageIndex << std::setw(indexWidth) << std::setfill('0') << testImageIndex;
         Mat segmentation = drawSegmentation(bgrImage, glassMask);
-        imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_segmentation.png", segmentation);
+        imwrite(visualizationPath + "/image_" + imageIndex.str() + "_segmentation.png", segmentation);
 
 #ifndef RUN_ONLY_SEGMENTATION
         Mat detectionImage = bgrImage.clone();
-        detector.visualize(poses_cam, detectedObjectsNames, detectionImage);
-        string detectionFilename = visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_detection.png";
+        detector.visualize(poses_cam, detectedObjectsNames, detectionImage, &debugInfo);
+        string detectionFilename = visualizationPath + "/image_" + imageIndex.str() + "_detection.png";
         bool isSuccess = imwrite(detectionFilename, detectionImage);
         if (!isSuccess)
         {
@@ -180,20 +180,24 @@ int main(int argc, char *argv[])
 #endif
 
         const float depthNormalizationFactor = 100;
-        imwrite(visualizationPath + "/" + objectNames[0] + "_" + str.str() + "_depth.png", depth * depthNormalizationFactor);
+        imwrite(visualizationPath + "/image_" + imageIndex.str() + "_depth.png", depth * depthNormalizationFactor);
     }
 
-    std::ofstream fout(qualitiesFilename.c_str());
-    if (!fout.is_open())
+    if (objectNames.size() == 1)
     {
-        CV_Error(CV_StsBadArg, "Cannot write to " + qualitiesFilename);
+        std::ofstream fout(qualitiesFilename.c_str());
+        if (!fout.is_open())
+        {
+            CV_Error(CV_StsBadArg, "Cannot write to " + qualitiesFilename);
+        }
+        for(size_t _testIdx = 0; _testIdx < testIndices.size(); ++_testIdx)
+        {
+            int testImageIndex = testIndices[_testIdx];
+            fout << testImageIndex << " " << allQualities[_testIdx] << '\n';
+        }
+        fout.close();
     }
-    for(size_t _testIdx = 0; _testIdx < testIndices.size(); ++_testIdx)
-    {
-        int testImageIndex = testIndices[_testIdx];
-        fout << testImageIndex << " " << allQualities[_testIdx] << '\n';
-    }
-    fout.close();
 
     std::system("date");
+    return 0;
 }
