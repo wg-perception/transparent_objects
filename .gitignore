@@ -14,3 +14,5 @@ build/
 .pydevproject
 linemod
 mmod
+.DS_Store
+CMakeLists.txt.user

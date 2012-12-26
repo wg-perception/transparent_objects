@@ -7,15 +7,13 @@
 
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/utils.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 
 #ifdef USE_3D_VISUALIZATION
 #include <boost/thread/thread.hpp>
 #endif
 
 #include <opencv2/opencv.hpp>
-
-#include <opencv2/rgbd/rgbd.hpp>
 
 //#define VISUALIZE_DETECTION
 
@@ -45,6 +43,13 @@ EdgeModel Detector::getModel(const string &objectName)
 void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, bool isModelUpsideDown, bool centralize)
 {
   EdgeModel edgeModel(points, isModelUpsideDown, centralize);
+  addTrainObject(objectName, edgeModel);
+}
+
+void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals,
+                              bool isModelUpsideDown, bool centralize)
+{
+  EdgeModel edgeModel(points, normals, isModelUpsideDown, centralize);
   addTrainObject(objectName, edgeModel);
 }
 
@@ -301,17 +306,14 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
 #endif
 }
 
-void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask,
+                      std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames,
+                      Detector::DebugInfo *debugInfo) const
 {
-  pcl::PointCloud<pcl::PointXYZ> pclCloud;
-  if (!sceneCloud.empty())
-  {
-    cv2pcl(sceneCloud.reshape(3, 1), pclCloud);
-  }
-  detect(srcBgrImage, srcDepth, srcRegistrationMask, pclCloud, poses_cam, posesQualities, detectedObjectNames, debugInfo);
+    detect(srcBgrImage, srcDepth, srcRegistrationMask, vector<Point3f>(), poses_cam, posesQualities, detectedObjectNames, debugInfo);
 }
 
-void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const std::vector<cv::Point3f> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {
   CV_Assert(srcBgrImage.size() == srcDepth.size());
   CV_Assert(srcRegistrationMask.size() == srcDepth.size());
@@ -359,7 +361,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   switch(params.planeSegmentationMethod)
   {
     case PCL:
-      isEstimated = computeTableOrientation(params.pclPlaneSegmentationParams.downLeafSize,
+      isEstimated = computeTableOrientationByPCL(params.pclPlaneSegmentationParams.downLeafSize,
                       params.pclPlaneSegmentationParams.kSearch, params.pclPlaneSegmentationParams.distanceThreshold,
                       sceneCloud, tablePlane, &validTestCamera, &tableHull, params.pclPlaneSegmentationParams.clusterTolerance, params.pclPlaneSegmentationParams.verticalDirection);
       break;
@@ -419,6 +421,7 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   {
     debugInfo->glassMask = glassMask;
     debugInfo->tablePlane = tablePlane;
+    debugInfo->tableHull = tableHull;
   }
 #ifdef VERBOSE
   std::cout << "glass is segmented" << std::endl;
@@ -483,12 +486,25 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
   }
 }
 
-void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image,
+                         const DebugInfo *debugInfo) const
+{
+    vector<float> posesQualities(poses.size(), 0.0f);
+    visualize(poses, posesQualities, objectNames, image, debugInfo);
+}
+
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<float> &posesQualities, const std::vector<std::string> &objectNames, cv::Mat &image,
+                         const DebugInfo *debugInfo) const
 {
   CV_Assert(poses.size() == objectNames.size());
   if (image.size() != validTestImageSize)
   {
     resize(image, image, validTestImageSize);
+  }
+
+  if (debugInfo != 0)
+  {
+      drawTable(debugInfo->tableHull, image);
   }
 
   for (size_t i = 0; i < poses.size(); ++i)
@@ -513,7 +529,9 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
         color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
     }
 
-    poseEstimators.find(objectNames[i])->second.visualize(poses[i], image, color);
+    const PoseEstimator &estimator = poseEstimators.find(objectNames[i])->second;
+    float blendingFactor = estimator.computeBlendingFactor(posesQualities[i]);
+    estimator.visualize(poses[i], image, color, blendingFactor);
   }
 }
 
@@ -525,9 +543,11 @@ void Detector::showResults(const std::vector<PoseRT> &poses, const std::vector<s
   imshow(title, visualization);
 }
 
-void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, const std::vector<cv::Point3f> &sceneCloud) const
 {
 #ifdef USE_3D_VISUALIZATION
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  cv2pcl(sceneCloud, cloud);
   CV_Assert(poses.size() == objectNames.size());
 
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("detected objects"));

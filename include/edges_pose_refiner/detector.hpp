@@ -62,7 +62,7 @@ namespace transpod
 
     DetectorParams()
     {
-      planeSegmentationMethod = PCL;
+      planeSegmentationMethod = RGBD;
       pclPlaneSegmentationParams = PCLPlaneSegmentationParams();
       glassSegmentationMethod = AUTOMATIC;
       glassSegmentationParams = GlassSegmentatorParams();
@@ -101,6 +101,9 @@ namespace transpod
     void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points,
                         bool isModelUpsideDown = false, bool centralize = true);
 
+    void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals,
+                        bool isModelUpsideDown = false, bool centralize = true);
+
     /** \brief Add a new train object to the detector which will be searched at the test stage
      *
      * \param objectName name of the train object
@@ -126,11 +129,11 @@ namespace transpod
      * \param objectNames names of the corresponding detected objects
      * \param debugInfo optional information for debugging
      */
-    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const pcl::PointCloud<pcl::PointXYZ> &sceneCloud,
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask,
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
 
-    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const cv::Mat &sceneCloud,
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const std::vector<cv::Point3f> &sceneCloud,
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
 
@@ -141,7 +144,10 @@ namespace transpod
      * \param image image to draw visualized poses
      */
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
-                   cv::Mat &image) const;
+                   cv::Mat &image, const DebugInfo *debugInfo = 0) const;
+
+    void visualize(const std::vector<PoseRT> &poses, const std::vector<float> &posesQualities, const std::vector<std::string> &objectNames,
+                   cv::Mat &image, const DebugInfo *debugInfo = 0) const;
 
     /** \brief Visualize and show detected poses
      *
@@ -160,7 +166,7 @@ namespace transpod
      * \param cloud point cloud to add detected poses
      */
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
-                   pcl::PointCloud<pcl::PointXYZ> &cloud) const;
+                   const std::vector<cv::Point3f> &sceneCloud) const;
   private:
     DetectorParams params;
     PinholeCamera srcCamera;
@@ -174,6 +180,7 @@ namespace transpod
       std::vector<cv::Mat> initialSilhouettes;
       std::vector<PoseRT> initialPoses;
       cv::Vec4f tablePlane;
+      std::vector<cv::Point2f> tableHull;
   };
 
   void reconstructCollisionMap(const PinholeCamera &validTestCamera,

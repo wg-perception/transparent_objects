@@ -9,9 +9,6 @@
 #define GLASSDETECTOR_HPP_
 
 #include <opencv2/core/core.hpp>
-#include <pcl/pcl_base.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
 
 #include "edges_pose_refiner/pinholeCamera.hpp"
 
@@ -34,6 +31,7 @@ struct GlassSegmentatorParams
 
   /** \brief Width of the region where grab cut will be used */
   int grabCutErosionsIterations;
+  int grabCutDilationsIterations;
 
   //TODO: do you need this parameter?
   /** \brief Additional width of grub cut ROI */
@@ -53,7 +51,8 @@ struct GlassSegmentatorParams
     useGrabCut = true;
     grabCutIterations = 2;
     grabCutErosionsIterations = 6;
-    grabCutMargin = 10;
+    grabCutDilationsIterations = 12;
+    grabCutMargin = 20;
 
     fillConvex = false;
 

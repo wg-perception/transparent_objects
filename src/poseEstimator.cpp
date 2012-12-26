@@ -7,7 +7,7 @@
 
 #include "edges_pose_refiner/poseEstimator.hpp"
 #include "edges_pose_refiner/localPoseRefiner.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #include "edges_pose_refiner/nonMaximumSuppression.hpp"
 
 #ifdef USE_3D_VISUALIZATION
@@ -48,11 +48,6 @@ namespace transpod
     edgeModel.generateSilhouettes(centralCameraPtr, params.silhouetteCount, silhouettes, params.downFactor, params.closingIterationsCount);
     generateGeometricHashes();
 
-    votes.resize(silhouettes.size());
-    for (size_t i = 0; i < silhouettes.size(); ++i)
-    {
-      votes[i] = Mat(silhouettes[i].getDownsampledSize(), silhouettes[i].getDownsampledSize(), CV_32SC1);
-    }
   }
 
   EdgeModel PoseEstimator::getModel() const
@@ -88,7 +83,6 @@ namespace transpod
   {
     CV_Assert(kinectBgrImage.size() == glassMask.size());
     CV_Assert(kinectBgrImage.size() == getValidTestImageSize());
-    testBgrImage = kinectBgrImage;
 
     if (silhouettes.empty())
     {
@@ -113,15 +107,14 @@ namespace transpod
   void PoseEstimator::refinePosesBySupportPlane(const cv::Mat &bgrImage, const cv::Mat &glassMask, const cv::Vec4f &tablePlane,
                                                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
   {
-    testBgrImage = bgrImage;
     Mat testEdges, silhouetteEdges;
     computeCentralEdges(bgrImage, glassMask, testEdges, silhouetteEdges);
-    refinePosesByTableOrientation(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
-    refineFinalTablePoses(tablePlane, testEdges, silhouetteEdges, poses_cam, posesQualities);
+    refinePosesByTableOrientation(tablePlane, bgrImage, testEdges, silhouetteEdges, poses_cam, posesQualities);
+    refineFinalTablePoses(tablePlane, bgrImage, testEdges, silhouetteEdges, poses_cam, posesQualities);
   }
 
   void PoseEstimator::refineFinalTablePoses(const cv::Vec4f &tablePlane,
-                      const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
+                      const cv::Mat &testBgrImage, const cv::Mat &testEdges, const cv::Mat &silhouetteEdges,
                       std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities) const
   {
 #ifdef VERBOSE
@@ -152,7 +145,7 @@ namespace transpod
   }
 
   void PoseEstimator::refinePosesByTableOrientation(const cv::Vec4f &tablePlane,
-                      const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
+                      const cv::Mat &testBgrImage, const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                       vector<PoseRT> &poses_cam, vector<float> &initPosesQualities) const
   {
 #ifdef VERBOSE
@@ -169,7 +162,7 @@ namespace transpod
     LocalPoseRefinerParams lmJacobianParams = params.lmInitialParams;
     lmJacobianParams.termCriteria = params.lmJacobianCriteria;
     vector<Mat> jacobians;
-    refineInitialPoses(centralEdges, silhouetteEdges, poses_cam, initPosesQualities, lmJacobianParams, &jacobians);
+    refineInitialPoses(testBgrImage, centralEdges, silhouetteEdges, poses_cam, initPosesQualities, lmJacobianParams, &jacobians);
 
     for (size_t initPoseIdx = 0; initPoseIdx < poses_cam.size(); ++initPoseIdx)
     {
@@ -467,9 +460,10 @@ namespace transpod
     Point2f secondPoint= contour.at(testBasis.second);
     const float testScale = norm(firstPoint - secondPoint);
 
-    for (size_t i = 0; i < silhouettes.size(); ++i)
+    vector<Mat> votes(silhouettes.size());
+    for (size_t i = 0; i < votes.size(); ++i)
     {
-      votes[i] = Scalar(0);
+      votes[i] = Mat(silhouettes[i].getDownsampledSize(), silhouettes[i].getDownsampledSize(), CV_32SC1, Scalar(0));
     }
 
     Mat similarityTransformation;
@@ -489,9 +483,8 @@ namespace transpod
       Point pt = transformedContourVec[i] * invertedGranularity;
       GHKey key(pt.x, pt.y);
 
-      std::pair<GHTable::iterator, GHTable::iterator> range = ghTable->equal_range(key);
-  //        std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable.equal_range(key);
-      for(GHTable::iterator it = range.first; it != range.second; ++it)
+      std::pair<GHTable::const_iterator, GHTable::const_iterator> range = ghTable->equal_range(key);
+      for(GHTable::const_iterator it = range.first; it != range.second; ++it)
       {
         GHValue value = it->second;
         votes[value[0]].at<int>(value[1], value[2]) += 1;
@@ -965,7 +958,7 @@ namespace transpod
   }
   */
 
-  void PoseEstimator::refineInitialPoses(const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
+  void PoseEstimator::refineInitialPoses(const cv::Mat &testBgrImage, const cv::Mat &centralEdges, const cv::Mat &silhouetteEdges,
                                          vector<PoseRT> &initPoses_cam, vector<float> &initPosesQualities,
                                          const LocalPoseRefinerParams &lmParams, vector<cv::Mat> *jacobians) const
   {
@@ -1048,6 +1041,7 @@ namespace transpod
       canonicScales.push_back(currentScale);
     }
 
+/*
     votes.clear();
     const cv::FileNode votesFN = fn["votes"];
     for (cv::FileNodeIterator it = votesFN.begin(); it != votesFN.end(); ++it)
@@ -1056,6 +1050,7 @@ namespace transpod
       (*it) >> currentVote;
       votes.push_back(currentVote);
     }
+*/
 
     ghTable = new GHTable();
     Mat hashTable;
@@ -1098,17 +1093,19 @@ namespace transpod
     }
     fs << "]";
 
+/*
     fs << "votes" << "[";
     for (size_t i = 0; i < votes.size(); ++i)
     {
       fs << votes[i];
     }
     fs << "]";
+*/
 
     Mat hash_table(ghTable->size(), GH_KEY_DIMENSION + GHValue::channels, CV_32SC1);
     CV_Assert(GHValue::depth == CV_32S);
     int elementIndex = 0;
-    for (GHTable::iterator it = ghTable->begin(); it != ghTable->end(); ++it, ++elementIndex)
+    for (GHTable::const_iterator it = ghTable->begin(); it != ghTable->end(); ++it, ++elementIndex)
     {
       hash_table.at<int>(elementIndex, 0) = it->first.first;
       hash_table.at<int>(elementIndex, 1) = it->first.second;
@@ -1149,9 +1146,21 @@ namespace transpod
     fs << "}";
   }
 
-  void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color) const
+  void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image,
+                                cv::Scalar color, float blendingFactor) const
   {
-    image = drawEdgels(image, edgeModel.points, pose, kinectCamera, color);
+    image = drawEdgels(image, edgeModel.points, pose, kinectCamera, color, blendingFactor);
+  }
+
+  float PoseEstimator::computeBlendingFactor(float error) const
+  {
+      //TODO: move up
+      const float alpha = -5.5f;
+      const float beta = -3.3f;
+
+      //sigmoid function
+      float blendingFactor = 1.0 / (1.0 + exp(-alpha * error + beta));
+      return blendingFactor;
   }
 
   #ifdef USE_3D_VISUALIZATION

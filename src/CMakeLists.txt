@@ -14,6 +14,9 @@ set(src
     utils.cpp
     nonMaximumSuppression.cpp
     chamfer_matching/chamfer_matching.cpp
+    tableSegmentation.cpp
+    pcl.cpp
+    pclVisualization.cpp
 )
 
 include_directories(SYSTEM
@@ -50,6 +53,54 @@ target_link_libraries(fdcm
                       ${OpenCV_LIBRARIES}
 )
 
+set(MODEL_CAPTURE False)
+if(MODEL_CAPTURE)
+    set(src_mrf
+        mrf/BP-S.cpp
+        mrf/GCoptimization.cpp
+        mrf/ICM.cpp
+        mrf/maxflow.cpp
+        mrf/mrf.cpp
+        mrf/TRW-S.cpp
+        mrf/graph.cpp
+        mrf/LinkedBlockList.cpp
+        mrf/MaxProdBP.cpp
+        mrf/regions-maxprod.cpp
+    )
+
+    add_library(mrf SHARED
+        ${src_mrf}
+        )
+    set_target_properties(mrf PROPERTIES COMPILE_FLAGS "-W -Wall -DUSE_64_BIT_PTR_CAST")
+
+
+
+    set(src_model_capture
+        modelCapture/modelCapturer.cpp
+    )
+    add_library(model_capture SHARED
+        ${src_model_capture}
+        )
+    set_target_properties(model_capture PROPERTIES COMPILE_FLAGS "-fopenmp" LINK_FLAGS "-fopenmp")
+    target_link_libraries(model_capture
+                          edges_pose_refiner
+                          mrf
+    )
+
+
+
+    add_executable(captureModel apps/captureModel.cpp)
+    set_target_properties(captureModel PROPERTIES
+      COMPILE_FLAGS "-fopenmp"
+      LINK_FLAGS "-fopenmp"
+      )
+    target_link_libraries(captureModel edges_pose_refiner
+                                       model_capture
+                                       mrf
+                                       ${PYTHON_LIBRARIES}
+    )
+endif()
+
 target_link_libraries(edges_pose_refiner
                       fdcm
                       ${PCL_LIBRARIES}
@@ -60,7 +111,6 @@ target_link_libraries(edges_pose_refiner
 install(TARGETS edges_pose_refiner fdcm
   DESTINATION lib
   )
-
 
 
 
@@ -131,10 +181,14 @@ endif()
 #  PROPERTIES
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
-#target_link_libraries(transparentExperiments edges_pose_refiner)
+#target_link_libraries(transparentExperiments edges_pose_refiner
+#                                             ${PYTHON_LIBRARIES}
+#)
 
 #add_executable(createObjectMask apps/createObjectMask.cpp)
-#target_link_libraries(createObjectMask edges_pose_refiner)
+#target_link_libraries(createObjectMask edges_pose_refiner
+#                                       ${PYTHON_LIBRARIES}
+#)
 
 #add_executable(kinfuSegmentation apps/kinfuSegmentation.cpp)
 #target_link_libraries(kinfuSegmentation edges_pose_refiner)
@@ -144,4 +198,72 @@ endif()
 #  PROPERTIES
 #  COMPILE_FLAGS "-std=c++0x"
 #  )
-#target_link_libraries(poseEstimationDemo edges_pose_refiner)
+#target_link_libraries(poseEstimationDemo edges_pose_refiner
+#                                         ${PYTHON_LIBRARIES}
+#)
+
+#add_executable(evaluateLine2D line2D/evaluation.cpp line2D/line2D.cpp)
+#set_target_properties(evaluateLine2D
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x"
+#  )
+#target_link_libraries(evaluateLine2D edges_pose_refiner
+#                                     ${PYTHON_LIBRARIES}
+#)
+
+#add_executable(labelDataset apps/labelDataset.cpp)
+#set_target_properties(labelDataset
+#  PROPERTIES
+#  COMPILE_FLAGS "-std=c++0x"
+#  )
+#target_link_libraries(labelDataset edges_pose_refiner
+#                                   ${PYTHON_LIBRARIES}#
+#)
+
+#add_executable(labelSegmentation apps/labelSegmentation.cpp)
+#target_link_libraries(labelSegmentation edges_pose_refiner
+#                                        ${PYTHON_LIBRARIES}
+#)
+
+#add_executable(showTable apps/showTable.cpp)
+#set_target_properties(showTable PROPERTIES
+#    COMPILE_FLAGS "-fopenmp"
+#    LINK_FLAGS "-fopenmp"
+#)
+#target_link_libraries(showTable edges_pose_refiner
+#                                ${PYTHON_LIBRARIES}
+#)
+
+add_executable(reconstructRotationalModel_singleImage apps/reconstructRotationalModel_singleImage.cpp)
+target_link_libraries(reconstructRotationalModel_singleImage edges_pose_refiner
+                                                 ${OpenCV_LIBRARIES}
+)
+
+add_executable(runDetectionOnDataset apps/runDetectionOnDataset.cpp)
+set_target_properties(runDetectionOnDataset PROPERTIES
+    COMPILE_FLAGS "-fopenmp"
+    LINK_FLAGS "-fopenmp"
+)
+target_link_libraries(runDetectionOnDataset edges_pose_refiner)
+
+#add_executable(writeVideo apps/writeVideo.cpp)
+#target_link_libraries(writeVideo ${OpenCV_LIBRARIES})
+
+set(WITH_ROS False)
+if (WITH_ROS)
+    #TODO: remove hard-coded paths
+    include_directories(/opt/ros/fuerte/stacks/vision_opencv/cv_bridge/include/)
+    add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
+    target_link_libraries(dumpBagFile ${roscpp_LIBRARIES}
+                                      ${OpenCV_LIBRARIES}
+                                      ${Boost_LIBRARIES}
+                                      /usr/lib/libboost_signals.so
+                                      /usr/lib/libboost_program_options.so
+                                      /opt/ros/fuerte/lib/libmessage_filters.so
+                                      /opt/ros/fuerte/lib/librosbag.so
+                                      /opt/ros/fuerte/lib/libroscpp.so
+                                      /opt/ros/fuerte/lib/librostime.so
+                                      /opt/ros/fuerte/lib/libroscpp_serialization.so
+                                      ${PYTHON_LIBRARIES}
+    )
+endif()

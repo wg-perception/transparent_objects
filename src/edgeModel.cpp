@@ -1,7 +1,8 @@
 #include "edges_pose_refiner/edgeModel.hpp"
 #include "edges_pose_refiner/pclProcessing.hpp"
-#include <pcl/registration/icp_nl.h>
-#include <boost/make_shared.hpp>
+#include "edges_pose_refiner/pcl.hpp"
+//#include <pcl/registration/icp_nl.h>
+//#include <boost/make_shared.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/eigen.hpp>
 
@@ -172,7 +173,6 @@ EdgeModel::EdgeModel(const std::vector<cv::Point3f> &_points, bool isModelUpside
 //  *this = EdgeModel(_points, std::vector<cv::Point3f> (), isModelUpsideDown, centralize, params);
 
   //TODO: use normals from the RGBD module
-
   pcl::PointCloud<pcl::PointXYZ> pclPoints;
   cv2pcl(_points, pclPoints);
   pcl::PointCloud<pcl::Normal> pclNormals;
@@ -655,10 +655,10 @@ void EdgeModel::clear()
 
 void EdgeModel::visualize()
 {
+#ifdef USE_3D_VISUALIZATION
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclPoints(new pcl::PointCloud<pcl::PointXYZ>), pclStablePoints(new pcl::PointCloud<pcl::PointXYZ>);
   cv2pcl(points, *pclPoints);
   cv2pcl(stableEdgels, *pclStablePoints);
-#ifdef USE_3D_VISUALIZATION
   pcl::visualization::CloudViewer viewer ("all points");
   viewer.showCloud(pclPoints, "points");
 

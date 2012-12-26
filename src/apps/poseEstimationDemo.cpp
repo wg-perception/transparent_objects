@@ -2,10 +2,14 @@
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
+#ifdef SHOW_CLOUD
+#include <opencv2/rgbd/rgbd.hpp>
+#endif
+
 //#define USE_INITIAL_GUESS
 
 #ifdef USE_INITIAL_GUESS
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 #endif
 
 using namespace cv;
@@ -21,23 +25,21 @@ int main(int argc, char *argv[])
   RNG &rng = theRNG();
   rng.state = 0xffffffff;
 
-  if (argc != 3)
+  if (argc != 4)
   {
-    cout << argv[0] << " <baseFolder> <testObjectName>" << endl;
+    cout << argv[0] << " <baseFolder> <modelsPath> <testObjectName>" << endl;
     return -1;
   }
   string baseFolder = argv[1];
-  string testObjectName = argv[2];
+  string trainedModelsPath = argv[2];
+  string testObjectName = argv[3];
 
-  const string modelsPath = "/media/2Tb/transparentBases/trainedModels/";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
-  const string kinectCameraFilename = baseFolder + "/center.yml";
-  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
   const string imageFilename = baseFolder + "/image.png";
   const string depthFilename = baseFolder + "/depth.xml.gz";
   const string pointCloudFilename = baseFolder + "/pointCloud.pcd";
 
-  const vector<string> objectNames = {testObjectName};
+  const vector<string> objectNames(1, testObjectName);
 //  const vector<string> objectNames = {"bank", "bottle", "glass", "sourCream", "wineglass"};
 //  const vector<string> objectNames = {"bank", "bottle", "sourCream", "wineglass"};
 //  const vector<string> objectNames = {"bank", "bottle", "wineglass"};
@@ -52,13 +54,20 @@ int main(int argc, char *argv[])
 //  params.glassSegmentationParams.finalClosingIterations = 12;
 
   //good clutter
+  /*
   params.glassSegmentationParams.openingIterations = 15;
   params.glassSegmentationParams.closingIterations = 12;
   params.glassSegmentationParams.finalClosingIterations = 32;
   params.glassSegmentationParams.grabCutErosionsIterations = 4;
   params.planeSegmentationMethod = FIDUCIALS;
+  */
 
-  TODBaseImporter dataImporter(testFolder);
+  //test_planar_glass
+  params.planeSegmentationMethod = RGBD;
+  params.glassSegmentationParams.grabCutErosionsIterations = 3;
+  params.glassSegmentationParams.grabCutDilationsIterations = 3;
+
+  TODBaseImporter dataImporter(baseFolder, testFolder);
 
   Mat kinectDepth, kinectBgrImage;
   dataImporter.importBGRImage(imageFilename, kinectBgrImage);
@@ -67,18 +76,10 @@ int main(int argc, char *argv[])
   imshow("depth", kinectDepth);
   waitKey(500);
 
+  Mat registrationMask;
   PinholeCamera kinectCamera;
-  dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
-  CV_Assert(kinectCamera.imageSize == Size(640, 480));
-
-  vector<EdgeModel> edgeModels(objectNames.size());
-  for (size_t i = 0; i < objectNames.size(); ++i)
-  {
-    dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
-    cout << "All points in the model: " << edgeModels[i].points.size() << endl;
-    cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
-    EdgeModel::computeSurfaceEdgelsOrientations(edgeModels[i]);
-  }
+  vector<EdgeModel> edgeModels;
+  dataImporter.importAllData(&trainedModelsPath, &objectNames, &kinectCamera, &registrationMask, &edgeModels);
 
   Detector detector(kinectCamera, params);
   for (size_t i = 0; i < edgeModels.size(); ++i)
@@ -86,12 +87,13 @@ int main(int argc, char *argv[])
     detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
 
-  Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-  CV_Assert(!registrationMask.empty());
-
-
-  pcl::PointCloud<pcl::PointXYZ> testPointCloud;
-  dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
+  vector<Point3f> testPointCloud;
+  //dataImporter.importPointCloud(pointCloudFilename, testPointCloud);
+#ifdef SHOW_CLOUD
+  Mat points3d;
+  depthTo3d(kinectDepth, kinectCamera.cameraMatrix, points3d);
+  testPointCloud = points3d.reshape(3, points3d.total());
+#endif
 
   vector<PoseRT> poses_cam;
   vector<float> posesQualities;
@@ -158,6 +160,7 @@ int main(int argc, char *argv[])
 
   if (!posesQualities.empty())
   {
+    cout << "quality: " << posesQualities[0] << endl;
     std::vector<float>::iterator bestDetection = std::min_element(posesQualities.begin(), posesQualities.end());
     int bestDetectionIndex = std::distance(posesQualities.begin(), bestDetection);
     cout << "Recognized object: " << detectedObjectsNames[bestDetectionIndex] << endl;
@@ -170,9 +173,12 @@ int main(int argc, char *argv[])
     imshow("detection", detectionResults);
     imwrite("detection_" + bestName[0] + ".png", detectionResults);
     imwrite("testImage_" + bestName[0] + ".png", kinectBgrImage);
-    waitKey();
   }
+  waitKey();
 
+#ifdef SHOW_CLOUD
+  detector.visualize(poses_cam, detectedObjectsNames, testPointCloud);
+#endif
 
   std::system("date");
   return 0;

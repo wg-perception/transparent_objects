@@ -8,8 +8,6 @@
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 #include <fstream>
 #include <iomanip>
-#include "pcl/io/pcd_io.h"
-#include "pcl/point_types.h"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -23,21 +21,64 @@ TODBaseImporter::TODBaseImporter()
 {
 }
 
-//TODBaseImporter::TODBaseImporter(const std::string &_trainFolder, const std::string &_testFolder)
-TODBaseImporter::TODBaseImporter(const std::string &_testFolder)
+TODBaseImporter::TODBaseImporter(const std::string &_baseFolder, const std::string &_testFolder)
 {
-//  trainFolder = _trainFolder;
+  baseFolder = _baseFolder;
   testFolder = _testFolder;
-
-//  PinholeCamera camera;
-//  readCameraParams(trainFolder, camera);
-//  cameraMatrix = camera.cameraMatrix;
-//  distCoeffs = camera.distCoeffs;
 }
 
-void TODBaseImporter::readCameraParams(const string &folder, PinholeCamera &camera, bool addFilename)
+void TODBaseImporter::importAllData(const std::string *trainedModelsPath, const std::vector<std::string> *trainObjectNames,
+                                    PinholeCamera *kinectCamera, cv::Mat *registrationMask,
+                                    std::vector<EdgeModel> *edgeModels, std::vector<int> *testIndices,
+                                    std::vector<EdgeModel> *occlusionObjects, std::vector<PoseRT> *occlusionOffsets,
+                                    PoseRT *offset) const
 {
-  string cameraFilename = addFilename ? folder + "/camera.yml" : folder;
+  if (kinectCamera != 0)
+  {
+    importCamera(*kinectCamera);
+    //TODO: move up
+    CV_Assert(kinectCamera->imageSize == Size(640, 480));
+  }
+
+  if (edgeModels != 0)
+  {
+    edgeModels->resize(trainObjectNames->size());
+    for (size_t i = 0; i < trainObjectNames->size(); ++i)
+    {
+      importEdgeModel(*trainedModelsPath, (*trainObjectNames)[i], (*edgeModels)[i]);
+      cout << ("Imported a model for " + (*trainObjectNames)[i] + ": ") <<
+              (*edgeModels)[i].points.size() << " points (" << (*edgeModels)[i].stableEdgels.size() << " surface edgels)" << endl;
+      EdgeModel::computeSurfaceEdgelsOrientations((*edgeModels)[i]);
+    }
+  }
+
+  CV_Assert( !((occlusionObjects == 0) ^ (occlusionOffsets == 0)) );
+  if (occlusionObjects != 0 && occlusionOffsets != 0)
+  {
+    importOcclusionObjects(*trainedModelsPath, *occlusionObjects, *occlusionOffsets);
+  }
+
+  if (testIndices != 0)
+  {
+    importTestIndices(*testIndices);
+  }
+
+  if (registrationMask != 0)
+  {
+    importRegistrationMask(*registrationMask);
+  }
+
+  if (offset != 0)
+  {
+    importOffset(*offset);
+  }
+}
+
+void TODBaseImporter::importCamera(PinholeCamera &camera) const
+{
+//  string cameraFilename = addFilename ? folder + "/camera.yml" : folder;
+  //TODO: move up
+  string cameraFilename = baseFolder + "/camera.yml";
   camera.read(cameraFilename);
 }
 
@@ -59,12 +100,14 @@ void TODBaseImporter::readMultiCameraParams(const string &camerasListFilename, s
   {
     if(camerasMask[i])
     {
-      readCameraParams(intrinsicsFilenames[i], allCameras[cameraIdx], false);
+      CV_Assert(false);
+      //readCameraParams(intrinsicsFilenames[i], allCameras[cameraIdx], false);
       cameraIdx++;
     }
   }
 }
 
+/*
 void TODBaseImporter::readTrainObjectsNames(const string &trainConfigFilename, std::vector<string> &trainObjectsNames)
 {
   trainObjectsNames.clear();
@@ -86,10 +129,11 @@ void TODBaseImporter::readTrainObjectsNames(const string &trainConfigFilename, s
   }
   configFile.close();
 }
+*/
 
 bool isNan(const Point3f& p)
 {
- return isnan(p.x) || isnan(p.y) || isnan(p.z);
+ return cvIsNaN(p.x) || cvIsNaN(p.y) || cvIsNaN(p.z);
 }
 
 void TODBaseImporter::readRegisteredClouds(const string &configFilename, vector<vector<cv::Point3f> > &registeredClouds) const
@@ -157,7 +201,8 @@ void TODBaseImporter::importEdgeModel(const std::string &modelsPath, const std::
     cout << "Cannot read edge model: " << modelFilename << endl;
     vector<Point3f> points, normals;
     readPointCloud(modelsPath + "/downPointClouds/" + objectName + ".ply", points, &normals);
-    edgeModel = EdgeModel(points, normals, true, true);
+//    edgeModel = EdgeModel(points, normals, true, true);
+    edgeModel = EdgeModel(points, normals, false, true);
 
 /*  uncomment for obsolete models (sourCream)
 
@@ -208,7 +253,10 @@ void TODBaseImporter::importTestIndices(vector<int> &testIndices) const
 void TODBaseImporter::importDepth(const std::string &filename, cv::Mat &depth)
 {
   FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
+  if (!fs.isOpened())
+  {
+    CV_Error(CV_StsBadArg, "Cannot open the file " + filename);
+  }
   fs["depth_image"] >> depth;
   fs.release();
   CV_Assert(!depth.empty());
@@ -243,12 +291,36 @@ void TODBaseImporter::importRawMask(int testImageIdx, cv::Mat &mask) const
   imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.raw_mask.png";
   importBGRImage(imageFilename.str(), mask);
   CV_Assert(mask.channels() == 1);
+  CV_Assert(mask.type() == CV_8UC1);
 }
 
-void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset, PoseRT *offsetPtr) const
+void TODBaseImporter::importUserMask(int testImageIdx, cv::Mat &userMask) const
+{
+  std::stringstream imageFilename;
+  imageFilename << testFolder << "/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.user_mask.png";
+  importBGRImage(imageFilename.str(), userMask);
+  CV_Assert(userMask.channels() == 1);
+  CV_Assert(userMask.type() == CV_8UC1);
+}
+
+void TODBaseImporter::importOffset(PoseRT &offset) const
+{
+  //TODO: move up
+  const string offsetFilename = "offset.xml";
+  offset.read(testFolder + "/" + offsetFilename);
+}
+
+void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bool shiftByOffset, PoseRT *offsetPtr, bool isKeyFrame) const
 {
   std::stringstream testPoseFilename;
-  testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
+  if (isKeyFrame)
+  {
+    testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml.kf";
+  }
+  else
+  {
+    testPoseFilename << testFolder +"/image_" << std::setfill('0') << std::setw(5) << testImageIdx << ".png.pose.yaml";
+  }
   FileStorage testPoseFS;
   testPoseFS.open(testPoseFilename.str(), FileStorage::READ);
   CV_Assert(testPoseFS.isOpened());
@@ -259,10 +331,8 @@ void TODBaseImporter::importGroundTruth(int testImageIdx, PoseRT &model2test, bo
 
   if (shiftByOffset || offsetPtr != 0)
   {
-    //TODO: move up
-    const string offsetFilename = "offset.xml";
     PoseRT offset;
-    offset.read(testFolder + "/" + offsetFilename);
+    importOffset(offset);
     if (shiftByOffset)
     {
       model2test = model2test * offset;
@@ -288,25 +358,34 @@ void TODBaseImporter::importAllGroundTruth(std::map<int, PoseRT> &allPoses) cons
   }
 }
 
-void TODBaseImporter::importPointCloud(const std::string &filename, pcl::PointCloud<pcl::PointXYZ> &cloud)
+/*
+void TODBaseImporter::importPointCloud(const std::string &filename, std::vector<cv::Point3f> &cloud)
 {
-  pcl::io::loadPCDFile(filename, cloud);
+  CV_Assert(false);
+//  pcl::io::loadPCDFile(filename, cloud);
 }
 
-void TODBaseImporter::importPointCloud(int testImageIdx, pcl::PointCloud<pcl::PointXYZ> &cloud) const
+void TODBaseImporter::importPointCloud(int testImageIdx, std::vector<cv::Point3f> &cloud) const
 {
   std::stringstream pointCloudFilename;
   pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
   importPointCloud(pointCloudFilename.str(), cloud);
 }
+*/
 
-void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud)
+void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud, cv::Mat &normals)
 {
-  FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
-  fs["cloud"] >> cloud;
-  fs.release();
-  CV_Assert(!cloud.empty());
+  vector<Point3f> cloud_Vector, normals_Vector;
+  readPointCloud(filename, cloud_Vector, &normals_Vector);
+  cloud = Mat(cloud_Vector).clone();
+  normals = Mat(normals_Vector).clone();
+}
+
+void TODBaseImporter::importRegistrationMask(cv::Mat &registrationMask) const
+{
+  //TODO: move up
+  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
+  importRegistrationMask(registrationMaskFilename, registrationMask);
 }
 
 void TODBaseImporter::importRegistrationMask(const std::string &filename, cv::Mat &registrationMask)

@@ -530,6 +530,24 @@ double LocalPoseRefiner::getError(const cv::Mat &residuals) const
   return cv::norm(residuals) / sqrt((double) residuals.rows);
 }
 
+double LocalPoseRefiner::normalizeError(const PoseRT &pose_cam, double error) const
+{
+    PinholeCamera camera(cameraMatrix, distCoeffs, extrinsicsRt);
+    vector<Point2f> projectedPoints;
+    camera.projectPoints(originalEdgeModel.points, pose_cam, projectedPoints);
+
+    Mat covar, mean;
+    calcCovarMatrix(Mat(projectedPoints).reshape(1), covar, mean, CV_COVAR_NORMAL | CV_COVAR_SCALE | CV_COVAR_ROWS);
+    //scale errors to ~1.0 scale
+    double normalizationFactor = sqrt(determinant(covar));
+    const double eps = 1e-4;
+    //TODO: use a smarter approach
+    const double scaleFactor = 100.0;
+    double normalizedError = scaleFactor * (normalizationFactor > eps ? error / normalizationFactor : error / eps);
+
+    return normalizedError;
+}
+
 float LocalPoseRefiner::estimateOutlierError(const cv::Mat &distanceImage, int distanceType)
 {
   CV_Assert(!distanceImage.empty());
@@ -549,8 +567,8 @@ void LocalPoseRefiner::computeWeights(const vector<Point2f> &projectedPointsVect
   for (size_t i = 0; i < projectedPointsVector.size(); ++i)
   {
     Point2f pt = projectedPointsVector[i];
-    CV_Assert(!isnan(pt.x));
-    CV_Assert(!isnan(pt.y));
+    CV_Assert(!cvIsNaN(pt.x));
+    CV_Assert(!cvIsNaN(pt.y));
   }
   CV_Assert(!weights.empty());
 
@@ -1164,6 +1182,8 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
   getTransformationMatrix(R_obj2cam, t_obj2cam, rvecParams, tvecParams, transMat);
   transMat = transMat * poseInit_cam.getProjectiveMatrix();
   pose_cam.setProjectiveMatrix(transMat);
+
+  finishError = normalizeError(pose_cam, finishError);
 
   return finishError;
 }

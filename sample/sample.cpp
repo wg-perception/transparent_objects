@@ -5,8 +5,9 @@
 using namespace cv;
 using namespace transpod;
 
-void readData(const string &pathToDemoData, PinholeCamera &camera, Mat &objectPointCloud_1, Mat &objectPointCloud_2,
-              Mat &registrationMask, Mat &image, Mat &depth, Mat &testPointCloud);
+void readData(const string &pathToDemoData, PinholeCamera &camera,
+              Mat &objectPointCloud_1, Mat &objectNormals_1, Mat &objectPointCloud_2, Mat &objectNormals_2,
+              Mat &registrationMask, Mat &image, Mat &depth);
 
 int main(int argc, char *argv[])
 {
@@ -23,8 +24,8 @@ int main(int argc, char *argv[])
   // 1. Get the data
   std::cout << "Reading data...  " << std::flush;
   PinholeCamera camera;
-  Mat objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud;
-  readData(pathToDemoData, camera, objectPointCloud_1, objectPointCloud_2, registrationMask, image, depth, testPointCloud);
+  Mat objectPointCloud_1, objectNormals_1, objectPointCloud_2, objectNormals_2, registrationMask, image, depth;
+  readData(pathToDemoData, camera, objectPointCloud_1, objectNormals_1, objectPointCloud_2, objectNormals_2, registrationMask, image, depth);
   std::cout << "done." << std::endl;
 
   // 2. Initialize the detector
@@ -35,8 +36,8 @@ int main(int argc, char *argv[])
   params.glassSegmentationParams.openingIterations = 10;
   //    B. add train objects into the detector
   Detector detector(camera, params);
-  detector.addTrainObject(objectName_1, objectPointCloud_1);
-  detector.addTrainObject(objectName_2, objectPointCloud_2);
+  detector.addTrainObject(objectName_1, objectPointCloud_1, objectNormals_1);
+  detector.addTrainObject(objectName_2, objectPointCloud_2, objectNormals_2);
   std::cout << "done." << std::endl;
 
   // 3. Detect transparent objects
@@ -45,7 +46,7 @@ int main(int argc, char *argv[])
   vector<float> errors;
   vector<string> detectedObjectsNames;
   Detector::DebugInfo debugInfo;
-  detector.detect(image, depth, registrationMask, testPointCloud,
+  detector.detect(image, depth, registrationMask,
                   poses, errors, detectedObjectsNames, &debugInfo);
   std::cout << "done." << std::endl;
 
@@ -59,23 +60,22 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void readData(const string &pathToDemoData, PinholeCamera &camera, Mat &objectPointCloud_1, Mat &objectPointCloud_2,
-              Mat &registrationMask, Mat &image, Mat &depth, Mat &testPointCloud)
+void readData(const string &pathToDemoData, PinholeCamera &camera,
+              Mat &objectPointCloud_1, Mat &objectNormals_1, Mat &objectPointCloud_2, Mat &objectNormals_2,
+              Mat &registrationMask, Mat &image, Mat &depth)
 {
-  const string objectPointCloudFilename_1 = pathToDemoData + "/trainObject_1.xml.gz";
-  const string objectPointCloudFilename_2 = pathToDemoData + "/trainObject_2.xml.gz";
+  const string objectPointCloudFilename_1 = pathToDemoData + "/trainObject_1.ply";
+  const string objectPointCloudFilename_2 = pathToDemoData + "/trainObject_2.ply";
   const string cameraFilename = pathToDemoData + "/camera.yml";
   const string registrationMaskFilename = pathToDemoData + "/registrationMask.png";
   const string imageFilename = pathToDemoData + "/image.png";
   const string depthFilename = pathToDemoData + "/depth.xml.gz";
-  const string testPointCloudFilename = pathToDemoData + "/testPointCloud.xml.gz";
 
   TODBaseImporter dataImporter;
   dataImporter.importCamera(cameraFilename, camera);
-  dataImporter.importPointCloud(objectPointCloudFilename_1, objectPointCloud_1);
-  dataImporter.importPointCloud(objectPointCloudFilename_2, objectPointCloud_2);
+  dataImporter.importPointCloud(objectPointCloudFilename_1, objectPointCloud_1, objectNormals_1);
+  dataImporter.importPointCloud(objectPointCloudFilename_2, objectPointCloud_2, objectNormals_2);
   dataImporter.importRegistrationMask(registrationMaskFilename, registrationMask);
   dataImporter.importBGRImage(imageFilename, image);
   dataImporter.importDepth(depthFilename, depth);
-  dataImporter.importPointCloud(testPointCloudFilename, testPointCloud);
 }

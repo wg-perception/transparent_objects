@@ -12,33 +12,28 @@ using std::endl;
 
 //#define VISUALIZE_TABLE
 
-void showGrabCutResults(const Mat &mask, const string &title = "grabCut");
 
-void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params)
+void showGrabCutResults(const Mat &bgrImage, const Mat &mask, const string &title = "grabCut");
+
+
+void createMasksForGrabCut(const cv::Mat &objectMask,
+                           std::vector<cv::Rect> &allRois, std::vector<cv::Mat> &allRoiMasks,
+                           const GlassSegmentatorParams &params)
 {
-#ifdef VISUALIZE
-  imshow("before grabcut", rawMask);
-#endif
+  Mat objectMaskEroded;
+  erode(objectMask, objectMaskEroded, Mat(), Point(-1, -1), params.grabCutErosionsIterations);
+  Mat objectMaskDilated;
+  dilate(objectMask, objectMaskDilated, Mat(), Point(-1, -1), params.grabCutDilationsIterations);
 
-  refinedMask = Mat(rawMask.size(), CV_8UC1, Scalar(0));
-  Mat erodedMask;
-  erode(rawMask, erodedMask, Mat(), Point(-1, -1), params.grabCutErosionsIterations);
-  Mat rawMaskDilated;
-  //dilate(rawMask, rawMaskDilated, Mat(), Point(-1, -1), 6*erosionsIterations);
-  dilate(rawMask, rawMaskDilated, Mat(), Point(-1, -1), params.grabCutErosionsIterations);
-  Mat tmpRawMask = rawMask.clone();
+  Mat tmpObjectMask = objectMask.clone();
   vector<vector<Point> > contours;
-
-  findContours(tmpRawMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-
-//  cout << "Running grabCut on " << contours.size() << " contours" << endl;
-#ifdef VISUALIZE
-  Mat commonMask(rawMask.size(), CV_8UC1, Scalar(4));
-#endif
-  //TODO: move up
-  const float minArea = 40.0f;
+  findContours(tmpObjectMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  allRois.clear();
+  allRoiMasks.clear();
   for(size_t i = 0; i < contours.size(); ++i)
   {
+    //TODO: move up
+    const float minArea = 40.0f;
     if (contourArea(contours[i]) < minArea)
     {
       continue;
@@ -47,39 +42,61 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     Rect roi = boundingRect(Mat(contours[i]));
     roi.x = std::max(0, roi.x - params.grabCutMargin);
     roi.y = std::max(0, roi.y - params.grabCutMargin);
-    roi.width = std::min(bgrImage.cols - roi.x, roi.width + 2*params.grabCutMargin);
-    roi.height = std::min(bgrImage.rows - roi.y, roi.height + 2*params.grabCutMargin);
+    roi.width = std::min(objectMask.cols - roi.x, roi.width + 2*params.grabCutMargin);
+    roi.height = std::min(objectMask.rows - roi.y, roi.height + 2*params.grabCutMargin);
 
-    Rect fullRoi = roi;
-    fullRoi.x = std::max(0, fullRoi.x - params.grabCutMargin);
-    fullRoi.y = std::max(0, fullRoi.y - params.grabCutMargin);
-    fullRoi.width = std::min(bgrImage.cols - fullRoi.x, fullRoi.width + 2*params.grabCutMargin);
-    fullRoi.height = std::min(bgrImage.rows - fullRoi.y, fullRoi.height + 2*params.grabCutMargin);
+    Mat currentMask(objectMask.size(), CV_8UC1, GC_BGD);
+    currentMask(roi).setTo(GC_PR_BGD, objectMaskDilated(roi));
+    currentMask(roi).setTo(GC_PR_FGD, objectMask(roi));
+    currentMask(roi).setTo(GC_FGD, objectMaskEroded(roi));
 
-    Mat curMask(rawMask.size(), CV_8UC1, GC_BGD);
-    curMask(roi).setTo(GC_PR_BGD, rawMaskDilated(roi));
-    curMask(roi).setTo(GC_PR_FGD, rawMask(roi));
-    curMask(roi).setTo(GC_FGD, erodedMask(roi));
+    Mat roiMask = currentMask(roi);
 
-    Mat bgdModel, fgdModel;
-    Mat roiMask = curMask(fullRoi);
+    allRois.push_back(roi);
+    allRoiMasks.push_back(roiMask);
+  }
+  CV_Assert(allRois.size() == allRoiMasks.size());
+}
 
+void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params)
+{
+  CV_Assert(!rawMask.empty());
 #ifdef VISUALIZE
-    showGrabCutResults(curMask, "initMask");
-    Mat commonMaskRoi = commonMask(fullRoi);
-    roiMask.copyTo(commonMaskRoi);
+  imshow("before grabcut", rawMask);
 #endif
 
-    grabCut(bgrImage(fullRoi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
-    curMask.copyTo(refinedMask, curMask);
+  refinedMask = Mat(rawMask.size(), CV_8UC1, Scalar(GC_BGD));
+
+  vector<Rect> allRois;
+  vector<Mat> allRoiMasks;
+  createMasksForGrabCut(rawMask, allRois, allRoiMasks, params);
+
+  for(size_t i = 0; i < allRois.size(); ++i)
+  {
+    Rect roi = allRois[i];
+    Mat roiMask = allRoiMasks[i];
+#ifdef VISUALIZE
+    showGrabCutResults(bgrImage(roi), roiMask, "initial mask for GrabCut segmentation");
+#endif
+
+    Mat bgdModel, fgdModel;
+    grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
+
+    Mat refinedMaskRoi = refinedMask(roi);
+    roiMask.copyTo(refinedMaskRoi, (roiMask != GC_BGD) & (roiMask != GC_PR_BGD));
+
+#ifdef VISUALIZE
+    showGrabCutResults(bgrImage(roi), roiMask, "grab cut segmentation");
+    waitKey();
+#endif
   }
 
   Mat prFgd = (refinedMask == GC_PR_FGD);
   Mat fgd = (refinedMask == GC_FGD);
   refinedMask = prFgd | fgd;
 #ifdef VISUALIZE
-  showGrabCutResults(commonMask, "init mask");
-  imshow("final mask", refinedMask);
+  showSegmentation(bgrImage, refinedMask, "final GrabCut segmentation");
+  imshow("final GrabCut mask", refinedMask);
 #endif
 }
 
@@ -150,7 +167,7 @@ void refineSegmentationBySnake(const Mat &bgrImage, const Mat &rawMask, Mat &ref
 }
 
 
-void showGrabCutResults(const Mat &mask, const string &title)
+void showGrabCutResults(const Mat &bgrImage, const Mat &mask, const string &title)
 {
   Mat result(mask.size(), CV_8UC3, Scalar::all(0));
   result.setTo(Scalar(255, 0, 0), mask == GC_BGD);
@@ -159,22 +176,16 @@ void showGrabCutResults(const Mat &mask, const string &title)
   result.setTo(Scalar(0, 0, 128), mask == GC_PR_FGD);
 
   imshow(title, result);
+
+  //TODO: move up
+  Mat mergedMask = 0.7 * bgrImage + 0.3 * result;
+  imshow(title + " merged", mergedMask);
 }
 
 void showSegmentation(const Mat &image, const Mat &mask, const string &title)
 {
   Mat drawImage = drawSegmentation(image, mask);
   imshow(title, drawImage);
-}
-
-void readDepthImage(const string &filename, Mat &depthMat)
-{
-  FileStorage fs(filename, FileStorage::READ);
-  cout << filename << endl;
-  CV_Assert(fs.isOpened());
-
-  fs["depth_image"] >> depthMat;
-  fs.release();
 }
 
 GlassSegmentator::GlassSegmentator(const GlassSegmentatorParams &_params)
@@ -303,53 +314,11 @@ void GlassSegmentator::segment(const cv::Mat &bgrImage, const cv::Mat &depthMat,
 #endif
 }
 
-struct ManualGlassSegmentationData
-{
-  bool isLButtonPressed;
-  std::vector<cv::Point> glassContour;
-  cv::Mat displayedImage;
-  std::string windowName;
-};
-
-static void onMouse(int event, int x, int y, int, void *srcData)
-{
-  ManualGlassSegmentationData *data = static_cast<ManualGlassSegmentationData*>(srcData);
-  if (event == CV_EVENT_LBUTTONUP)
-  {
-    data->isLButtonPressed = false;
-  }
-
-  if (event == CV_EVENT_LBUTTONDOWN)
-  {
-    data->isLButtonPressed = true;
-  }
-
-  if (!data->isLButtonPressed)
-  {
-    return;
-  }
-
-  Point pt(x, y);
-  data->glassContour.push_back(pt);
-  circle(data->displayedImage, pt, 1, Scalar(255, 0, 0), -1);
-  imshow(data->windowName, data->displayedImage);
-}
-
 void segmentGlassManually(const cv::Mat &image, cv::Mat &glassMask)
 {
-  ManualGlassSegmentationData data;
-  //TODO: what if button is pressed already?
-  data.isLButtonPressed = false;
-  data.displayedImage = image.clone();
-  data.windowName = "manual glass segmentation";
+  vector<vector<Point> > contours(1);
+  markContourByUser(image, contours[0], "manual glass segmentation");
 
-  namedWindow(data.windowName);
-  setMouseCallback(data.windowName, onMouse, &data);
-  imshow(data.windowName, data.displayedImage);
-  waitKey();
-  destroyWindow(data.windowName);
-
-  vector<vector<Point> > contours(1, data.glassContour);
   glassMask = Mat(image.size(), CV_8UC1, Scalar(0));
   drawContours(glassMask, contours, -1, Scalar::all(255), -1);
 }

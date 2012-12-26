@@ -91,74 +91,6 @@ void getRotationTranslation(const cv::Mat &projectiveMatrix, cv::Mat &R, cv::Mat
   projectiveMatrix(Range(0, 3), Range(3, 4)).copyTo(t);
 }
 
-#ifdef USE_3D_VISUALIZATION
-void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title, const PoseRT &pose)
-{
-  vector<Point3f> rotatedPoints;
-  project3dPoints(points, pose.getRvec(), pose.getTvec(), rotatedPoints);
-  pcl::PointCloud<pcl::PointXYZ> pclPoints;
-  cv2pcl(rotatedPoints, pclPoints);
-
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> pointsColor(pclPoints.makeShared(), color[2], color[1], color[0]);
-  viewer->addPointCloud<pcl::PointXYZ>(pclPoints.makeShared(), pointsColor, title);
-}
-#endif
-
-void publishPoints(const std::vector<cv::Point3f>& points, cv::Scalar color, const std::string &id, const PoseRT &pose)
-{
-#ifdef USE_3D_VISUALIZATION
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer ("id"));
-  publishPoints(points, viewer, color, id, pose);
-
-  while (!viewer->wasStopped ())
-  {
-    viewer->spinOnce (100);
-    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-  }
-#endif
-}
-
-void publishPoints(const std::vector<std::vector<cv::Point3f> >& points)
-{
-  cout << "publising..." << endl;
-  const int minVal = 128;
-  const int maxVal = 255;
-  const int colorDim = 3;
-  for (size_t i = 0; i < points.size(); i++)
-  {
-    cout << "size: " << points[i].size() << endl;
-    Scalar color;
-    for (int j = 0; j < colorDim; j++)
-    {
-      color[j] = minVal + rand() % (maxVal - minVal + 1);
-    }
-
-    std::stringstream str;
-    str << i;
-    publishPoints(points[i], color, str.str());
-  }
-}
-
-
-void pcl2cv(const pcl::PointCloud<pcl::PointXYZ> &pclCloud, std::vector<cv::Point3f> &cvCloud)
-{
-  cvCloud.resize(pclCloud.size());
-
-  for(size_t i=0; i<pclCloud.size(); i++)
-  {
-    cvCloud[i] = cv::Point3f(pclCloud.points[i].x, pclCloud.points[i].y, pclCloud.points[i].z);
-  }
-}
-
-void cv2pcl(const std::vector<cv::Point3f> &cvCloud, pcl::PointCloud<pcl::PointXYZ> &pclCloud)
-{
-  pclCloud.points.resize(cvCloud.size());
-  for(size_t i=0; i<cvCloud.size(); i++)
-  {
-    cv::Point3f pt = cvCloud[i];
-    pclCloud.points[i] = pcl::PointXYZ(pt.x, pt.y, pt.z);
-  }
-}
 
 void transformPoint(const cv::Mat &Rt, const cv::Point3d &point, cv::Point3d &transformedPoint)
 {
@@ -235,10 +167,49 @@ void readFiducial(const string &filename, Mat &blackBlobsObject, Mat &whiteBlobs
   CV_Assert(!blackBlobsObject.empty() && !whiteBlobsObject.empty());
 }
 
+void detectFiducial(const cv::Mat &bgrImage, cv::Mat &blackBlobs, cv::Mat &whiteBlobs)
+{
+  //TODO: move up
+  const Size boardSize(4, 11);
+  SimpleBlobDetector::Params params;
+  params.filterByInertia = true;
+  params.minArea = 10;
+  params.minDistBetweenBlobs = 5;
+//  params.minArea = 6;
+//  params.minDistBetweenBlobs = 3;
+
+  params.blobColor = 0;
+  Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
+
+  params.blobColor = 255;
+  Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
+
+  bool isBlackFound = findCirclesGrid(bgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
+  bool isWhiteFound = findCirclesGrid(bgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
+
+  if (!isBlackFound)
+  {
+      blackBlobs = Mat();
+  }
+
+  if (!isWhiteFound)
+  {
+      whiteBlobs = Mat();
+  }
+}
+
 cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar &color, int thickness)
 {
   CV_Assert(!image.empty() && !mask.empty());
-  Mat drawImage = image.clone();
+  Mat drawImage;
+  if (image.channels() == 3)
+  {
+    drawImage = image.clone();
+  }
+  else
+  {
+    cvtColor(image, drawImage, CV_GRAY2BGR);
+  }
 
   Mat glassMask = mask.clone();
   vector<vector<Point> > contours;
@@ -250,8 +221,9 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar
 vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
-                          cv::Scalar color)
+                          cv::Scalar color, float blendingFactor)
 {
+  CV_Assert(0.0f < blendingFactor && blendingFactor <= 1.0f);
   vector<Mat> drawImages(images.size());
   for(size_t i=0; i<images.size(); i++)
   {
@@ -272,16 +244,19 @@ vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
       //circle(drawImages[i], projectedEdgels[j], 2, Scalar(0, 0, 255), -1);
       circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
+
+    drawImages[i] = blendingFactor * drawImages[i] + (1.0f - blendingFactor) * images[i];
   }
 
   return drawImages;
 }
 
-Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
+Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera,
+               cv::Scalar color, float blendingFactor)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return drawEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
+  return drawEdgels(images, edgels3d, pose_cam, allCameras, color, blendingFactor)[0];
 }
 
 vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
@@ -467,6 +442,11 @@ void readPointCloud(const std::string &filename, std::vector<cv::Point3f> &point
   }
 }
 
+void project3dPoints(const std::vector<cv::Point3f>& points, const PoseRT &pose, std::vector<cv::Point3f>& modif_points)
+{
+  project3dPoints(points, pose.getRvec(), pose.getTvec(), modif_points);
+}
+
 void project3dPoints(const vector<Point3f>& points, const Mat& rvec, const Mat& tvec, vector<Point3f>& modif_points)
 {
   modif_points.clear();
@@ -620,4 +600,128 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
   cvReleaseImage(&annotated_img);
   cvReleaseImage(&dist_img);
   cvReleaseImage(&orientation_img);
+}
+
+struct Imshow3dData
+{
+  cv::Mat image3d;
+  std::string windowName;
+  int position;
+};
+
+void onTrackbarChange(int position, void *rawData)
+{
+  Imshow3dData *data = static_cast<Imshow3dData*>(rawData);
+
+  Mat image3d = data->image3d;
+  CV_Assert(image3d.isContinuous());
+  CV_Assert(image3d.dims == 3);
+  CV_Assert(position >= 0 && position < image3d.size.p[0]);
+
+  //TODO: support different types
+  void *slice = 0;
+  switch(image3d.type())
+  {
+    case CV_8UC3:
+      slice = image3d.ptr<Vec3b>(position, 0, 0);
+      break;
+    case CV_8UC1:
+      slice = image3d.ptr<uchar>(position, 0, 0);
+      break;
+    default:
+      CV_Assert(false);
+  }
+  Mat image2d(image3d.size.p[1], image3d.size.p[2], image3d.type(), slice);
+
+  imshow(data->windowName, image2d);
+}
+
+void imshow3d(const std::string &windowName, const cv::Mat &image3d)
+{
+  namedWindow(windowName); //QT backend crashes when destroying non-existent window
+  destroyWindow(windowName);
+
+  CV_Assert(image3d.dims == 3);
+  namedWindow(windowName, CV_WINDOW_NORMAL);
+  int count = image3d.size.p[0] - 1;
+
+  //TODO: clear data when closing a window
+  static std::map<std::string, Imshow3dData> allWindows;
+  Imshow3dData &data = allWindows[windowName];
+  data.position = 0;
+  data.image3d = image3d;
+  data.windowName = windowName;
+
+  createTrackbar("z", windowName, &data.position, count, onTrackbarChange, &data);
+  onTrackbarChange(data.position, &data);
+}
+
+void cvtColor3d(const cv::Mat &src, cv::Mat &dst, int code)
+{
+  CV_Assert(src.dims == 3);
+  Mat src_vector(1, src.total(), src.type(), src.data);
+  Mat dst_vector;
+  cvtColor(src_vector, dst_vector, code);
+  //TODO: eliminate copy
+  Mat(src.dims, src.size.p, dst_vector.type(), dst_vector.data).copyTo(dst);
+}
+
+struct ManualContourMarkingData
+{
+  bool isLButtonPressed;
+  std::vector<cv::Point> *contour;
+  cv::Mat displayedImage;
+  std::string windowName;
+};
+
+static void onMouse(int event, int x, int y, int, void *srcData)
+{
+  ManualContourMarkingData *data = static_cast<ManualContourMarkingData*>(srcData);
+  if (event == CV_EVENT_LBUTTONUP)
+  {
+    data->isLButtonPressed = false;
+  }
+
+  if (event == CV_EVENT_LBUTTONDOWN)
+  {
+    data->isLButtonPressed = true;
+  }
+
+  if (!data->isLButtonPressed)
+  {
+    return;
+  }
+
+  Point pt(x, y);
+  data->contour->push_back(pt);
+  circle(data->displayedImage, pt, 1, Scalar(255, 0, 0), -1);
+  imshow(data->windowName, data->displayedImage);
+}
+
+void markContourByUser(const cv::Mat &image, std::vector<cv::Point> &contour,
+                       const std::string &windowName)
+{
+  const char resetKey = 'r';
+  contour.clear();
+
+  ManualContourMarkingData data;
+  data.contour = &contour;
+  //TODO: what if button is pressed already?
+  data.isLButtonPressed = false;
+  data.displayedImage = image.clone();
+  data.windowName = windowName;
+
+  namedWindow(data.windowName, WINDOW_NORMAL);
+  setMouseCallback(data.windowName, onMouse, &data);
+  imshow(data.windowName, data.displayedImage);
+  int key = waitKey();
+  while (key == resetKey)
+  {
+    data.displayedImage = image.clone();
+    data.contour->clear();
+    key = waitKey();
+  }
+  destroyWindow(data.windowName);
+
+  CV_Assert(!contour.empty());
 }

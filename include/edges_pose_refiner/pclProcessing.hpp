@@ -36,14 +36,4 @@ void segmentObjects(float minZ, float maxZ, const pcl::PointCloud<pcl::PointXYZ>
 
 void rotateTable(const pcl::ModelCoefficients::Ptr &coefficients, pcl::PointCloud<pcl::PointXYZ> &sceneCloud, pcl::PointCloud<pcl::PointXYZ> &projectedInliers, pcl::PointCloud<pcl::PointXYZ> &tableHull);
 
-bool computeTableOrientation(float downLeafSize, int kSearch, float distanceThreshold, const pcl::PointCloud<pcl::PointXYZ> &fullSceneCloud,
-                             cv::Vec4f &tablePlane,  const PinholeCamera *camera = 0, std::vector<cv::Point2f> *tableHull = 0,
-                             float clusterTolerance = 0.05f, cv::Point3f verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f));
-
-bool computeTableOrientationByRGBD(const cv::Mat &depth, const PinholeCamera &camera,
-                                   cv::Vec4f &tablePlane, std::vector<cv::Point> *tableHull = 0,
-                                   cv::Point3f verticalDirection = cv::Point3f(0.0f, -1.0f, 0.0f));
-
-bool computeTableOrientationByFiducials(const PinholeCamera &camera, const cv::Mat &bgrImage,
-                                        cv::Vec4f &tablePlane);
 #endif /* PCLPROCESSING_HPP_ */

@@ -217,52 +217,29 @@ int main(int argc, char **argv)
     cout << argv[0] << " <modelsPath> <baseFoldler> <testObjectName>" << endl;
     return -1;
   }
-  string modelsPath = argv[1];
-  string baseFolder = argv[2];
-  string testObjectName = argv[3];
 
-  //const string modelFilename = "finalModels/" + objectName + ".xml";
+  const string trainedModelsPath = argv[1];
+  const string baseFolder = argv[2];
+  const string testObjectName = argv[3];
 
   const string testFolder = baseFolder + "/" + testObjectName + "/";
-
-//  const string camerasListFilename = baseFolder + "/cameras.txt";
-  const string kinectCameraFilename = baseFolder + "/center.yml";
 //  const string visualizationPath = "visualized_results/";
   const string errorsVisualizationPath = "/home/ilysenkov/errors/";
 //  const vector<string> objectNames = {"bank", "bucket"};
 //  const vector<string> objectNames = {"bank", "bottle", "bucket", "glass", "wineglass"};
-  const string registrationMaskFilename = baseFolder + "/registrationMask.png";
-
   const vector<string> objectNames = {testObjectName};
 
 
-
-  TODBaseImporter dataImporter(testFolder);
+  TODBaseImporter dataImporter(baseFolder, testFolder);
 
   PinholeCamera kinectCamera;
-  if(!kinectCameraFilename.empty())
-  {
-    dataImporter.readCameraParams(kinectCameraFilename, kinectCamera, false);
-    CV_Assert(kinectCamera.imageSize == Size(640, 480));
-  }
-
-  vector<EdgeModel> edgeModels(objectNames.size());
-  for (size_t i = 0; i < objectNames.size(); ++i)
-  {
-    dataImporter.importEdgeModel(modelsPath, objectNames[i], edgeModels[i]);
-    cout << "All points in the model: " << edgeModels[i].points.size() << endl;
-    cout << "Surface points in the model: " << edgeModels[i].stableEdgels.size() << endl;
-    EdgeModel::computeSurfaceEdgelsOrientations(edgeModels[i]);
-  }
-
+  vector<EdgeModel> edgeModels;
   vector<EdgeModel> occlusionObjects;
   vector<PoseRT> occlusionOffsets;
-  dataImporter.importOcclusionObjects(modelsPath, occlusionObjects, occlusionOffsets);
-
-
-//#ifdef VISUALIZE_POSE_REFINEMENT
-//  edgeModels[0].visualize();
-//#endif
+  vector<int> testIndices;
+  Mat registrationMask;
+  dataImporter.importAllData(&trainedModelsPath, &objectNames,
+                             &kinectCamera, &registrationMask, &edgeModels, &testIndices, &occlusionObjects, &occlusionOffsets);
 
   DetectorParams params;
 //  params.glassSegmentationParams.closingIterations = 8;
@@ -284,17 +261,10 @@ int main(int argc, char **argv)
   //params.glassSegmentationParams.finalClosingIterations = 12;
 
   Detector detector(kinectCamera, params);
-//  TransparentDetector detector(kinectCamera);
   for (size_t i = 0; i < edgeModels.size(); ++i)
   {
     detector.addTrainObject(objectNames[i], edgeModels[i]);
   }
-
-  vector<int> testIndices;
-  dataImporter.importTestIndices(testIndices);
-
-  Mat registrationMask = imread(registrationMaskFilename, CV_LOAD_IMAGE_GRAYSCALE);
-  CV_Assert(!registrationMask.empty());
 
   vector<size_t> initialPoseCount;
   vector<PoseError> bestPoses, bestInitialPoses;
@@ -317,12 +287,9 @@ int main(int argc, char **argv)
     int testImageIdx = testIndices[ testIdx ];
     cout << "Test: " << testIdx << " " << testImageIdx << endl;
 
-    Mat kinectDepth, kinectBgrImage;
-    if(!kinectCameraFilename.empty())
-    {
-      dataImporter.importBGRImage(testImageIdx, kinectBgrImage);
-      dataImporter.importDepth(testImageIdx, kinectDepth);
-    }
+    Mat kinectBgrImage, kinectDepth;
+    dataImporter.importBGRImage(testImageIdx, kinectBgrImage);
+    dataImporter.importDepth(testImageIdx, kinectDepth);
 
 /*
     Mat silhouetteImage(480, 640, CV_8UC1, Scalar(0));

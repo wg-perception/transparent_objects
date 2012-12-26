@@ -3,7 +3,7 @@
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/poseEstimator.hpp"
-#include "edges_pose_refiner/pclProcessing.hpp"
+#include "edges_pose_refiner/tableSegmentation.hpp"
 
 using namespace cv;
 using std::cout;
@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  const string modelsPath = argv[1];
+  const string trainedModelsPath = argv[1];
   const string baseFolder = argv[2];
   const string testObjectName = argv[3];
   const string occlusionName = argv[4];
@@ -25,23 +25,19 @@ int main(int argc, char *argv[])
   const string cameraFilename = baseFolder + "/center.yml";
   const string testFolder = baseFolder + "/" + testObjectName + "/";
 
-  TODBaseImporter baseImporter(testFolder);
+  vector<string> occlusionObjectsNames = {occlusionName};
 
-  EdgeModel occlusionEdgeModel;
-  baseImporter.importEdgeModel(modelsPath, occlusionName, occlusionEdgeModel);
-  EdgeModel::computeSurfaceEdgelsOrientations(occlusionEdgeModel);
-
-  vector<int> testIndices;
-  baseImporter.importTestIndices(testIndices);
-
-  Mat registrationMask;
-  baseImporter.importRegistrationMask(registrationMaskFilename, registrationMask);
+  TODBaseImporter baseImporter(baseFolder, testFolder);
 
   PinholeCamera camera;
-  baseImporter.importCamera(cameraFilename, camera);
+  Mat registrationMask;
+  vector<int> testIndices;
+  vector<EdgeModel> occlusionEdgeModels;
+  baseImporter.importAllData(&trainedModelsPath, &occlusionObjectsNames,
+                             &camera, &registrationMask, &occlusionEdgeModels, &testIndices);
 
   transpod::PoseEstimator occlusionPoseEstimator(camera);
-  occlusionPoseEstimator.setModel(occlusionEdgeModel);
+  occlusionPoseEstimator.setModel(occlusionEdgeModels[0]);
 
   GlassSegmentatorParams glassSegmentationParams;
   //good_clutter
