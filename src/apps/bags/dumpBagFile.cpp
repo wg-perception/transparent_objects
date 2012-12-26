@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include <cv_bridge/CvBridge.h>
 
@@ -162,6 +163,7 @@ int main(int argc, char ** argv)
   ImagePointsCamera ipc_package;
 
   TodProcessor p(opts);
+  cout << "dumping the bag file...  " << std::flush;
   foreach(rosbag::MessageInstance const m, view)
   {
     if(m.getTopic() == opts.topic_image)
@@ -188,6 +190,15 @@ int main(int argc, char ** argv)
       ipc_package.clear();
     }
   }
-
   bag.close();
+  cout << "done." << endl;
+
+  std::string testImagesFilename = (opts.full_path/"testImages.txt").string();
+  std::ofstream fout(testImagesFilename.c_str());
+  CV_Assert(fout.is_open());
+  for (int i = 0; i < p.n; ++i)
+  {
+      fout << i << '\n';
+  }
+  fout.close();
 }
