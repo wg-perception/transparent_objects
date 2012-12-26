@@ -62,7 +62,7 @@ namespace transpod
 
     DetectorParams()
     {
-      planeSegmentationMethod = PCL;
+      planeSegmentationMethod = RGBD;
       pclPlaneSegmentationParams = PCLPlaneSegmentationParams();
       glassSegmentationMethod = AUTOMATIC;
       glassSegmentationParams = GlassSegmentatorParams();
