@@ -49,9 +49,8 @@ public:
   void importRawMask(int testImageIdx, cv::Mat &rawMask) const;
   void importUserMask(int testImageIdx, cv::Mat &userMask) const;
 
-  void importPointCloud(int testImageIdx, std::vector<cv::Point3f> &cloud) const;
-  static void importPointCloud(const std::string &filename, std::vector<cv::Point3f> &cloud);
-//  static void importPointCloud(const std::string &filename, cv::Mat &cloud);
+  //void importPointCloud(int testImageIdx, std::vector<cv::Point3f> &cloud) const;
+  static void importPointCloud(const std::string &filename, cv::Mat &cloud, cv::Mat &normals);
 
   void exportTrainPointClouds(const std::string &outFolder) const;
 private:

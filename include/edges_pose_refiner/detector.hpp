@@ -101,6 +101,9 @@ namespace transpod
     void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points,
                         bool isModelUpsideDown = false, bool centralize = true);
 
+    void addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals,
+                        bool isModelUpsideDown = false, bool centralize = true);
+
     /** \brief Add a new train object to the detector which will be searched at the test stage
      *
      * \param objectName name of the train object
@@ -126,14 +129,14 @@ namespace transpod
      * \param objectNames names of the corresponding detected objects
      * \param debugInfo optional information for debugging
      */
+    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask,
+                std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
+                DebugInfo *debugInfo = 0) const;
+
     void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const std::vector<cv::Point3f> &sceneCloud,
                 std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
                 DebugInfo *debugInfo = 0) const;
-/*
-    void detect(const cv::Mat &bgrImage, const cv::Mat &depth, const cv::Mat &registrationMask, const cv::Mat &sceneCloud,
-                std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &objectNames,
-                DebugInfo *debugInfo = 0) const;
-*/
+
     /** \brief Visualize detected poses
      *
      * \param poses detected poses to be visualized

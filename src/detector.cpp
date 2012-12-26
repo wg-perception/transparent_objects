@@ -46,6 +46,13 @@ void Detector::addTrainObject(const std::string &objectName, const std::vector<c
   addTrainObject(objectName, edgeModel);
 }
 
+void Detector::addTrainObject(const std::string &objectName, const std::vector<cv::Point3f> &points, const std::vector<cv::Point3f> &normals,
+                              bool isModelUpsideDown, bool centralize)
+{
+  EdgeModel edgeModel(points, normals, isModelUpsideDown, centralize);
+  addTrainObject(objectName, edgeModel);
+}
+
 void Detector::addTrainObject(const std::string &objectName, const EdgeModel &edgeModel)
 {
   PoseEstimator estimator(srcCamera);
@@ -298,17 +305,13 @@ void reconstructCollisionMap(const PinholeCamera &validTestCamera,
 */
 #endif
 }
-/*
-void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const cv::Mat &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
+
+void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask,
+                      std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames,
+                      Detector::DebugInfo *debugInfo) const
 {
-  pcl::PointCloud<pcl::PointXYZ> pclCloud;
-  if (!sceneCloud.empty())
-  {
-    cv2pcl(sceneCloud.reshape(3, 1), pclCloud);
-  }
-  detect(srcBgrImage, srcDepth, srcRegistrationMask, pclCloud, poses_cam, posesQualities, detectedObjectNames, debugInfo);
+    detect(srcBgrImage, srcDepth, srcRegistrationMask, vector<Point3f>(), poses_cam, posesQualities, detectedObjectNames, debugInfo);
 }
-*/
 
 void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const cv::Mat &srcRegistrationMask, const std::vector<cv::Point3f> &sceneCloud, std::vector<PoseRT> &poses_cam, std::vector<float> &posesQualities, std::vector<std::string> &detectedObjectNames, Detector::DebugInfo *debugInfo) const
 {

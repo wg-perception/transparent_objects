@@ -358,6 +358,7 @@ void TODBaseImporter::importAllGroundTruth(std::map<int, PoseRT> &allPoses) cons
   }
 }
 
+/*
 void TODBaseImporter::importPointCloud(const std::string &filename, std::vector<cv::Point3f> &cloud)
 {
   CV_Assert(false);
@@ -370,17 +371,15 @@ void TODBaseImporter::importPointCloud(int testImageIdx, std::vector<cv::Point3f
   pointCloudFilename << testFolder << "/new_cloud_" << std::setfill('0') << std::setw(5) << testImageIdx << ".pcd";
   importPointCloud(pointCloudFilename.str(), cloud);
 }
-
-/*
-void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud)
-{
-  FileStorage fs(filename, FileStorage::READ);
-  CV_Assert(fs.isOpened());
-  fs["cloud"] >> cloud;
-  fs.release();
-  CV_Assert(!cloud.empty());
-}
 */
+
+void TODBaseImporter::importPointCloud(const std::string &filename, cv::Mat &cloud, cv::Mat &normals)
+{
+  vector<Point3f> cloud_Vector, normals_Vector;
+  readPointCloud(filename, cloud_Vector, &normals_Vector);
+  cloud = Mat(cloud_Vector).clone();
+  normals = Mat(normals_Vector).clone();
+}
 
 void TODBaseImporter::importRegistrationMask(cv::Mat &registrationMask) const
 {
