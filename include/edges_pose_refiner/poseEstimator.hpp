@@ -256,7 +256,10 @@ namespace transpod
      * \param image image where pose will be visualized
      * \param color color of the object in visualization
      */
-    void visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color = cv::Scalar(0, 0, 255)) const;
+    void visualize(const PoseRT &pose, cv::Mat &image,
+                   cv::Scalar color = cv::Scalar(0, 0, 255), float blendingFactor = 1.0f) const;
+
+    float computeBlendingFactor(float error) const;
 
   #ifdef USE_3D_VISUALIZATION
     /** \brief Visualizes an estimated pose in 3D

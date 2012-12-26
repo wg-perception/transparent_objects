@@ -143,6 +143,9 @@ namespace transpod
     void visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames,
                    cv::Mat &image, const DebugInfo *debugInfo = 0) const;
 
+    void visualize(const std::vector<PoseRT> &poses, const std::vector<float> &posesQualities, const std::vector<std::string> &objectNames,
+                   cv::Mat &image, const DebugInfo *debugInfo = 0) const;
+
     /** \brief Visualize and show detected poses
      *
      * \param poses detected poses to be visualized

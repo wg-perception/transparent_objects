@@ -221,8 +221,9 @@ cv::Mat drawSegmentation(const cv::Mat &image, const cv::Mat &mask, const Scalar
 vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,
                           const PoseRT &pose_cam,
                           const std::vector<PinholeCamera> &cameras,
-                          cv::Scalar color)
+                          cv::Scalar color, float blendingFactor)
 {
+  CV_Assert(0.0f < blendingFactor && blendingFactor <= 1.0f);
   vector<Mat> drawImages(images.size());
   for(size_t i=0; i<images.size(); i++)
   {
@@ -244,17 +245,18 @@ vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
       circle(drawImages[i], projectedEdgels[j], 1, color, -1);
     }
 
-//    drawImages[i] = 0.3 * drawImages[i] + 0.7 * images[i];
+    drawImages[i] = blendingFactor * drawImages[i] + (1.0f - blendingFactor) * images[i];
   }
 
   return drawImages;
 }
 
-Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera, cv::Scalar color)
+Mat drawEdgels(const cv::Mat &image, const vector<Point3f> &edgels3d, const PoseRT &pose_cam, const PinholeCamera &camera,
+               cv::Scalar color, float blendingFactor)
 {
   vector<Mat> images(1, image);
   vector<PinholeCamera> allCameras(1, camera);
-  return drawEdgels(images, edgels3d, pose_cam, allCameras, color)[0];
+  return drawEdgels(images, edgels3d, pose_cam, allCameras, color, blendingFactor)[0];
 }
 
 vector<Mat> showEdgels(const std::vector<cv::Mat> &images, const vector<Point3f> &edgels3d,

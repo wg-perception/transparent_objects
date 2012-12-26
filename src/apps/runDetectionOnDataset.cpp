@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
 
 #ifndef RUN_ONLY_SEGMENTATION
         Mat detectionImage = bgrImage.clone();
-        detector.visualize(poses_cam, detectedObjectsNames, detectionImage, &debugInfo);
+        detector.visualize(poses_cam, posesQualities, detectedObjectsNames, detectionImage, &debugInfo);
         string detectionFilename = visualizationPath + "/image_" + imageIndex.str() + "_detection.png";
         bool isSuccess = imwrite(detectionFilename, detectionImage);
         if (!isSuccess)

@@ -1146,9 +1146,21 @@ namespace transpod
     fs << "}";
   }
 
-  void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image, cv::Scalar color) const
+  void PoseEstimator::visualize(const PoseRT &pose, cv::Mat &image,
+                                cv::Scalar color, float blendingFactor) const
   {
-    image = drawEdgels(image, edgeModel.points, pose, kinectCamera, color);
+    image = drawEdgels(image, edgeModel.points, pose, kinectCamera, color, blendingFactor);
+  }
+
+  float PoseEstimator::computeBlendingFactor(float error) const
+  {
+      //TODO: move up
+      const float alpha = -5.5f;
+      const float beta = -3.3f;
+
+      //sigmoid function
+      float blendingFactor = 1.0 / (1.0 + exp(-alpha * error + beta));
+      return blendingFactor;
   }
 
   #ifdef USE_3D_VISUALIZATION

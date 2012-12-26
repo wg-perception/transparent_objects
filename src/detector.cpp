@@ -486,6 +486,13 @@ void Detector::detect(const cv::Mat &srcBgrImage, const cv::Mat &srcDepth, const
 void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std::string> &objectNames, cv::Mat &image,
                          const DebugInfo *debugInfo) const
 {
+    vector<float> posesQualities(poses.size(), 0.0f);
+    visualize(poses, posesQualities, objectNames, image, debugInfo);
+}
+
+void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<float> &posesQualities, const std::vector<std::string> &objectNames, cv::Mat &image,
+                         const DebugInfo *debugInfo) const
+{
   CV_Assert(poses.size() == objectNames.size());
   if (image.size() != validTestImageSize)
   {
@@ -519,7 +526,9 @@ void Detector::visualize(const std::vector<PoseRT> &poses, const std::vector<std
         color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
     }
 
-    poseEstimators.find(objectNames[i])->second.visualize(poses[i], image, color);
+    const PoseEstimator &estimator = poseEstimators.find(objectNames[i])->second;
+    float blendingFactor = estimator.computeBlendingFactor(posesQualities[i]);
+    estimator.visualize(poses[i], image, color, blendingFactor);
   }
 }
 
