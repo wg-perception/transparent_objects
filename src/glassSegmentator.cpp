@@ -3,7 +3,6 @@
 
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/utils.hpp"
-#include "edges_pose_refiner/gmm.hpp"
 
 using namespace cv;
 using std::cout;
@@ -59,31 +58,7 @@ void createMasksForGrabCut(const cv::Mat &objectMask,
   CV_Assert(allRois.size() == allRoiMasks.size());
 }
 
-void createModels(const std::vector<cv::Mat> &images, const std::vector<cv::Mat> &initMasks,
-                  cv::Mat &bgdModel, cv::Mat &fgdModel, const GlassSegmentatorParams &params)
-{
-  vector<Vec3f> bgdSamples, fgdSamples;
-  CV_Assert(images.size() == initMasks.size());
-  for (size_t observationIndex = 0; observationIndex < images.size(); ++observationIndex)
-  {
-    Mat bgrImage = images[observationIndex];
-    Mat rawMask = initMasks[observationIndex];
-
-    vector<Rect> rois;
-    vector<Mat> roiMasks;
-    createMasksForGrabCut(rawMask, rois, roiMasks, params);
-    CV_Assert(rois.size() == 1 && roiMasks.size() == 1);
-
-    transpod::addSamples(bgrImage(rois[0]), roiMasks[0], bgdSamples, fgdSamples);
-  }
-
-  transpod::GMM bgdGMM(bgdModel), fgdGMM(fgdModel);
-  transpod::initGMMs(bgdSamples, fgdSamples, bgdGMM, fgdGMM);
-}
-
-void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params,
-                                 const cv::Mat *computedBgdModel, const cv::Mat *computedFgdModel,
-                                 cv::Mat *bgdProbabilities, cv::Mat *fgdProbabilities)
+void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask, const GlassSegmentatorParams &params)
 {
   CV_Assert(!rawMask.empty());
 #ifdef VISUALIZE
@@ -110,23 +85,7 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     showGrabCutResults(bgrImage(roi), roiMask, "initial mask for GrabCut segmentation");
 #endif
 
-    Mat bgdModel, fgdModel;
-    //TODO: move up
-    const double gamma = 50.0;
-    if (computedBgdModel != 0 && computedFgdModel != 0)
-    {
-      bgdModel = computedBgdModel->clone();
-      fgdModel = computedFgdModel->clone();
-      //TODO: use gamma
-      //grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_EVAL, gamma);
-      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_EVAL);
-    }
-    else
-    {
-      //TODO: use gamma
-      //grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK, gamma);
-      grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
-    }
+    grabCut(bgrImage(roi), roiMask, Rect(), bgdModel, fgdModel, params.grabCutIterations, GC_INIT_WITH_MASK);
 
     Mat refinedMaskRoi = refinedMask(roi);
     roiMask.copyTo(refinedMaskRoi, (roiMask != GC_BGD) & (roiMask != GC_PR_BGD));
@@ -135,38 +94,6 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
     showGrabCutResults(bgrImage(roi), roiMask, "grab cut segmentation");
     waitKey();
 #endif
-
-    if (bgdProbabilities != 0 && fgdProbabilities != 0)
-    {
-      transpod::GMM bgdGMM(bgdModel), fgdGMM(fgdModel);
-      bgdProbabilities->create(bgrImage.size(), CV_64FC1);
-      fgdProbabilities->create(bgrImage.size(), CV_64FC1);
-
-      for (int i = 0; i < bgrImage.rows; ++i)
-      {
-        for (int j = 0; j < bgrImage.cols; ++j)
-        {
-          Vec3b val = bgrImage.at<Vec3b>(i, j);
-          bgdProbabilities->at<double>(i, j) = bgdGMM(val);
-          fgdProbabilities->at<double>(i, j) = fgdGMM(val);
-        }
-      }
-    }
-
-/*
-    Mat probabilityMask(bgrImage.size(), CV_8UC1);
-    for (int i = 0; i < bgrImage.rows; ++i)
-    {
-      for (int j = 0; j < bgrImage.cols; ++j)
-      {
-        Vec3b val = bgrImage.at<Vec3b>(i, j);
-        probabilityMask.at<uchar>(i, j) = bgdGMM(val) > fgdGMM(val) ? 0 : 255;
-      }
-    }
-    imshow("probs", probabilityMask);
-
-    waitKey();
-*/
   }
 
   Mat prFgd = (refinedMask == GC_PR_FGD);
