@@ -223,7 +223,8 @@ vector<Mat> drawEdgels(const std::vector<cv::Mat> &images, const vector<Point3f>
                           const std::vector<PinholeCamera> &cameras,
                           cv::Scalar color, float blendingFactor)
 {
-  CV_Assert(0.0f < blendingFactor && blendingFactor <= 1.0f);
+  const float eps = 1e-5;
+  CV_Assert(-eps < blendingFactor && blendingFactor < 1.0f + eps);
   vector<Mat> drawImages(images.size());
   for(size_t i=0; i<images.size(); i++)
   {
