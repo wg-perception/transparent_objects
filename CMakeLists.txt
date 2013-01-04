@@ -16,6 +16,10 @@ if (catkin_FOUND)
         catkin_project(object_recognition_transparent_objects
                    INCLUDE_DIRS include
         )
+        list(APPEND catkin_INCLUDE_DIRS ${ecto_INCLUDE_DIRS} ${object_recognition_core_INCLUDE_DIRS}
+                                        ${opencv_candidate_INCLUDE_DIRS}
+        )
+        list(APPEND catkin_LIBRARIES ${ecto_LIBRARIES} ${object_recognition_core_LIBRARIES} ${opencv_candidate_LIBRARIES})
     endif()
 
     #install targets for all things python
@@ -36,7 +40,7 @@ include_directories(SYSTEM ${object_recognition_core_INCLUDE_DIRS})
 
 add_subdirectory(src)
 
-if (${ecto_FOUND} AND ${object_recognition_core_FOUND})    
+if (${ecto_FOUND} AND ${object_recognition_core_FOUND})
     add_subdirectory(cells)
 endif()
 
