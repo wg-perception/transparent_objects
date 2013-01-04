@@ -7,16 +7,14 @@ ectomodule(transparent_objects_cells DESTINATION ${PROJECT_NAME}
     modelFiller.cpp
     )
 
-include_directories(SYSTEM
-                    ${object_recognition_core_INCLUDE_DIRS}
-                    ${PCL_INCLUDE_DIRS}
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS}
+                           ${PCL_INCLUDE_DIRS}
 )
 
 link_ecto(transparent_objects_cells
     ${PCL_LIBRARIES}
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
-    ${object_recognition_core_LIBRARIES}
     edges_pose_refiner
 )
 
