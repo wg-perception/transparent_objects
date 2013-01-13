@@ -25,7 +25,7 @@ using ecto::tendrils;
 using ecto::spore;
 using object_recognition_core::db::ObjectId;
 using object_recognition_core::common::PoseResult;
-using object_recognition_core::db::ObjectDb;
+using object_recognition_core::db::ObjectDbPtr;
 
 namespace transparent_objects
 {
@@ -232,7 +232,7 @@ namespace transparent_objects
     /** The object recognition results */
     ecto::spore<std::vector<PoseResult> > pose_results_;
     /** The DB parameters */
-    ecto::spore<ObjectDb> object_db_;
+    ecto::spore<ObjectDbPtr> object_db_;
 
     cv::Ptr<transpod::Detector> detector_;
 
