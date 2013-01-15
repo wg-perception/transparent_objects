@@ -21,6 +21,12 @@ TODBaseImporter::TODBaseImporter()
 {
 }
 
+TODBaseImporter::TODBaseImporter(const std::string &_testFolder)
+{
+  testFolder = _testFolder;
+  baseFolder = testFolder + "/../";
+}
+
 TODBaseImporter::TODBaseImporter(const std::string &_baseFolder, const std::string &_testFolder)
 {
   baseFolder = _baseFolder;

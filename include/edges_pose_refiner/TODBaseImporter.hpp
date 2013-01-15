@@ -15,6 +15,7 @@ class TODBaseImporter
 {
 public:
   TODBaseImporter();
+  TODBaseImporter(const std::string &testFolder);
   TODBaseImporter(const std::string &baseFolder, const std::string &testFolder);
 
   void importAllData(const std::string *trainedModelsPath = 0, const std::vector<std::string> *trainObjectNames = 0,
