@@ -9,6 +9,8 @@
 #include <fstream>
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
+#define INITIAL_RUN
+
 using namespace cv;
 using std::cout;
 using std::endl;
@@ -25,8 +27,9 @@ struct VolumeParams
   {
     minBound = cv::Vec3f(0.1f, -0.1f, -0.3f);
     maxBound = cv::Vec3f(0.5f,  0.2f,  0.0f);
-//    step = cv::Vec3f::all(0.01f);
-    step = cv::Vec3f::all(0.05f);
+    step = cv::Vec3f::all(0.02f);
+//    step = cv::Vec3f::all(0.03f);
+//    step = cv::Vec3f::all(0.05f);
   }
 };
 
@@ -54,6 +57,256 @@ void initializeVolume(Mat &volumePoints, const VolumeParams &params = VolumePara
   }
 }
 
+struct VolumeVariable
+{
+    int ilpIndex;
+    int volumeIndex;
+    float label;
+};
+
+struct PixelVariable
+{
+    int ilpIndex;
+    int imageIndex;
+    int x, y;
+    float label;
+};
+
+struct Constraint
+{
+    std::map<int, float> coefficients;
+    int b;
+};
+
+
+void createProblemInstance(const cv::Mat &volumePoints,
+                           const PinholeCamera &camera,
+                           const std::vector<PoseRT> &allPoses,
+                           const std::vector<cv::Mat> &allMasks,
+                           std::vector<VolumeVariable> &volumeVariables,
+                           std::vector<PixelVariable> &pixelVariables,
+                           std::vector<Constraint> &constraints)
+{
+    volumeVariables.clear();
+    pixelVariables.clear();
+    constraints.clear();
+
+    Mat volumePoints_Vector(1, volumePoints.total(), CV_32FC3, volumePoints.data);
+
+    for (size_t i = 0; i < volumePoints.total(); ++i)
+    {
+        VolumeVariable variable;
+        variable.volumeIndex = i;
+        variable.ilpIndex = i;
+        volumeVariables.push_back(variable);
+    }
+
+    int pixelVariableILPIndex = volumePoints.total();
+    for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
+    {
+        const Mat &mask = allMasks[imageIndex];
+        CV_Assert(mask.type() == CV_8UC1);
+        const PoseRT &pose = allPoses[imageIndex];
+
+        vector<Point2f> projectedVolume;
+        camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
+
+        vector<vector<vector<size_t> > > projectedPointsIndices(mask.rows);
+        for (int i = 0; i < mask.rows; ++i)
+        {
+            projectedPointsIndices[i].resize(mask.cols);
+        }
+
+        for (size_t i = 0; i < projectedVolume.size(); ++i)
+        {
+            Point pt = projectedVolume[i];
+            if (!isPointInside(mask, pt))
+            {
+                continue;
+            }
+
+            projectedPointsIndices[pt.y][pt.x].push_back(i);
+        }
+
+        for (int i = 0; i < mask.rows; ++i)
+        {
+            for (int j = 0; j < mask.cols; ++j)
+            {
+                if (projectedPointsIndices[i][j].empty())
+                {
+                    continue;
+                }
+
+                Constraint constraint;
+                constraint.coefficients[pixelVariableILPIndex] = 1;
+
+                if (mask.at<uchar>(i, j) == 0)
+                {
+                    for (size_t k = 0; k < projectedPointsIndices[i][j].size(); ++k)
+                    {
+                        constraint.coefficients[projectedPointsIndices[i][j][k]] = 1;
+                        constraint.b = 1;
+                        constraints.push_back(constraint);
+                    }
+                }
+                else
+                {
+                    for (size_t k = 0; k < projectedPointsIndices[i][j].size(); ++k)
+                    {
+                        constraint.coefficients[projectedPointsIndices[i][j][k]] = -1;
+                    }
+                    constraint.b = 0;
+                    constraints.push_back(constraint);
+                }
+
+                PixelVariable variable;
+                variable.x = j;
+                variable.y = i;
+                variable.imageIndex = imageIndex;
+                variable.ilpIndex = pixelVariableILPIndex;
+                pixelVariables.push_back(variable);
+
+                ++pixelVariableILPIndex;
+            }
+        }
+    }
+}
+
+//TODO: implement read/write methods for these classes and call them in these functions
+void writeProblemInstance(const std::string &filename,
+                          const std::vector<VolumeVariable> &volumeVariables,
+                          const std::vector<PixelVariable> &pixelVariables,
+                          const std::vector<Constraint> &constraints)
+{
+    std::ofstream fout(filename.c_str());
+    CV_Assert(fout.is_open());
+
+    fout << "Volume variables: " << volumeVariables.size() << "\n";
+    for (size_t i = 0; i < volumeVariables.size(); ++i)
+    {
+        fout << volumeVariables[i].ilpIndex << " " << volumeVariables[i].volumeIndex << "\n";
+    }
+
+    fout << "Pixel variables: " << pixelVariables.size() << "\n";
+    for (size_t i = 0; i < pixelVariables.size(); ++i)
+    {
+        const PixelVariable &pv = pixelVariables[i];
+        fout << pv.ilpIndex << " " << pv.imageIndex << " " << pv.x << " " << pv.y << "\n";
+    }
+
+    fout << "Constraints: " << constraints.size() << "\n";
+    for (size_t i = 0; i < constraints.size(); ++i)
+    {
+        fout << constraints[i].b;
+        for (std::map<int, float>::const_iterator it = constraints[i].coefficients.begin(); it != constraints[i].coefficients.end(); ++it)
+        {
+            fout << " " << it->first << " " << it->second;
+        }
+        fout << "\n";
+    }
+}
+
+enum ReadingMode {READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
+void readProblemInstance(const std::string &problemInstanceFilename, const std::string &solutionFilename,
+                         std::vector<VolumeVariable> &volumeVariables,
+                         std::vector<PixelVariable> &pixelVariables,
+                         std::vector<Constraint> &constraints)
+{
+    const std::string volumeVariablesTag = "Volume variables: ";
+    const std::string pixelVariablesTag = "Pixel variables: ";
+    const std::string constraintsTag = "Constraints: ";
+
+    volumeVariables.clear();
+    pixelVariables.clear();
+    constraints.clear();
+
+    {
+        std::ifstream fin(problemInstanceFilename.c_str());
+        CV_Assert(fin.is_open());
+
+
+        int volumeVariablesCount, pixelVariablesCount, constraintsCount;
+        std::string line;
+        bool isReadingConstraints = false;
+        ReadingMode mode = READ_VOLUME_VARIABLES;
+        int iteration = 0;
+        while (std::getline(fin, line))
+        {
+            std::istringstream input(line);
+            if (mode == READ_VOLUME_VARIABLES)
+            {
+                //TODO: eliminate code duplication
+                if (line.find(volumeVariablesTag) != string::npos)
+                {
+                    int suffixLength = line.length() - static_cast<int>(volumeVariablesTag.length());
+                    volumeVariablesCount = atoi(line.substr(volumeVariablesTag.length(), suffixLength).c_str());
+                }
+                else
+                {
+                    if (line.find(pixelVariablesTag) != string::npos)
+                    {
+                        int suffixLength = line.length() - static_cast<int>(pixelVariablesTag.length());
+                        pixelVariablesCount = atoi(line.substr(pixelVariablesTag.length(), suffixLength).c_str());
+                        mode = READ_PIXEL_VARIABLES;
+                        continue;
+                    }
+
+                    VolumeVariable var;
+                    input >> var.ilpIndex >> var.volumeIndex;
+                    volumeVariables.push_back(var);
+                }
+            }
+
+            if (mode == READ_PIXEL_VARIABLES)
+            {
+                if (line.find(constraintsTag) != string::npos)
+                {
+                    int suffixLength = line.length() - static_cast<int>(constraintsTag.length());
+                    constraintsCount = atoi(line.substr(constraintsTag.length(), suffixLength).c_str());
+                    mode = READ_CONSTRAINTS;
+                    continue;
+                }
+
+                PixelVariable var;
+                input >> var.ilpIndex >> var.imageIndex >> var.x >> var.y;
+                pixelVariables.push_back(var);
+            }
+
+            if (mode == READ_CONSTRAINTS)
+            {
+                Constraint constraint;
+                input >> constraint.b;
+                int index;
+                float coefficient;
+                while (input >> index >> coefficient)
+                {
+                    constraint.coefficients[index] = coefficient;
+                }
+                constraints.push_back(constraint);
+            }
+        }
+        fin.close();
+
+        cout << "counts: " << volumeVariablesCount << " " << pixelVariablesCount << " " << constraintsCount << endl;
+        cout << "read counts: " << volumeVariables.size() << " " << pixelVariables.size() << " " << constraints.size() << endl;
+    }
+
+    {
+        std::ifstream fin(solutionFilename.c_str());
+        CV_Assert(fin.is_open());
+        for (size_t i = 0; i < volumeVariables.size(); ++i)
+        {
+            fin >> volumeVariables[i].label;
+        }
+
+        for (size_t i = 0; i < pixelVariables.size(); ++i)
+        {
+            fin >> pixelVariables[i].label;
+        }
+        fin.close();
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 4)
@@ -66,7 +319,7 @@ int main(int argc, char *argv[])
     const string baseFolder = argv[2];
     const string testObjectName = argv[3];
 
-
+#ifdef WITH_GROUND_TRUTH
     vector<float> groundTruthLabels;
     std::ifstream fin("solution.csv");
     CV_Assert(fin.is_open());
@@ -78,6 +331,31 @@ int main(int argc, char *argv[])
         groundTruthLabels.push_back(label);
     }
 
+    //TODO: fix
+    const int variablesCount = 3597;
+    const int allPixelVariablesCount = 3309;
+    const int allVolumeVariablesCount = variablesCount - allPixelVariablesCount;
+    groundTruthLabels.resize(variablesCount);
+    vector<float> volumeLabels;
+    vector<Point3f> model;
+    for (int i = allPixelVariablesCount; i < variablesCount; ++i)
+    {
+        cout << groundTruthLabels[i] << endl;
+        volumeLabels.push_back(groundTruthLabels[i]);
+
+
+        /*
+        float label = groundTruthLabels[i];
+        if (label > 0.00001f)
+        {
+            model.push_back(volumePoints_Vector.at<Vec3f>(i - globalPixelVariableIndex));
+        }
+        */
+    }
+//    writePointCloud("model.asc", model);
+#endif
+
+
     PinholeCamera camera;
     vector<PoseRT> allPoses;
     vector<Mat> allMasks;
@@ -85,13 +363,21 @@ int main(int argc, char *argv[])
 
     Mat volumePoints;
     initializeVolume(volumePoints);
+
+    std::vector<VolumeVariable> volumeVariables;
+    std::vector<PixelVariable> pixelVariables;
+    std::vector<Constraint> constraints;
+
+#ifdef INITIAL_RUN
+    createProblemInstance(volumePoints, camera, allPoses, allMasks,
+                          volumeVariables, pixelVariables, constraints);
+
+    writeProblemInstance("ilpProblem.txt", volumeVariables, pixelVariables, constraints);
+#else
+    readProblemInstance("ilpProblem.txt", "solution.csv", volumeVariables, pixelVariables, constraints);
+
     Mat volumePoints_Vector(1, volumePoints.total(), CV_32FC3, volumePoints.data);
-
-    Mat A_volumeVariables, b(0, 1, CV_32SC1);
-    vector<Mat> allA_pixelVariables;
-    cout << "Number of images: " << allMasks.size() << endl;
-
-    int globalPixelVariableIndex = 0;
+    int currentPixelVariableIndex = 0;
     for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
     {
         const Mat &mask = allMasks[imageIndex];
@@ -99,10 +385,67 @@ int main(int argc, char *argv[])
         cvtColor(mask, visualization, CV_GRAY2BGR);
         CV_Assert(mask.type() == CV_8UC1);
         const PoseRT &pose = allPoses[imageIndex];
+
+
+        vector<Point2f> projectedVolume;
+        camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
+        for (size_t i = 0; i < projectedVolume.size(); ++i)
+        {
+            //TODO: move up
+            Scalar color = volumeVariables[i].label > 0.0001f ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
+            circle(visualization, projectedVolume[i], 2, color, -1);
+        }
+
+        imshow("volume", visualization);
+
+        Mat pixelVariablesVisualization;
+        cvtColor(mask, pixelVariablesVisualization, CV_GRAY2BGR);
+        while (currentPixelVariableIndex < pixelVariables.size() && pixelVariables[currentPixelVariableIndex].imageIndex == imageIndex)
+        {
+            Scalar color = pixelVariables[currentPixelVariableIndex].label > 0.0001f ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
+            Point pt(pixelVariables[currentPixelVariableIndex].x, pixelVariables[currentPixelVariableIndex].y);
+            circle(pixelVariablesVisualization, pt, 2, color, -1);
+            ++currentPixelVariableIndex;
+        }
+
+        imshow("pixels", pixelVariablesVisualization);
+
+        waitKey();
+    }
+#endif
+
+#if 0
+    Mat A_volumeVariables, b(0, 1, CV_32SC1);
+    vector<Mat> allA_pixelVariables;
+    cout << "Number of images: " << allMasks.size() << endl;
+    int globalPixelVariableIndex = 0;
+    for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
+    {
+        const Mat &mask = allMasks[imageIndex];
+#ifdef WITH_GROUND_TRUTH
+        Mat visualization, volumeVisualization;
+        cvtColor(mask, visualization, CV_GRAY2BGR);
+        cvtColor(mask, volumeVisualization, CV_GRAY2BGR);
+#endif
+        CV_Assert(mask.type() == CV_8UC1);
+        const PoseRT &pose = allPoses[imageIndex];
         Mat A_pixelVariables;
 
         vector<Point2f> projectedVolume;
         camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
+
+#ifdef WITH_GROUND_TRUTH
+        for (size_t i = 0; i < volumeLabels.size(); ++i)
+        {
+            //TODO: move up
+            if (volumeLabels[i] > 0.001f)
+            {
+                circle(volumeVisualization, projectedVolume[i], 2, Scalar(255, 0, 255), -1);
+            }
+        }
+
+        imshow("volumeViz", volumeVisualization);
+#endif
 
         /*
         CV_Assert(!mask.empty());
@@ -172,32 +515,24 @@ int main(int argc, char *argv[])
                     b.push_back(0);
                 }
 
-
+#ifdef WITH_GROUND_TRUTH
                 float label = groundTruthLabels[globalPixelVariableIndex];
                 Scalar color = label > 0.5 ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
                 circle(visualization, Point(j, i), 2, color, -1);
 //                visualization.at<Vec3b>(i, j) = label > 0.5 ? Vec3b(0, 255, 0) : Vec3b(255, 0, 255);
-                ++pixelVariableIndex;
                 ++globalPixelVariableIndex;
+#endif
+                ++pixelVariableIndex;
             }
         }
 
+#ifdef WITH_GROUND_TRUTH
         imshow("viz", visualization);
-        waitKey();
+//        waitKey();
+#endif
 
         allA_pixelVariables.push_back(A_pixelVariables);
     }
-
-    vector<Point3f> model;
-    for (int i = globalPixelVariableIndex; i < globalPixelVariableIndex + volumePoints.total(); ++i)
-    {
-        float label = groundTruthLabels[i];
-        if (label > 0.00001f)
-        {
-            model.push_back(volumePoints_Vector.at<Vec3f>(i - globalPixelVariableIndex));
-        }
-    }
-    writePointCloud("model.asc", model);
 
     int pixelVariablesCount = 0;
     int constraintsCount = 0;
@@ -239,7 +574,7 @@ int main(int argc, char *argv[])
     {
         std::ofstream fout("b.csv");
         CV_Assert(fout.is_open());
-        fout << format(b, "csv");
+        fout << format(b.t(), "csv");
         fout.close();
     }
 
@@ -249,6 +584,7 @@ int main(int argc, char *argv[])
     fs << "b" << b;
     fs.release();
 */
+#endif
 
     return 0;
 }
