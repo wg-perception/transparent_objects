@@ -14,7 +14,7 @@
 #include <string>
 #include <fstream>
 
-#include <cv_bridge/CvBridge.h>
+#include <cv_bridge/cv_bridge.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -122,12 +122,12 @@ public:
   {
     {
       //write image to file
-      const cv::Mat cv_image = bridge_.imgMsgToCv(ipc.img, "bgr8");
+      const cv::Mat cv_image = cv_bridge::toCvShare(ipc.img, "bgr8")->image;
       cv::imwrite((opts.full_path / str(boost::format("image_%05d.png") % n)).string(), cv_image);
     }
     {
       //write image to file
-      const cv::Mat cv_image = bridge_.imgMsgToCv(ipc.depth_img);
+      const cv::Mat cv_image = cv_bridge::toCvShare(ipc.depth_img)->image;
       std::string path = (opts.full_path / str(boost::format("depth_image_%05d.xml.gz") % n)).string();
       cv::FileStorage fs(path, cv::FileStorage::WRITE);
       CV_Assert(fs.isOpened());
@@ -140,7 +140,6 @@ public:
   }
   int n;
   Options opts;
-  sensor_msgs::CvBridge bridge_;
 };
 
 }

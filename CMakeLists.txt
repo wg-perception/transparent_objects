@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 2.8)
 project(object_recognition_transparent_objects)
 
+find_package(Boost REQUIRED program_options signals)
 find_package(PCL REQUIRED)
 find_package(catkin QUIET)
+
 if (catkin_FOUND)
     if (${catkin_VERSION} VERSION_GREATER "0.5.28")
-    find_package(catkin REQUIRED ecto ecto_opencv object_recognition_core opencv_candidate)
+    find_package(catkin REQUIRED cv_bridge ecto ecto_opencv object_recognition_core opencv_candidate roscpp rosbag)
         catkin_package(INCLUDE_DIRS include)
     else()
         find_package(catkin REQUIRED opencv_candidate)

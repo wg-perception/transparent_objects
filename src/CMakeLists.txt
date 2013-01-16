@@ -163,7 +163,6 @@ if (USE_ON_ROBOT)
     add_executable(pickAndPlace apps/pickAndPlace.cpp)
 
     find_package(ROS COMPONENTS roscpp actionlib)
-    find_package(Boost REQUIRED)
 
     message("libs: ${object_manipulator_LIBRARIES}")
     target_link_libraries(pickAndPlace ${roscpp_LIBRARIES}
@@ -250,19 +249,32 @@ target_link_libraries(runDetectionOnDataset edges_pose_refiner)
 #target_link_libraries(writeVideo ${OpenCV_LIBRARIES})
 
 if (${WITH_ROS})
-    #TODO: remove hard-coded paths
+
+if (${catkin_VERSION} VERSION_GREATER "0.5.28")
+    # Groovy case
+    include_directories(${catkin_INCLUDE_DIRS})
+else()
+    # Fuerte case
     include_directories(/opt/ros/fuerte/stacks/vision_opencv/cv_bridge/include/)
+endif()
+
     add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
-    target_link_libraries(dumpBagFile ${roscpp_LIBRARIES}
-                                      ${OpenCV_LIBRARIES}
-                                      ${Boost_LIBRARIES}
-                                      /usr/lib/libboost_signals.so
-                                      /usr/lib/libboost_program_options.so
-                                      /opt/ros/fuerte/lib/libmessage_filters.so
+
+if (${catkin_VERSION} VERSION_GREATER "0.5.28")
+    # Groovy case
+else()
+    # Fuerte case
+    target_link_libraries(dumpBagFile /opt/ros/fuerte/lib/libmessage_filters.so
                                       /opt/ros/fuerte/lib/librosbag.so
                                       /opt/ros/fuerte/lib/libroscpp.so
                                       /opt/ros/fuerte/lib/librostime.so
                                       /opt/ros/fuerte/lib/libroscpp_serialization.so
+    )
+endif()
+
+    target_link_libraries(dumpBagFile ${Boost_LIBRARIES}
+                                      ${catkin_LIBRARIES}
+                                      ${OpenCV_LIBRARIES}
                                       ${PYTHON_LIBRARIES}
     )
 endif()
