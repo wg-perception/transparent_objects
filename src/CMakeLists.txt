@@ -248,6 +248,7 @@ target_link_libraries(runDetectionOnDataset edges_pose_refiner)
 #add_executable(writeVideo apps/writeVideo.cpp)
 #target_link_libraries(writeVideo ${OpenCV_LIBRARIES})
 
+set(WITH_ROS FALSE)
 if (${WITH_ROS})
 
 if (${catkin_VERSION} VERSION_GREATER "0.5.28")
