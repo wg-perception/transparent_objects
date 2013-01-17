@@ -1,25 +1,24 @@
 source1:
-  type: ros_kinect
-  module: 'object_recognition_ros.io'
+  type: RosKinect
+  module: object_recognition_ros.io
   rgb_frame_id: '/camera_rgb_optical_frame'
 
 sink1:
-  type: publisher
-  module: 'object_recognition_ros.io'
+  type: Publisher
+  module: object_recognition_ros.io
 
 pipeline1:
-  type: 'transparent_objects'
-  module: 'object_recognition_transparent_objects'
+  type: TransparentObjectsDetector
+  module: object_recognition_transparent_objects
   subtype: ''
-  sources: [source1]
-  sinks: [sink1]
+  inputs: ['source1']
+  outputs: ['sink1']
   parameters:
-    registrationMaskFilename: '/tmp/registrationMask_SXGA.png'
+    registrationMaskFilename: /tmp/registrationMask_SXGA.png
     db:
-      type: 'CouchDB'
-      root: 'http://localhost:5984'
-      collection: 'object_recognition'
-
+      type: CouchDB
+      root: http://localhost:5984
+      collection: object_recognition
     # The list of object_ids to analyze
     #object_ids: "all"
-    object_ids: ['1acfa3a425f5637f958c0eaff31fe42d']
+    object_ids: ["1acfa3a425f5637f958c0eaff31fe42d"]

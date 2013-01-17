@@ -7,8 +7,8 @@ from ecto import BlackBoxCellInfo as CellInfo
 from object_recognition_core.db import Document, Documents
 from object_recognition_core.db.models import find_model_for_object
 from object_recognition_core.db.tools import db_params_to_db
-from object_recognition_core.pipelines.training import TrainingPipeline
-from object_recognition_core.utils.json_helper import dict_to_cpp_json_str
+from object_recognition_core.pipelines.training import TrainerBase
+from object_recognition_core.utils.json_helper import obj_to_cpp_json_str
 import ecto
 import transparent_objects_cells
 
@@ -71,7 +71,7 @@ class TransparentObjectsTrainingPipeline(TrainingPipeline):
             imageHeight = 480
 
             db_models = []
-        return TransparentObjectsProcessor(json_subtype=dict_to_cpp_json_str(subtype), json_K=dict_to_cpp_json_str(json_K), json_D=dict_to_cpp_json_str(json_D), imageWidth=imageWidth, imageHeight=imageHeight, db_models=db_models)
+        return TransparentObjectsProcessor(json_subtype=obj_to_cpp_json_str(subtype), json_K=obj_to_cpp_json_str(json_K), json_D=obj_to_cpp_json_str(json_D), imageWidth=imageWidth, imageHeight=imageHeight, db_models=db_models)
 
     @classmethod
     def post_processor(cls, *args, **kwarg):

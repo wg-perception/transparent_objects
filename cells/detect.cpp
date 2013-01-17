@@ -29,10 +29,10 @@ using object_recognition_core::db::ObjectDbPtr;
 
 namespace transparent_objects
 {
-  struct TransparentObjectsDetector: public object_recognition_core::db::bases::ModelReaderImpl
+  struct TransparentObjectsDetector: public object_recognition_core::db::bases::ModelReaderBase
   {
     void
-    ParameterCallback(const object_recognition_core::db::Documents & db_documents)
+    parameter_callback(const object_recognition_core::db::Documents & db_documents)
     {
       std::cout << "detector: ParameterCallback" << std::endl;
       BOOST_FOREACH(const object_recognition_core::db::Document & document, db_documents)
@@ -50,6 +50,7 @@ namespace transparent_objects
     static void
     declare_params(tendrils& params)
     {
+      object_recognition_core::db::bases::declare_params_impl(params);
       std::cout << "detector: declare_params" << std::endl;
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
       params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
@@ -71,6 +72,7 @@ namespace transparent_objects
     void
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
+      configure_impl();
       std::cout << "detector: configure" << std::endl;
       detector_ = new transpod::Detector;
       std::cout << "detector: leaving configure" << std::endl;
@@ -243,5 +245,5 @@ namespace transparent_objects
   };
 }
 
-ECTO_CELL(transparent_objects_cells, object_recognition_core::db::bases::ModelReaderBase<transparent_objects::TransparentObjectsDetector>, "Detector",
-  "Detection of transparent objects.");
+ECTO_CELL(transparent_objects_cells, transparent_objects::TransparentObjectsDetector, "Detector",
+          "Detection of transparent objects.");

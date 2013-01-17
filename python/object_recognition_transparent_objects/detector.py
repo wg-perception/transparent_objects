@@ -3,37 +3,26 @@
 Module defining the transparent objects detector to find objects in a scene
 """
 
-from object_recognition_core.db import ObjectDb, Models
-from object_recognition_core.pipelines.detection import DetectionPipeline
-from object_recognition_core.utils import json_helper
+from ecto.blackbox import BlackBoxCellInfo as CellInfo
+from object_recognition_core.pipelines.detection import DetectorBase
+import ecto
 import transparent_objects_cells
 
 ########################################################################################################################
 
-class TransparentObjectsDetectionPipeline(DetectionPipeline):
+class TransparentObjectsDetector(ecto.BlackBox, DetectorBase):
+
+    def __init__(self, *args, **kwargs):
+        ecto.BlackBox.__init__(self, *args, **kwargs)
+        DetectorBase.__init__(self)
 
     @classmethod
-    def config_doc(cls):
-        return  """
-                parameters:
-                    # The path of the 'registrationMask_SXGA.png' given in the conf folder
-                    registrationMaskFilename: '/tmp/registrationMask_SXGA.png'
-                    # The usual parameters for the DB
-                    db:
-        """
+    def declare_cells(cls, _p):
+        return {'main': CellInfo(transparent_objects_cells.Detector)}
 
     @classmethod
-    def type_name(cls):
-        return 'transparent_objects'
-
-    @classmethod
-    def detector(self, *args, **kwargs):
-        visualize = kwargs.pop('visualize', False)
-        subtype = kwargs.pop('subtype')
-        parameters = kwargs.pop('parameters')
-        object_ids = parameters['object_ids']
-        object_db = ObjectDb(parameters['db'])
-        model_documents = Models(object_db, object_ids, self.type_name(), json_helper.dict_to_cpp_json_str(subtype))
-        registrationMaskFilename = parameters.get('registrationMaskFilename')
-        return transparent_objects_cells.Detector(model_documents=model_documents, object_db=object_db,
-                                            registrationMaskFilename=registrationMaskFilename, visualize=visualize)
+    def declare_forwards(cls, _p):
+        return ({'main':'all'}, {'main':'all'}, {'main':'all'})
+    
+    def connections(self, _p):
+        return [self.main]
