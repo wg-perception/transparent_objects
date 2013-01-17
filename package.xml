@@ -9,13 +9,11 @@
   <license>BSD</license>
   <url>http://ecto.willowgarage.com</url>
 
-  <build_depend>cv_bridge</build_depend>
   <build_depend>ecto</build_depend>
   <build_depend>object_recognition_core</build_depend>
   <build_depend>openni-dev</build_depend>
   <build_depend>pcl</build_depend>
 
-  <run_depend>cv_bridge</run_depend>
   <run_depend>ecto</run_depend>
   <run_depend>ecto_opencv</run_depend>
   <run_depend>object_recognition_core</run_depend>

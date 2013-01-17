@@ -7,7 +7,7 @@ find_package(catkin QUIET)
 
 if (catkin_FOUND)
     if (${catkin_VERSION} VERSION_GREATER "0.5.28")
-    find_package(catkin REQUIRED cv_bridge ecto ecto_opencv object_recognition_core opencv_candidate)
+    find_package(catkin REQUIRED ecto ecto_opencv object_recognition_core opencv_candidate)
         catkin_package(INCLUDE_DIRS include)
     else()
         find_package(catkin REQUIRED opencv_candidate)
