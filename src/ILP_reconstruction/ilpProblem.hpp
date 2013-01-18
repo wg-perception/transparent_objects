@@ -19,8 +19,9 @@ struct VolumeParams
     minBound = cv::Vec3f(0.19f, -0.00f, -0.15f);
     maxBound = cv::Vec3f(0.30f,  0.14f,  0.0f);
 
-    step = cv::Vec3f::all(0.0025f);
-//    step = cv::Vec3f::all(0.005f);
+//    step = cv::Vec3f::all(0.0025f);
+    step = cv::Vec3f::all(0.005f);
+//    step = cv::Vec3f::all(0.02f);
   }
 };
 

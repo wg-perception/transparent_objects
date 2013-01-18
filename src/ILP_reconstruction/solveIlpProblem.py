@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
   (f, A, b) = readProblemInstance(sys.argv[1])
   print f
-  print A
+#  print A
   print b
  
   lb = np.array([0] * len(f))

@@ -21,7 +21,7 @@ void initializeVolume(Mat &volumePoints, const VolumeParams &params = VolumePara
   Mat(dimensions, false) /= Mat(params.step);
   cout << "Volume dims: " << Mat(dimensions) << endl;
 
-  int dims[] = {dimensions[2], dimensions[0], dimensions[1]};
+  int dims[] = {cvRound(dimensions[2]), cvRound(dimensions[0]), cvRound(dimensions[1])};
   const int ndims= 3;
   volumePoints.create(ndims, dims, CV_32FC3);
 
@@ -43,7 +43,127 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
 {
     volumeParams = _volumeParams;
     camera = _camera;
+
+    initializeVolume(volumePoints, volumeParams);
+    volumePoints_Vector = Mat(1, volumePoints.total(), CV_32FC3, volumePoints.data);
 }
+
+#if 1
+ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_camera,
+                       const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks)
+{
+    volumeParams = _volumeParams;
+    camera = _camera;
+    isSolved = false;
+
+    initializeVolume(volumePoints, volumeParams);
+    volumePoints_Vector = Mat(1, volumePoints.total(), CV_32FC3, volumePoints.data);
+
+    for (size_t i = 0; i < volumePoints.total(); ++i)
+    {
+        VolumeVariable variable;
+        variable.volumeIndex = i;
+        variable.ilpIndex = i;
+        volumeVariables.push_back(variable);
+    }
+
+    int pixelVariableILPIndex = volumePoints.total();
+    for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
+    {
+        cout << "image: " << imageIndex << endl;
+
+        const Mat &mask = allMasks[imageIndex];
+        CV_Assert(mask.type() == CV_8UC1);
+        const PoseRT &pose = allPoses[imageIndex];
+
+        vector<vector<Point2f> > convexHulls;
+        for (size_t i = 0; i < volumePoints.total(); ++i)
+        {
+            Point3f pt = volumePoints_Vector.at<Point3f>(i);
+
+            vector<Point3f> corners;
+
+            float dx = volumeParams.step[0] / 2;
+            float dy = volumeParams.step[1] / 2;
+            float dz = volumeParams.step[2] / 2;
+            //TODO: use a loop
+            corners.push_back(pt + Point3f(-dx, -dy, -dz));
+            corners.push_back(pt + Point3f(-dx, -dy, +dz));
+            corners.push_back(pt + Point3f(-dx, +dy, -dz));
+            corners.push_back(pt + Point3f(-dx, +dy, +dz));
+            corners.push_back(pt + Point3f(+dx, -dy, -dz));
+            corners.push_back(pt + Point3f(+dx, -dy, +dz));
+            corners.push_back(pt + Point3f(+dx, +dy, -dz));
+            corners.push_back(pt + Point3f(+dx, +dy, +dz));
+
+            vector<Point2f> projectedCorners;
+            camera.projectPoints(corners, pose, projectedCorners);
+
+            vector<Point2f> hull;
+            convexHull(projectedCorners, hull);
+            convexHulls.push_back(hull);
+        }
+
+        cout << "convex hulls are computed" << endl;
+
+        //TODO: move up
+        const int pixelStep = 4;
+        for (int i = 0; i < mask.rows; i += pixelStep)
+        {
+            for (int j = 0; j < mask.cols; j += pixelStep)
+            {
+                vector<int> intersectedVoxelsIndices;
+                for (size_t k = 0; k < convexHulls.size(); ++k)
+                {
+                    if (pointPolygonTest(convexHulls[k], Point(j, i), false) >= 0)
+                    {
+                        intersectedVoxelsIndices.push_back(k);
+                    }
+                }
+
+                if (intersectedVoxelsIndices.empty())
+                {
+                    continue;
+                }
+
+
+                if (mask.at<uchar>(i, j) == 0)
+                {
+                    for (int &voxelIndex : intersectedVoxelsIndices)
+                    {
+                        Constraint constraint;
+                        constraint.coefficients[pixelVariableILPIndex] = 1;
+                        constraint.coefficients[voxelIndex] = 1;
+                        constraint.b = 1;
+                        constraints.push_back(constraint);
+                    }
+                }
+                else
+                {
+                    Constraint constraint;
+                    constraint.coefficients[pixelVariableILPIndex] = 1;
+                    for (int &voxelIndex : intersectedVoxelsIndices)
+                    {
+                        constraint.coefficients[voxelIndex] = -1;
+                    }
+                    constraint.b = 0;
+                    constraints.push_back(constraint);
+                }
+
+                PixelVariable variable;
+                variable.x = j;
+                variable.y = i;
+                variable.imageIndex = imageIndex;
+                variable.ilpIndex = pixelVariableILPIndex;
+                pixelVariables.push_back(variable);
+
+                ++pixelVariableILPIndex;
+            }
+        }
+    }
+}
+
+#else
 
 ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_camera,
                        const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks)
@@ -135,6 +255,7 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
         }
     }
 }
+#endif
 
 void ILPProblem::write(const std::string &filename) const
 {
@@ -291,6 +412,8 @@ void ILPProblem::getModel(std::vector<cv::Point3f> &model) const
 
 void ILPProblem::visualize(const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks) const
 {
+    CV_Assert(isSolved);
+
     int currentPixelVariableIndex = 0;
     for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
     {
