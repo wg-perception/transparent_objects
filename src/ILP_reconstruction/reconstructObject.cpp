@@ -9,14 +9,15 @@
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 #include "ilpProblem.hpp"
 
-#define INITIAL_RUN
+//#define INITIAL_RUN
 
 using namespace cv;
 using std::cout;
 using std::endl;
 
 void getGroundTruthData(const string &trainedModelsPath, const string &baseFolder, const string &testObjectName,
-                        PinholeCamera &camera, std::vector<PoseRT> &poses, std::vector<Mat> &masks);
+                        PinholeCamera &camera, std::vector<PoseRT> &poses, std::vector<Mat> &masks,
+                        std::vector<cv::Point3f> &groundTruthModel);
 
 int main(int argc, char *argv[])
 {
@@ -33,7 +34,8 @@ int main(int argc, char *argv[])
     PinholeCamera camera;
     vector<PoseRT> allPoses;
     vector<Mat> allMasks;
-    getGroundTruthData(trainedModelsPath, baseFolder, testObjectName, camera, allPoses, allMasks);
+    vector<Point3f> groundTruthModel;
+    getGroundTruthData(trainedModelsPath, baseFolder, testObjectName, camera, allPoses, allMasks, groundTruthModel);
 
 //TODO: remove
 #if 0
@@ -64,19 +66,22 @@ int main(int argc, char *argv[])
 #else
     ILPProblem ilpProblem(VolumeParams(), camera);
     ilpProblem.read("ilpProblem.txt", "solution.csv");
+    ilpProblem.setGroundTruthModel(groundTruthModel);
 
     vector<Point3f> model;
     ilpProblem.getModel(model);
     writePointCloud("model.asc", model);
 
-    ilpProblem.visualize(allPoses, allMasks);
+//    ilpProblem.visualize(allPoses, allMasks);
+    ilpProblem.visualizeVolumeVariables();
 #endif
 
     return 0;
 }
 
 void getGroundTruthData(const string &trainedModelsPath, const string &baseFolder, const string &testObjectName,
-                        PinholeCamera &camera, std::vector<PoseRT> &poses, std::vector<Mat> &masks)
+                        PinholeCamera &camera, std::vector<PoseRT> &poses, std::vector<Mat> &masks,
+                        std::vector<cv::Point3f> &groundTruthModel)
 {
     const string testFolder = baseFolder + "/" + testObjectName + "/";
 
@@ -87,19 +92,25 @@ void getGroundTruthData(const string &trainedModelsPath, const string &baseFolde
     vector<EdgeModel> allEdgeModels;
     vector<int> testIndices;
     baseImporter.importAllData(&trainedModelsPath, &objectNames, &camera, 0, &allEdgeModels, &testIndices);
-    EdgeModel &edgeModel = allEdgeModels[0];
     poses.clear();
     masks.clear();
+    groundTruthModel.clear();
     for (size_t _testIdx = 0; _testIdx < testIndices.size(); ++ _testIdx)
     {
         int imageIndex = testIndices[_testIdx];
         PoseRT fiducialPose, offset;
         baseImporter.importGroundTruth(imageIndex, fiducialPose, false, &offset);
-        PoseRT model2test = fiducialPose * offset;
+
+        if (groundTruthModel.empty())
+        {
+            project3dPoints(allEdgeModels[0].points, offset, groundTruthModel);
+        }
+//        PoseRT model2test = fiducialPose * offset;
 
         //TODO: wrap it as a single function
         vector<Point2f> projectedPoints;
-        camera.projectPoints(edgeModel.points, model2test, projectedPoints);
+//        camera.projectPoints(groundTruthModel, model2test, projectedPoints);
+        camera.projectPoints(groundTruthModel, fiducialPose, projectedPoints);
         //TODO: move up
         const Size imageSize(640, 480);
         const float downFactor = 1.0f;
@@ -112,4 +123,5 @@ void getGroundTruthData(const string &trainedModelsPath, const string &baseFolde
         poses.push_back(fiducialPose);
         masks.push_back(objectMask);
     }
+
 }

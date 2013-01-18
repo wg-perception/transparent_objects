@@ -452,3 +452,72 @@ void ILPProblem::visualize(const std::vector<PoseRT> &allPoses, const std::vecto
         waitKey();
     }
 }
+
+void ILPProblem::visualizeVolumeVariables() const
+{
+    CV_Assert(isSolved);
+
+    Mat labels(volumePoints.dims, volumePoints.size.p, CV_32FC1);
+    Mat labels_Vector(1, labels.total(), CV_32FC3, labels.data);
+    CV_Assert(labels.total() == volumeVariables.size());
+    for (size_t i = 0; i < volumeVariables.size(); ++i)
+    {
+        labels_Vector.at<float>(i) = volumeVariables[i].label;
+    }
+
+    Mat visualization = labels;
+    if (!groundTruthModel.empty())
+    {
+        supperimposeGroundTruth(labels, visualization);
+    }
+
+    imshow3d("labels", visualization);
+    waitKey();
+}
+
+void ILPProblem::setGroundTruthModel(const std::vector<Point3f> &_groundTruthModel)
+{
+    groundTruthModel = _groundTruthModel;
+}
+
+void ILPProblem::supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &supperimposedImage) const
+{
+  //TODO: move up
+  const Vec3b groundTruthColor(0, 255, 0);
+  const float groundTruthWeight = 0.2f;
+
+  CV_Assert(image3d.channels() == 1);
+  Mat image3d_uchar = image3d;
+  if (image3d.type() == CV_32FC1)
+  {
+    image3d.convertTo(image3d_uchar, CV_8UC1, 255);
+  }
+  CV_Assert(image3d_uchar.type() == CV_8UC1);
+
+  cvtColor3d(image3d_uchar, supperimposedImage, CV_GRAY2BGR);
+
+  Vec3f inverseStep;
+  for (int i = 0; i < volumeParams.step.channels; ++i)
+  {
+    inverseStep[i] = 1.0 / volumeParams.step[i];
+  }
+
+  for (size_t i = 0; i < groundTruthModel.size(); ++i)
+  {
+    Vec3f pt(groundTruthModel[i]);
+    Vec3i raw_indices = (pt - volumeParams.minBound).mul(inverseStep);
+    Vec3i indices(raw_indices[2], raw_indices[0], raw_indices[1]);
+
+    bool isInside = true;
+    for (int j = 0; j < indices.channels; ++j)
+    {
+      isInside = isInside && indices[j] >= 0 && indices[j] < supperimposedImage.size.p[j];
+    }
+
+    if (isInside)
+    {
+      supperimposedImage.at<Vec3b>(indices) *= 1.0 - groundTruthWeight;
+      supperimposedImage.at<Vec3b>(indices) += groundTruthWeight * groundTruthColor;
+    }
+  }
+}

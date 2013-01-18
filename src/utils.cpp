@@ -629,6 +629,9 @@ void onTrackbarChange(int position, void *rawData)
     case CV_8UC1:
       slice = image3d.ptr<uchar>(position, 0, 0);
       break;
+    case CV_32FC1:
+      slice = image3d.ptr<float>(position, 0, 0);
+      break;
     default:
       CV_Assert(false);
   }

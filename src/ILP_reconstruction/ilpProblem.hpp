@@ -20,8 +20,8 @@ struct VolumeParams
     maxBound = cv::Vec3f(0.30f,  0.14f,  0.0f);
 
 //    step = cv::Vec3f::all(0.0025f);
-    step = cv::Vec3f::all(0.005f);
-//    step = cv::Vec3f::all(0.02f);
+//    step = cv::Vec3f::all(0.005f);
+    step = cv::Vec3f::all(0.02f);
   }
 };
 
@@ -54,18 +54,25 @@ public:
                const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks);
 
     void getModel(std::vector<cv::Point3f> &model) const;
+    void setGroundTruthModel(const std::vector<cv::Point3f> &groundTruthModel);
     void visualize(const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks) const;
+    void visualizeVolumeVariables() const;
 
     void write(const std::string &filename) const;
     void read(const std::string &problemInstanceFilename, const std::string &solutionFilename);
 private:
+    void supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &supperimposedImage) const;
+
     bool isSolved;
     VolumeParams volumeParams;
     PinholeCamera camera;
     cv::Mat volumePoints, volumePoints_Vector;
+
     std::vector<VolumeVariable> volumeVariables;
     std::vector<PixelVariable> pixelVariables;
     std::vector<Constraint> constraints;
+
+    std::vector<cv::Point3f> groundTruthModel;
 };
 
 #endif // ILPPROBLEM_HPP
