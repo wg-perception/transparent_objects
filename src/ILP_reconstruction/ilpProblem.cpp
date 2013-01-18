@@ -141,6 +141,11 @@ void ILPProblem::write(const std::string &filename) const
     std::ofstream fout(filename.c_str());
     CV_Assert(fout.is_open());
 
+    fout << "Volume params:\n";
+    fout << volumeParams.minBound[0] << " " << volumeParams.minBound[1] << " " << volumeParams.minBound[2] << "\n";
+    fout << volumeParams.maxBound[0] << " " << volumeParams.maxBound[1] << " " << volumeParams.maxBound[2] << "\n";
+    fout << volumeParams.step[0] << " " << volumeParams.step[1] << " " << volumeParams.step[2] << "\n";
+
     fout << "Volume variables: " << volumeVariables.size() << "\n";
     for (size_t i = 0; i < volumeVariables.size(); ++i)
     {
@@ -166,7 +171,7 @@ void ILPProblem::write(const std::string &filename) const
     }
 }
 
-enum ReadingMode {READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
+enum ReadingMode {READ_VOLUME_PARAMS, READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
 void ILPProblem::read(const std::string &problemInstanceFilename, const std::string &solutionFilename)
 {
     isSolved = true;
@@ -185,34 +190,35 @@ void ILPProblem::read(const std::string &problemInstanceFilename, const std::str
 
         int volumeVariablesCount, pixelVariablesCount, constraintsCount;
         std::string line;
-        bool isReadingConstraints = false;
-        ReadingMode mode = READ_VOLUME_VARIABLES;
-        int iteration = 0;
+        ReadingMode mode = READ_VOLUME_PARAMS;
         while (std::getline(fin, line))
         {
             std::istringstream input(line);
-            if (mode == READ_VOLUME_VARIABLES)
+            if (mode == READ_VOLUME_PARAMS)
             {
-                //TODO: eliminate code duplication
                 if (line.find(volumeVariablesTag) != string::npos)
                 {
                     int suffixLength = line.length() - static_cast<int>(volumeVariablesTag.length());
                     volumeVariablesCount = atoi(line.substr(volumeVariablesTag.length(), suffixLength).c_str());
+                    mode = READ_VOLUME_VARIABLES;
+                    continue;
                 }
-                else
-                {
-                    if (line.find(pixelVariablesTag) != string::npos)
-                    {
-                        int suffixLength = line.length() - static_cast<int>(pixelVariablesTag.length());
-                        pixelVariablesCount = atoi(line.substr(pixelVariablesTag.length(), suffixLength).c_str());
-                        mode = READ_PIXEL_VARIABLES;
-                        continue;
-                    }
+            }
 
-                    VolumeVariable var;
-                    input >> var.ilpIndex >> var.volumeIndex;
-                    volumeVariables.push_back(var);
+            if (mode == READ_VOLUME_VARIABLES)
+            {
+                //TODO: eliminate code duplication
+                if (line.find(pixelVariablesTag) != string::npos)
+                {
+                    int suffixLength = line.length() - static_cast<int>(pixelVariablesTag.length());
+                    pixelVariablesCount = atoi(line.substr(pixelVariablesTag.length(), suffixLength).c_str());
+                    mode = READ_PIXEL_VARIABLES;
+                    continue;
                 }
+
+                VolumeVariable var;
+                input >> var.ilpIndex >> var.volumeIndex;
+                volumeVariables.push_back(var);
             }
 
             if (mode == READ_PIXEL_VARIABLES)
