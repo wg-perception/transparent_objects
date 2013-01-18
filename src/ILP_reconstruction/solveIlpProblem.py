@@ -3,6 +3,8 @@ import re
 import numpy as np
 import openopt
 
+from scipy.sparse import lil_matrix
+
 def readProblemInstance(filename):
   lines = open(filename, 'r').read().splitlines()
 
@@ -12,7 +14,7 @@ def readProblemInstance(filename):
       words = line.split()
       pairs = zip(words[1::2], words[2::2])
       for pair in pairs:
-        A[constraintIndex, pair[0]] = pair[1]
+        A[constraintIndex, int(pair[0])] = pair[1]
 
       b[constraintIndex] = words[0]
       constraintIndex += 1
@@ -30,8 +32,8 @@ def readProblemInstance(filename):
       constraintsCount = int(match.group(1))
       variablesCount = volumeVariablesCount + pixelVariablesCount
       print "Problem dimesions: %d x %d" % (constraintsCount, variablesCount)
-
-      A = np.zeros((constraintsCount, variablesCount), dtype=np.int8)
+#      A = np.zeros((constraintsCount, variablesCount), dtype=np.int8)
+      A = lil_matrix((constraintsCount, variablesCount))
       b = np.empty((constraintsCount))
       isReadingConstraints = True
       constraintIndex = 0

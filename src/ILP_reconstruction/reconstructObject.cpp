@@ -25,9 +25,15 @@ struct VolumeParams
 
   VolumeParams()
   {
-    minBound = cv::Vec3f(0.1f, -0.1f, -0.3f);
-    maxBound = cv::Vec3f(0.5f,  0.2f,  0.0f);
-    step = cv::Vec3f::all(0.02f);
+//    minBound = cv::Vec3f(0.1f, -0.1f, -0.3f);
+    minBound = cv::Vec3f(0.19f, -0.00f, -0.15f);
+    maxBound = cv::Vec3f(0.30f,  0.14f,  0.0f);
+    step = cv::Vec3f::all(0.0025f);
+//    step = cv::Vec3f::all(0.005f);
+
+
+//    step = cv::Vec3f::all(0.01f);
+//    step = cv::Vec3f::all(0.01f);
 //    step = cv::Vec3f::all(0.03f);
 //    step = cv::Vec3f::all(0.05f);
   }
@@ -137,13 +143,13 @@ void createProblemInstance(const cv::Mat &volumePoints,
                     continue;
                 }
 
-                Constraint constraint;
-                constraint.coefficients[pixelVariableILPIndex] = 1;
 
                 if (mask.at<uchar>(i, j) == 0)
                 {
                     for (size_t k = 0; k < projectedPointsIndices[i][j].size(); ++k)
                     {
+                        Constraint constraint;
+                        constraint.coefficients[pixelVariableILPIndex] = 1;
                         constraint.coefficients[projectedPointsIndices[i][j][k]] = 1;
                         constraint.b = 1;
                         constraints.push_back(constraint);
@@ -151,6 +157,8 @@ void createProblemInstance(const cv::Mat &volumePoints,
                 }
                 else
                 {
+                    Constraint constraint;
+                    constraint.coefficients[pixelVariableILPIndex] = 1;
                     for (size_t k = 0; k < projectedPointsIndices[i][j].size(); ++k)
                     {
                         constraint.coefficients[projectedPointsIndices[i][j][k]] = -1;
@@ -364,6 +372,31 @@ int main(int argc, char *argv[])
     Mat volumePoints;
     initializeVolume(volumePoints);
 
+
+//TODO: remove
+#if 0
+{
+    Mat volumePoints_Vector(1, volumePoints.total(), CV_32FC3, volumePoints.data);
+    for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
+    {
+        const Mat &mask = allMasks[imageIndex];
+        Mat visualization;
+        cvtColor(mask, visualization, CV_GRAY2BGR);
+        CV_Assert(mask.type() == CV_8UC1);
+        const PoseRT &pose = allPoses[imageIndex];
+
+        vector<Point2f> projectedVolume;
+        camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
+
+        drawPoints(projectedVolume, visualization, Scalar(0, 255, 0));
+        imshow("viz", visualization);
+        waitKey();
+    }
+}
+    return 0;
+#endif
+
+
     std::vector<VolumeVariable> volumeVariables;
     std::vector<PixelVariable> pixelVariables;
     std::vector<Constraint> constraints;
@@ -378,6 +411,23 @@ int main(int argc, char *argv[])
 
     Mat volumePoints_Vector(1, volumePoints.total(), CV_32FC3, volumePoints.data);
     int currentPixelVariableIndex = 0;
+
+    vector<Point3f> model;
+    for (size_t i = 0; i < volumePoints.total(); ++i)
+    {
+        //TODO: move up
+        if (volumeVariables[i].label > 0.01f && volumeVariables[i].label < 0.99f)
+        {
+            cout << "not binary: " <<  volumeVariables[i].label << endl;
+        }
+
+        if (volumeVariables[i].label > 0.001f)
+        {
+            model.push_back(volumePoints_Vector.at<Point3f>(i));
+        }
+    }
+    writePointCloud("model.asc", model);
+
     for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
     {
         const Mat &mask = allMasks[imageIndex];
@@ -391,9 +441,12 @@ int main(int argc, char *argv[])
         camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
         for (size_t i = 0; i < projectedVolume.size(); ++i)
         {
-            //TODO: move up
-            Scalar color = volumeVariables[i].label > 0.0001f ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
-            circle(visualization, projectedVolume[i], 2, color, -1);
+            if (volumeVariables[i].label > 0.0001f)
+            {
+                //TODO: move up
+                Scalar color = volumeVariables[i].label > 0.0001f ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
+                circle(visualization, projectedVolume[i], 0, color, -1);
+            }
         }
 
         imshow("volume", visualization);
@@ -404,7 +457,7 @@ int main(int argc, char *argv[])
         {
             Scalar color = pixelVariables[currentPixelVariableIndex].label > 0.0001f ? Scalar(0, 255, 0) : Scalar(255, 0, 255);
             Point pt(pixelVariables[currentPixelVariableIndex].x, pixelVariables[currentPixelVariableIndex].y);
-            circle(pixelVariablesVisualization, pt, 2, color, -1);
+            circle(pixelVariablesVisualization, pt, 0, color, -1);
             ++currentPixelVariableIndex;
         }
 
