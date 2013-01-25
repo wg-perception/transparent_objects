@@ -53,14 +53,23 @@ if __name__ == '__main__':
 #  print A
   print b
  
-  lb = np.array([0] * len(f))
-  ub = np.array([1] * len(f))
+  lb = np.zeros(len(f))
+  ub = np.ones(len(f))
   print lb 
   print ub 
 
   p = openopt.LP(f, A=A, b=b, lb=lb, ub=ub)
-  p.debug = 1
+
+
+#  intVars = range(0, len(f))
+#  p = openopt.MILP(f, A=A, b=b, lb=lb, ub=ub, intVars=intVars)
+#  print 'Saving in MPS format...'
+#  isExported = p.exportToMPS('lp.mps')
+#  print 'Done:', isExported
+#  sys.exit(0)
+
   r = p.maximize('glpk')
+#  r = p.maximize('cvxopt_lp')
 #  r = p.maximize('pclp')
 #  r = p.maximize('lpSolve')
 
@@ -69,3 +78,10 @@ if __name__ == '__main__':
 
   np.savetxt('solution.csv', r.xf)
 
+  '''
+  solution = np.loadtxt('solution.csv')
+  print '<?xml version = "1.0" standalone="yes"?>\n<variables>'
+  for idx, val in enumerate(solution):
+      print '   <variable name="C%d" index="%d" value="%f"/>' % (idx + 1, idx + 1, val)
+  print '</variables>'
+  '''
