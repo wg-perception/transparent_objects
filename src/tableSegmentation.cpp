@@ -146,7 +146,8 @@ bool computeTableOrientationByRGBD(const Mat &depth, const PinholeCamera &camera
   Mat points3d;
   depthTo3d(depth, camera.cameraMatrix, points3d);
   RgbdNormals normalsEstimator(depth.rows, depth.cols, depth.depth(), camera.cameraMatrix);
-  Mat normals = normalsEstimator(points3d);
+  Mat normals;
+  normalsEstimator(points3d, normals);
 
   RgbdPlane planeEstimator;
   Mat planesMask;
