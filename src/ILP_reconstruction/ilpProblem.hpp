@@ -59,6 +59,8 @@ public:
     void visualizeVolumeVariables() const;
 
     void write(const std::string &filename) const;
+    void writeMPS(const std::string &filename) const;
+    void writeLP(const std::string &filename) const;
     void read(const std::string &problemInstanceFilename, const std::string &solutionFilename);
 private:
     void supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &supperimposedImage) const;

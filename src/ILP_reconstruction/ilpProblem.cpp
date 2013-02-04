@@ -290,6 +290,73 @@ void ILPProblem::write(const std::string &filename) const
         }
         fout << "\n";
     }
+
+    fout.close();
+}
+
+void ILPProblem::writeLP(const std::string &filename) const
+{
+    std::ofstream fout(filename.c_str());
+    CV_Assert(fout.is_open());
+    fout << "Maximize\n";
+    fout << " obj: ";
+    for (size_t i = 0; i < pixelVariables.size(); ++i)
+    {
+        fout << (i > 0 ? " + " : "") << "x" << pixelVariables[i].ilpIndex;
+    }
+
+    fout << "\nSubject To\n";
+    for (size_t i = 0; i < constraints.size(); ++i)
+    {
+        fout << " c" << i << ":";
+        for (const auto &coeff : constraints[i].coefficients)
+        {
+            fout << " " << (coeff.second > 0 ? " + " : "") << coeff.second << " x" << coeff.first;
+        }
+        fout << " <= " << constraints[i].b << "\n";
+    }
+
+    fout << "Bounds\n";
+    for (const auto &variable : volumeVariables)
+    {
+        fout << " 0 <= x" << variable.ilpIndex << " <= 1\n";
+    }
+    for (const auto &variable : pixelVariables)
+    {
+        fout << " 0 <= x" << variable.ilpIndex << " <= 1\n";
+    }
+
+    fout << "Binary\n";
+    for (const auto &variable : volumeVariables)
+    {
+        fout << " x" << variable.ilpIndex << "\n";
+    }
+    for (const auto &variable : pixelVariables)
+    {
+        fout << " x" << variable.ilpIndex << "\n";
+    }
+
+    fout.close();
+}
+
+void ILPProblem::writeMPS(const std::string &filename) const
+{
+    CV_Assert(false);
+
+    std::ofstream fout(filename.c_str());
+    CV_Assert(fout.is_open());
+    fout << "NAME\tTransparent_objects_reconstruction_" << volumeParams.step[0] << "\n";
+    fout << "ROWS\n";
+    fout << " N  COST\n";
+
+    for (size_t i = 0; i < constraints.size(); ++i)
+    {
+        fout << " L  R" << i << "\n";
+    }
+
+    fout << "COLUMNS\n";
+
+    fout.close();
 }
 
 enum ReadingMode {READ_VOLUME_PARAMS, READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};

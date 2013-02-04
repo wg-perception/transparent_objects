@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 #ifdef INITIAL_RUN
     ILPProblem ilpProblem(VolumeParams(), camera, allPoses, allMasks);
     ilpProblem.write("ilpProblem.txt");
+    ilpProblem.writeLP("ilpProblem.lp");
 #else
     ILPProblem ilpProblem(VolumeParams(), camera);
     ilpProblem.read("ilpProblem.txt", "solution.csv");
