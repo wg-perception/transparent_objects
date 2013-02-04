@@ -360,9 +360,9 @@ void ILPProblem::writeMPS(const std::string &filename) const
 }
 
 enum ReadingMode {READ_VOLUME_PARAMS, READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
-void ILPProblem::read(const std::string &problemInstanceFilename, const std::string &solutionFilename)
+
+void ILPProblem::readProblemFormulation(const std::string &problemInstanceFilename)
 {
-    isSolved = true;
     const std::string volumeVariablesTag = "Volume variables: ";
     const std::string pixelVariablesTag = "Pixel variables: ";
     const std::string constraintsTag = "Constraints: ";
@@ -371,92 +371,158 @@ void ILPProblem::read(const std::string &problemInstanceFilename, const std::str
     pixelVariables.clear();
     constraints.clear();
 
+    std::ifstream fin(problemInstanceFilename.c_str());
+    CV_Assert(fin.is_open());
+
+
+    int volumeVariablesCount, pixelVariablesCount, constraintsCount;
+    std::string line;
+    ReadingMode mode = READ_VOLUME_PARAMS;
+    while (std::getline(fin, line))
     {
-        std::ifstream fin(problemInstanceFilename.c_str());
-        CV_Assert(fin.is_open());
-
-
-        int volumeVariablesCount, pixelVariablesCount, constraintsCount;
-        std::string line;
-        ReadingMode mode = READ_VOLUME_PARAMS;
-        while (std::getline(fin, line))
+        std::istringstream input(line);
+        if (mode == READ_VOLUME_PARAMS)
         {
-            std::istringstream input(line);
-            if (mode == READ_VOLUME_PARAMS)
+            if (line.find(volumeVariablesTag) != string::npos)
             {
-                if (line.find(volumeVariablesTag) != string::npos)
-                {
-                    int suffixLength = line.length() - static_cast<int>(volumeVariablesTag.length());
-                    volumeVariablesCount = atoi(line.substr(volumeVariablesTag.length(), suffixLength).c_str());
-                    mode = READ_VOLUME_VARIABLES;
-                    continue;
-                }
-            }
-
-            if (mode == READ_VOLUME_VARIABLES)
-            {
-                //TODO: eliminate code duplication
-                if (line.find(pixelVariablesTag) != string::npos)
-                {
-                    int suffixLength = line.length() - static_cast<int>(pixelVariablesTag.length());
-                    pixelVariablesCount = atoi(line.substr(pixelVariablesTag.length(), suffixLength).c_str());
-                    mode = READ_PIXEL_VARIABLES;
-                    continue;
-                }
-
-                VolumeVariable var;
-                input >> var.ilpIndex >> var.volumeIndex;
-                volumeVariables.push_back(var);
-            }
-
-            if (mode == READ_PIXEL_VARIABLES)
-            {
-                if (line.find(constraintsTag) != string::npos)
-                {
-                    int suffixLength = line.length() - static_cast<int>(constraintsTag.length());
-                    constraintsCount = atoi(line.substr(constraintsTag.length(), suffixLength).c_str());
-                    mode = READ_CONSTRAINTS;
-                    continue;
-                }
-
-                PixelVariable var;
-                input >> var.ilpIndex >> var.imageIndex >> var.x >> var.y;
-                pixelVariables.push_back(var);
-            }
-
-            if (mode == READ_CONSTRAINTS)
-            {
-                Constraint constraint;
-                input >> constraint.b;
-                int index;
-                float coefficient;
-                while (input >> index >> coefficient)
-                {
-                    constraint.coefficients[index] = coefficient;
-                }
-                constraints.push_back(constraint);
+                int suffixLength = line.length() - static_cast<int>(volumeVariablesTag.length());
+                volumeVariablesCount = atoi(line.substr(volumeVariablesTag.length(), suffixLength).c_str());
+                mode = READ_VOLUME_VARIABLES;
+                continue;
             }
         }
-        fin.close();
 
-        cout << "counts: " << volumeVariablesCount << " " << pixelVariablesCount << " " << constraintsCount << endl;
-        cout << "read counts: " << volumeVariables.size() << " " << pixelVariables.size() << " " << constraints.size() << endl;
+        if (mode == READ_VOLUME_VARIABLES)
+        {
+            //TODO: eliminate code duplication
+            if (line.find(pixelVariablesTag) != string::npos)
+            {
+                int suffixLength = line.length() - static_cast<int>(pixelVariablesTag.length());
+                pixelVariablesCount = atoi(line.substr(pixelVariablesTag.length(), suffixLength).c_str());
+                mode = READ_PIXEL_VARIABLES;
+                continue;
+            }
+
+            VolumeVariable var;
+            input >> var.ilpIndex >> var.volumeIndex;
+            volumeVariables.push_back(var);
+        }
+
+        if (mode == READ_PIXEL_VARIABLES)
+        {
+            if (line.find(constraintsTag) != string::npos)
+            {
+                int suffixLength = line.length() - static_cast<int>(constraintsTag.length());
+                constraintsCount = atoi(line.substr(constraintsTag.length(), suffixLength).c_str());
+                mode = READ_CONSTRAINTS;
+                continue;
+            }
+
+            PixelVariable var;
+            input >> var.ilpIndex >> var.imageIndex >> var.x >> var.y;
+            pixelVariables.push_back(var);
+        }
+
+        if (mode == READ_CONSTRAINTS)
+        {
+            Constraint constraint;
+            input >> constraint.b;
+            int index;
+            float coefficient;
+            while (input >> index >> coefficient)
+            {
+                constraint.coefficients[index] = coefficient;
+            }
+            constraints.push_back(constraint);
+        }
     }
+    fin.close();
 
+    cout << "counts: " << volumeVariablesCount << " " << pixelVariablesCount << " " << constraintsCount << endl;
+    cout << "read counts: " << volumeVariables.size() << " " << pixelVariables.size() << " " << constraints.size() << endl;
+}
+
+void ILPProblem::readSolution(const std::string &solutionFilename)
+{
+    isSolved = true;
+
+    std::ifstream fin(solutionFilename.c_str());
+    CV_Assert(fin.is_open());
+
+    const int extensionSize = 3;
+    string extension = solutionFilename.substr(static_cast<int>(solutionFilename.size()) - extensionSize, extensionSize);
+    if (extension == "csv")
     {
-        std::ifstream fin(solutionFilename.c_str());
-        CV_Assert(fin.is_open());
         for (size_t i = 0; i < volumeVariables.size(); ++i)
         {
+            CV_Assert(!fin.eof());
             fin >> volumeVariables[i].label;
         }
 
         for (size_t i = 0; i < pixelVariables.size(); ++i)
         {
+            CV_Assert(!fin.eof());
             fin >> pixelVariables[i].label;
         }
-        fin.close();
+        CV_Assert(fin.eof());
     }
+    else
+    {
+        string line;
+        //skip the header
+        std::getline(fin, line);
+        std::getline(fin, line);
+        size_t currentVolumeVariableIndex = 0;
+        size_t currentPixelVariableIndex = 0;
+        while (std::getline(fin, line))
+        {
+            std::istringstream input(line);
+            string variableName;
+            input >> variableName;
+            int ilpIndex = atoi(variableName.substr(1, static_cast<int>(variableName.length()) - 1).c_str());
+
+            for (; currentVolumeVariableIndex < volumeVariables.size(); ++currentVolumeVariableIndex)
+            {
+                if (volumeVariables[currentVolumeVariableIndex].ilpIndex == ilpIndex)
+                {
+                    volumeVariables[currentVolumeVariableIndex].label = 1;
+                    ++currentVolumeVariableIndex;
+                    break;
+                }
+                else
+                {
+                    volumeVariables[currentVolumeVariableIndex].label = 0;
+                }
+            }
+
+            if (currentVolumeVariableIndex < volumeVariables.size())
+            {
+                continue;
+            }
+
+            for (; currentPixelVariableIndex < pixelVariables.size(); ++currentPixelVariableIndex)
+            {
+                if (pixelVariables[currentPixelVariableIndex].ilpIndex == ilpIndex)
+                {
+                    pixelVariables[currentPixelVariableIndex].label = 1;
+                    ++currentPixelVariableIndex;
+                    break;
+                }
+                else
+                {
+                    pixelVariables[currentPixelVariableIndex].label = 0;
+                }
+            }
+        }
+    }
+
+    fin.close();
+}
+
+void ILPProblem::read(const std::string &problemInstanceFilename, const std::string &solutionFilename)
+{
+    readProblemFormulation(problemInstanceFilename);
+    readSolution(solutionFilename);
 }
 
 void ILPProblem::getModel(std::vector<cv::Point3f> &model) const

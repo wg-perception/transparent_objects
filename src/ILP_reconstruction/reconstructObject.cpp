@@ -66,7 +66,8 @@ int main(int argc, char *argv[])
     ilpProblem.writeLP("ilpProblem.lp");
 #else
     ILPProblem ilpProblem(VolumeParams(), camera);
-    ilpProblem.read("ilpProblem.txt", "solution.csv");
+//    ilpProblem.read("ilpProblem.txt", "solution.csv");
+    ilpProblem.read("ilpProblem.txt", "solution.txt");
     ilpProblem.setGroundTruthModel(groundTruthModel);
 
     vector<Point3f> model;

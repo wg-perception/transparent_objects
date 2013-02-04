@@ -63,6 +63,8 @@ public:
     void writeLP(const std::string &filename) const;
     void read(const std::string &problemInstanceFilename, const std::string &solutionFilename);
 private:
+    void readProblemFormulation(const std::string &problemInstanceFilename);
+    void readSolution(const std::string &solutionFilename);
     void supperimposeGroundTruth(const cv::Mat &image3d, cv::Mat &supperimposedImage) const;
 
     bool isSolved;
