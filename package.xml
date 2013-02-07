@@ -1,6 +1,6 @@
 <package>
   <name>object_recognition_transparent_objects</name>
-  <version>0.3.11</version>
+  <version>0.3.12</version>
   <description>A technique to recognize and estimate poses of transparent objects</description>
   <author email="ilya.lysenkov@itseez.com">Ilya Lysenkov</author>
   <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
