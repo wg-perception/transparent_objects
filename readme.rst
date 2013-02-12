@@ -1,6 +1,6 @@
 Transparent objects
 ===================
-This module enables recognition and pose estimation of transparent objects. For details of the algorithm see the paper "Recognition and Pose Estimation of Rigid Transparent Objects with a Kinect Sensor" by Ilya Lysenkov, Victor Eruhimov and Gary Bradski, RSS 2012.
+This module enables recognition and pose estimation of transparent objects. See the `References`_ for details of the algorithm.
 
 Installation
 ^^^^^^^^^^^^
@@ -17,3 +17,9 @@ For a sample how to use the algorithm see the ``sample/sample.cpp`` file. This s
 Getting help
 ^^^^^^^^^^^^
 Feel free to contact maintainers if you have any questions or comments.
+
+References
+^^^^^^^^^^
+Ilya Lysenkov, Victor Eruhimov, and Gary Bradski, "`Recognition and Pose Estimation of Rigid Transparent Objects with a Kinect Sensor <http://www.roboticsproceedings.org/rss08/p35.html>`_," 2013 Robotics: Science and Systems Conference (RSS), 2013.
+
+Ilya Lysenkov, and Vincent Rabaud, "Pose Estimation of Rigid Transparent Objects in Transparent Clutter", 2013 IEEE International Conference on Robotics and Automation (ICRA), 2013.
