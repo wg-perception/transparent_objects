@@ -27,3 +27,8 @@ and the results of the algorithm working similar to this:
 
 .. figure:: estimatedPoses.jpg
 
+References
+----------
+Ilya Lysenkov, Victor Eruhimov, and Gary Bradski, "`Recognition and Pose Estimation of Rigid Transparent Objects with a Kinect Sensor <http://www.roboticsproceedings.org/rss08/p35.html>`_," 2013 Robotics: Science and Systems Conference (RSS), 2013.
+
+Ilya Lysenkov, and Vincent Rabaud, "Pose Estimation of Rigid Transparent Objects in Transparent Clutter", 2013 IEEE International Conference on Robotics and Automation (ICRA), 2013.
