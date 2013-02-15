@@ -6,7 +6,7 @@ sink1:
   type: publisher
 
 pipeline1:
-  type: 'transparent_objects'
+  type: 'Trainer'
   module: 'object_recognition_transparent_objects'
   subtype: ''
   sources: [1]
