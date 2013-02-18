@@ -2,6 +2,7 @@ import sys
 import re
 import numpy as np
 import openopt
+import itertools
 
 from scipy.sparse import lil_matrix
 
@@ -32,8 +33,8 @@ def readProblemInstance(filename):
       constraintsCount = int(match.group(1))
       variablesCount = volumeVariablesCount + pixelVariablesCount
       print "Problem dimesions: %d x %d" % (constraintsCount, variablesCount)
-#      A = np.zeros((constraintsCount, variablesCount), dtype=np.int8)
-      A = lil_matrix((constraintsCount, variablesCount))
+      A = np.zeros((constraintsCount, variablesCount), dtype=np.int8)
+#      A = lil_matrix((constraintsCount, variablesCount))
       b = np.empty((constraintsCount))
       isReadingConstraints = True
       constraintIndex = 0
@@ -58,15 +59,45 @@ if __name__ == '__main__':
   print lb 
   print ub 
 
-  p = openopt.LP(f, A=A, b=b, lb=lb, ub=ub)
 
+#  objectiveFunction = lambda x: -f.dot(x)
+#  objectiveGradient = lambda x: f
+#  x0 = np.zeros(len(f))
+#  x0 = np.loadtxt('solution.csv')
+#  c = []
 
-#  intVars = range(0, len(f))
-#  p = openopt.MILP(f, A=A, b=b, lb=lb, ub=ub, intVars=intVars)
-#  print 'Saving in MPS format...'
-#  isExported = p.exportToMPS('lp.mps')
-#  print 'Done:', isExported
+#  for idx, sparseRow in enumerate(A):
+#    c.append(lambda x: sum(x[i] * sparseRow[0, i] for i in cols) - b[idx])
+
+#  p = openopt.NLP(objectiveFunction, x0, df=objectiveGradient, A=A,  b=b, lb=lb, ub=ub, iprint = 1, maxIter = 10000, maxFunEvals = 1e7, name = 'NLP_1')
+#  p = openopt.NLP(f, x0, df=df,  c=c,  dc=dc, h=h,  dh=dh,  A=A,  b=b,  Aeq=Aeq,  beq=beq, 
+#	              lb=lb, ub=ub, gtol=gtol, contol=contol, iprint = 50, maxIter = 10000, maxFunEvals = 1e7, name = 'NLP_1')
+
+#  solver = 'ralg'
+#solver = 'algencan'
+#  solver = 'ipopt'
+#solver = 'scipy_slsqp'
+
+# solve the problem
+
+#  r = p.solve(solver, plot=0) # string argument is solver name
+
 #  sys.exit(0)
+
+
+
+
+
+#  p = openopt.LP(f, A=A, b=b, lb=lb, ub=ub)
+
+
+  intVars = range(0, len(f))
+  p = openopt.MILP(f, A=A, b=b, lb=lb, ub=ub, intVars=intVars)
+# use dense array for export
+  print 'Saving in MPS format...'
+  isExported = p.exportToMPS('lp.mps')
+  print 'Done:', isExported
+  sys.exit(0)
 
   r = p.maximize('glpk')
 #  r = p.maximize('cvxopt_lp')
