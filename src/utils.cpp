@@ -321,7 +321,7 @@ void readPointCloud(const string &filename, std::vector<cv::Point3f> &pointCloud
   }
 
   const int extSz = 3;
-  string ext = filename.substr(filename.size() - extSz, extSz);
+  string ext = filename.substr(static_cast<int>(filename.size()) - extSz, extSz);
   if(ext == "ply")
   {
     while(!file.eof())

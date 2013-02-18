@@ -98,6 +98,14 @@ cv::Mat PoseRT::getQuaternion() const
   return quaternion;
 }
 
+void PoseRT::setRvec(const cv::Mat &_rvec)
+{
+  CV_Assert(_rvec.type() == CV_64FC1);
+  CV_Assert(_rvec.rows == dim && _rvec.cols == 1);
+
+  rvec = _rvec.clone();
+}
+
 void PoseRT::setRotation(const cv::Mat &rotation)
 {
   CV_Assert(rotation.rows == 3 && rotation.cols == 3);

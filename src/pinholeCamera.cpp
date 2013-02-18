@@ -54,6 +54,27 @@ void PinholeCamera::reprojectPoints(const std::vector<cv::Point2f> &points, std:
 {
   const float eps = 1e-4;
   CV_Assert(norm(distCoeffs) < eps);
+  //TODO: remove
+  double rotationDistance, translationDistance;
+  PoseRT::computeObjectDistance(extrinsics, PoseRT(), rotationDistance, translationDistance);
+  CV_Assert(rotationDistance < eps && translationDistance < eps);
+
+  Point3f origin;
+  reprojectPoints(points, rays, origin);
+
+  CV_Assert(norm(origin) < eps);
+
+  //TODO: remove
+  for (size_t i = 0; i < rays.size(); ++i)
+  {
+      CV_Assert(fabs(rays[i].z - 1.0) < eps);
+  }
+}
+
+void PinholeCamera::reprojectPoints(const std::vector<cv::Point2f> &points, std::vector<cv::Point3f> &rays, cv::Point3f &origin) const
+{
+  const float eps = 1e-4;
+  CV_Assert(norm(distCoeffs) < eps);
 
   Mat homogeneousPoints;
   convertPointsToHomogeneous(points, homogeneousPoints);
@@ -62,14 +83,15 @@ void PinholeCamera::reprojectPoints(const std::vector<cv::Point2f> &points, std:
   Mat reprojectedRaysMat = homogeneousPoints.reshape(1) * cameraMatrixFloat.inv().t();
   CV_Assert(reprojectedRaysMat.type() == CV_32FC1);
 
-  //TODO: check that it is a deep copy
-  rays = reprojectedRaysMat.reshape(3);
+  PoseRT extrinsics_inv = extrinsics.inv();
+  PoseRT extrinsics_inv_rotation;
+  extrinsics_inv_rotation.setRvec(extrinsics_inv.getRvec());
+  Mat rotatedRaysMat;
+  perspectiveTransform(reprojectedRaysMat.reshape(reprojectedRaysMat.cols), rotatedRaysMat, extrinsics_inv_rotation.getProjectiveMatrix());
 
-  //TODO: remove
-  for (size_t i = 0; i < rays.size(); ++i)
-  {
-      CV_Assert(fabs(rays[i].z - 1.0) < eps);
-  }
+  //TODO: check that it is a deep copy
+  rays = rotatedRaysMat.reshape(3);
+  origin = Point3f(extrinsics_inv.getTvec());
 }
 
 cv::Point3f PinholeCamera::reprojectPoints(cv::Point2f point) const

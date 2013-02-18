@@ -76,6 +76,9 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
         CV_Assert(mask.type() == CV_8UC1);
         const PoseRT &pose = allPoses[imageIndex];
 
+        PinholeCamera currentCamera = camera;
+        currentCamera.extrinsics = pose;
+
         vector<vector<Point2f> > convexHulls;
         for (size_t i = 0; i < volumePoints.total(); ++i)
         {
@@ -106,15 +109,42 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
 
         cout << "convex hulls are computed" << endl;
 
+        vector<Point2f> allPixels;
         //TODO: move up
-        const int pixelStep = 4;
+        const int pixelStep = 1;
         for (int i = 0; i < mask.rows; i += pixelStep)
         {
             for (int j = 0; j < mask.cols; j += pixelStep)
             {
+                allPixels.push_back(Point2f(j, i));
+            }
+        }
+
+        Point3f reprojectedOrigin;
+        vector<Point3f> reprojectedRays;
+        currentCamera.reprojectPoints(allPixels, reprojectedRays, reprojectedOrigin);
+        for (Point3f &ray : reprojectedRays)
+        {
+            const float eps = 1e-4;
+            CV_Assert(norm(ray) > eps);
+            ray *= 1.0 / norm(ray);
+        }
+
+        size_t pixelIndex = 0;
+        for (int i = 0; i < mask.rows; i += pixelStep)
+        {
+            for (int j = 0; j < mask.cols; j += pixelStep, ++pixelIndex)
+            {
                 vector<int> intersectedVoxelsIndices;
                 for (size_t k = 0; k < convexHulls.size(); ++k)
                 {
+
+                    float distance = norm(reprojectedRays[pixelIndex].cross(volumePoints.at<Point3f>(k) - reprojectedOrigin));
+                    if (distance > norm(volumeParams.step))
+                    {
+                        continue;
+                    }
+
                     if (pointPolygonTest(convexHulls[k], Point(j, i), false) >= 0)
                     {
                         intersectedVoxelsIndices.push_back(k);
@@ -129,7 +159,7 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
 
                 if (mask.at<uchar>(i, j) == 0)
                 {
-                    for (int &voxelIndex : intersectedVoxelsIndices)
+                    for (const int &voxelIndex : intersectedVoxelsIndices)
                     {
                         Constraint constraint;
                         constraint.coefficients[pixelVariableILPIndex] = 1;
@@ -142,7 +172,7 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
                 {
                     Constraint constraint;
                     constraint.coefficients[pixelVariableILPIndex] = 1;
-                    for (int &voxelIndex : intersectedVoxelsIndices)
+                    for (const int &voxelIndex : intersectedVoxelsIndices)
                     {
                         constraint.coefficients[voxelIndex] = -1;
                     }
@@ -468,6 +498,7 @@ void ILPProblem::readSolution(const std::string &solutionFilename)
     }
     else
     {
+        cout << "reading the solution..." << endl;
         string line;
         //skip the header
         std::getline(fin, line);
@@ -528,6 +559,8 @@ void ILPProblem::read(const std::string &problemInstanceFilename, const std::str
 void ILPProblem::getModel(std::vector<cv::Point3f> &model) const
 {
     model.clear();
+    cout << volumePoints.total() << " " << volumeVariables.size() << endl;
+    CV_Assert(volumePoints.total() == volumeVariables.size());
     for (size_t i = 0; i < volumePoints.total(); ++i)
     {
         //TODO: move up

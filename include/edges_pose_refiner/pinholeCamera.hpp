@@ -22,6 +22,7 @@ struct PinholeCamera
 
   cv::Point3f reprojectPoints(cv::Point2f point) const;
   void reprojectPoints(const std::vector<cv::Point2f> &points, std::vector<cv::Point3f> &rays) const;
+  void reprojectPoints(const std::vector<cv::Point2f> &points, std::vector<cv::Point3f> &rays, cv::Point3f &origin) const;
 
   cv::Point3f reprojectPointsOnTable(cv::Point2f point, const cv::Vec4f &tablePlane) const;
   void reprojectPointsOnTable(const std::vector<cv::Point2f> &points, const cv::Vec4f &tablePlane,
