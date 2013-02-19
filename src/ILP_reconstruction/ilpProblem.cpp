@@ -503,8 +503,6 @@ void ILPProblem::readSolution(const std::string &solutionFilename)
         //skip the header
         std::getline(fin, line);
         std::getline(fin, line);
-        size_t currentVolumeVariableIndex = 0;
-        size_t currentPixelVariableIndex = 0;
         while (std::getline(fin, line))
         {
             std::istringstream input(line);
@@ -512,37 +510,14 @@ void ILPProblem::readSolution(const std::string &solutionFilename)
             input >> variableName;
             int ilpIndex = atoi(variableName.substr(1, static_cast<int>(variableName.length()) - 1).c_str());
 
-            for (; currentVolumeVariableIndex < volumeVariables.size(); ++currentVolumeVariableIndex)
+            //TODO: support floating labels too
+            if (ilpIndex < volumeVariables.size())
             {
-                if (volumeVariables[currentVolumeVariableIndex].ilpIndex == ilpIndex)
-                {
-                    volumeVariables[currentVolumeVariableIndex].label = 1;
-                    ++currentVolumeVariableIndex;
-                    break;
-                }
-                else
-                {
-                    volumeVariables[currentVolumeVariableIndex].label = 0;
-                }
+                volumeVariables[ilpIndex].label = 1.0f;
             }
-
-            if (currentVolumeVariableIndex < volumeVariables.size())
+            else
             {
-                continue;
-            }
-
-            for (; currentPixelVariableIndex < pixelVariables.size(); ++currentPixelVariableIndex)
-            {
-                if (pixelVariables[currentPixelVariableIndex].ilpIndex == ilpIndex)
-                {
-                    pixelVariables[currentPixelVariableIndex].label = 1;
-                    ++currentPixelVariableIndex;
-                    break;
-                }
-                else
-                {
-                    pixelVariables[currentPixelVariableIndex].label = 0;
-                }
+                pixelVariables[ilpIndex - static_cast<int>(volumeVariables.size())].label = 1.0f;
             }
         }
     }

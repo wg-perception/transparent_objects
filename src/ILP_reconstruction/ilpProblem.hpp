@@ -30,6 +30,11 @@ struct VolumeVariable
     int ilpIndex;
     int volumeIndex;
     float label;
+
+    VolumeVariable()
+    {
+        label = 0.0f;
+    }
 };
 
 struct PixelVariable
@@ -38,6 +43,11 @@ struct PixelVariable
     int imageIndex;
     int x, y;
     float label;
+
+    PixelVariable()
+    {
+        label = 0.0f;
+    }
 };
 
 struct Constraint
