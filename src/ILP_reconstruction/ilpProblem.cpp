@@ -48,9 +48,28 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
     volumePoints_Vector = Mat(1, volumePoints.total(), CV_32FC3, volumePoints.data);
 }
 
+void getCubeCorners(cv::Point3f center, cv::Vec3f step, std::vector<cv::Point3f> &corners)
+{
+    corners.clear();
+    float dx = step[0] / 2;
+    float dy = step[1] / 2;
+    float dz = step[2] / 2;
+
+    //TODO: use a loop
+    corners.push_back(center + Point3f(-dx, -dy, -dz));
+    corners.push_back(center + Point3f(-dx, -dy, +dz));
+    corners.push_back(center + Point3f(-dx, +dy, -dz));
+    corners.push_back(center + Point3f(-dx, +dy, +dz));
+    corners.push_back(center + Point3f(+dx, -dy, -dz));
+    corners.push_back(center + Point3f(+dx, -dy, +dz));
+    corners.push_back(center + Point3f(+dx, +dy, -dz));
+    corners.push_back(center + Point3f(+dx, +dy, +dz));
+}
+
 #if 1
 ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_camera,
                        const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &allMasks)
+                       const std::vector<PoseRT> &allPoses, const std::vector<cv::Mat> &originalMasks)
 {
     volumeParams = _volumeParams;
     camera = _camera;
@@ -58,6 +77,34 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
 
     initializeVolume(volumePoints, volumeParams);
     volumePoints_Vector = Mat(1, volumePoints.total(), CV_32FC3, volumePoints.data);
+
+    //find desired image resolution
+    {
+        vector<Point3f> cube;
+        //TODO: move up
+        getCubeCorners(Point3f(0.0, 0.0, 1.0f), volumeParams.step, cube);
+        vector<Point2f> projectedCube;
+        camera.projectPoints(cube, PoseRT(), projectedCube);
+        vector<Point2f> hull;
+        convexHull(projectedCube, hull);
+        float area = contourArea(hull);
+        cout << "area: " << area << endl;
+
+        //TODO: move up
+        const float desiredArea = 4.0f;
+        scalingFactor = sqrt(desiredArea / area);
+        cout << "scaling: " << scalingFactor << endl;
+    }
+
+    vector<Mat> allMasks;
+    for (const Mat &mask : originalMasks)
+    {
+        Mat resizedMask;
+        resize(mask, resizedMask, Size(), scalingFactor, scalingFactor, INTER_NEAREST);
+        allMasks.push_back(resizedMask);
+    }
+    camera.resize(allMasks[0].size());
+
 
     for (size_t i = 0; i < volumePoints.total(); ++i)
     {
@@ -85,19 +132,7 @@ ILPProblem::ILPProblem(const VolumeParams &_volumeParams, const PinholeCamera &_
             Point3f pt = volumePoints_Vector.at<Point3f>(i);
 
             vector<Point3f> corners;
-
-            float dx = volumeParams.step[0] / 2;
-            float dy = volumeParams.step[1] / 2;
-            float dz = volumeParams.step[2] / 2;
-            //TODO: use a loop
-            corners.push_back(pt + Point3f(-dx, -dy, -dz));
-            corners.push_back(pt + Point3f(-dx, -dy, +dz));
-            corners.push_back(pt + Point3f(-dx, +dy, -dz));
-            corners.push_back(pt + Point3f(-dx, +dy, +dz));
-            corners.push_back(pt + Point3f(+dx, -dy, -dz));
-            corners.push_back(pt + Point3f(+dx, -dy, +dz));
-            corners.push_back(pt + Point3f(+dx, +dy, -dz));
-            corners.push_back(pt + Point3f(+dx, +dy, +dz));
+            getCubeCorners(pt, volumeParams.step, corners);
 
             vector<Point2f> projectedCorners;
             camera.projectPoints(corners, pose, projectedCorners);
@@ -292,6 +327,8 @@ void ILPProblem::write(const std::string &filename) const
     std::ofstream fout(filename.c_str());
     CV_Assert(fout.is_open());
 
+    fout << "Scaling factor:\n";
+    fout << scalingFactor << "\n";
     fout << "Volume params:\n";
     fout << volumeParams.minBound[0] << " " << volumeParams.minBound[1] << " " << volumeParams.minBound[2] << "\n";
     fout << volumeParams.maxBound[0] << " " << volumeParams.maxBound[1] << " " << volumeParams.maxBound[2] << "\n";
@@ -390,9 +427,11 @@ void ILPProblem::writeMPS(const std::string &filename) const
 }
 
 enum ReadingMode {READ_VOLUME_PARAMS, READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
+enum ReadingMode {READ_SCALING_FACTOR, READ_VOLUME_PARAMS, READ_PIXEL_VARIABLES, READ_VOLUME_VARIABLES, READ_CONSTRAINTS};
 
 void ILPProblem::readProblemFormulation(const std::string &problemInstanceFilename)
 {
+    const std::string scalingFactorTag = "Scaling factor:";
     const std::string volumeVariablesTag = "Volume variables: ";
     const std::string pixelVariablesTag = "Pixel variables: ";
     const std::string constraintsTag = "Constraints: ";
@@ -407,10 +446,20 @@ void ILPProblem::readProblemFormulation(const std::string &problemInstanceFilena
 
     int volumeVariablesCount, pixelVariablesCount, constraintsCount;
     std::string line;
-    ReadingMode mode = READ_VOLUME_PARAMS;
+    ReadingMode mode = READ_SCALING_FACTOR;
     while (std::getline(fin, line))
     {
         std::istringstream input(line);
+        if (mode == READ_SCALING_FACTOR)
+        {
+            if (line.find(scalingFactorTag) == string::npos)
+            {
+                input >> scalingFactor;
+                mode = READ_VOLUME_PARAMS;
+                continue;
+            }
+        }
+
         if (mode == READ_VOLUME_PARAMS)
         {
             if (line.find(volumeVariablesTag) != string::npos)
@@ -558,13 +607,15 @@ void ILPProblem::visualize(const std::vector<PoseRT> &allPoses, const std::vecto
     int currentPixelVariableIndex = 0;
     for (size_t imageIndex = 0; imageIndex < allMasks.size(); ++imageIndex)
     {
-        const Mat &mask = allMasks[imageIndex];
+        Mat mask;
+        resize(allMasks[imageIndex], mask, Size(), scalingFactor, scalingFactor, INTER_NEAREST);
         Mat visualization;
         cvtColor(mask, visualization, CV_GRAY2BGR);
         CV_Assert(mask.type() == CV_8UC1);
         const PoseRT &pose = allPoses[imageIndex];
 
         vector<Point2f> projectedVolume;
+        //TODO: do you need to resize the camera?
         camera.projectPoints(volumePoints_Vector, pose, projectedVolume);
         for (size_t i = 0; i < projectedVolume.size(); ++i)
         {
