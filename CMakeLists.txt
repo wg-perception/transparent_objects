@@ -52,3 +52,6 @@ if(BUILD_TEST)
   enable_testing()
   add_subdirectory(test)
 endif()  
+
+# add docs
+ecto_sphinx(${CMAKE_CURRENT_SOURCE_DIR}/doc/source doc)
