@@ -34,7 +34,6 @@ namespace transparent_objects
     void
     parameter_callback(const object_recognition_core::db::Documents & db_documents)
     {
-      std::cout << "detector: ParameterCallback" << std::endl;
       BOOST_FOREACH(const object_recognition_core::db::Document & document, db_documents)
           {
             transpod::PoseEstimator currentPoseEstimator;
@@ -51,7 +50,6 @@ namespace transparent_objects
     declare_params(tendrils& params)
     {
       object_recognition_core::db::bases::declare_params_impl(params);
-      std::cout << "detector: declare_params" << std::endl;
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
       params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
       params.declare(&TransparentObjectsDetector::object_db_, "object_db", "The DB parameters").required(true);
@@ -73,15 +71,12 @@ namespace transparent_objects
     configure(const tendrils& params, const tendrils& inputs, const tendrils& outputs)
     {
       configure_impl();
-      std::cout << "detector: configure" << std::endl;
       detector_ = new transpod::Detector;
-      std::cout << "detector: leaving configure" << std::endl;
     }
 
     int
     process(const tendrils& inputs, const tendrils& outputs)
     {
-      std::cout << "detector: process" << std::endl;
 #ifdef TRANSPARENT_DEBUG
       cv::FileStorage fs("input.xml", cv::FileStorage::READ);
       if (fs.isOpened())
