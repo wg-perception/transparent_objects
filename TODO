@@ -1,0 +1,3 @@
+1. Updating and improving documentation (e.g. writing a tutorial to convey ideas of the algorithm working). I plan to do this at some point before ICRA 2013.
+2. Optimization. I guess thorough optimization is not absolutely necessary in this project so I'm going to optimize just obvious bottlenecks before ICRA.
+3. Training on unpainted transparent objects. This is a big issue and the problem turned out to be much more complicated than I thought originally. I'm going to continue working on this myself and to solve it to some extent.
