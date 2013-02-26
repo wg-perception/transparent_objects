@@ -1,6 +1,6 @@
 <stack>
   <name>object_recognition_transparent_objects</name>
-  <version>0.3.11</version>
+  <version>0.3.13</version>
   <description>A technique to recognize and estimate poses of transparent objects</description>
   <author email="ilya.lysenkov@itseez.com">Ilya Lysenkov</author>
   <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
@@ -14,15 +14,13 @@
   <build_depends>ecto</build_depends>
   <build_depends>object_recognition_core</build_depends>
   <build_depends>openni-dev</build_depends>
+  <build_depends>opencv2</build_depends>
   <build_depends>pcl</build_depends>
-  <build_depends>roscpp</build_depends>
-  <build_depends>vision_opencv</build_depends>
 
   <depends>ecto</depends>
   <depends>ecto_opencv</depends>
   <depends>object_recognition_core</depends>
   <depends>openni-dev</depends>
+  <depends>opencv2</depends>
   <depends>pcl</depends>
-  <depends>roscpp</depends>
-  <depends>vision_opencv</depends>
 </stack>
