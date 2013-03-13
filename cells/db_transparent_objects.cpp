@@ -50,7 +50,7 @@ namespace object_recognition_core
     // Specializations for cv::FileNode
     template<>
     void
-    object_recognition_core::db::Document::get_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::DummyDocument::get_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
                                                                                    transpod::PoseEstimator &value) const
     {
       // Get the binary file
@@ -76,7 +76,7 @@ namespace object_recognition_core
 
     template<>
     void
-    object_recognition_core::db::Document::set_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
+    object_recognition_core::db::DummyDocument::set_attachment<transpod::PoseEstimator>(const AttachmentName &attachment_name,
                                                                                    const transpod::PoseEstimator &value)
     {
       // First write the class to a file

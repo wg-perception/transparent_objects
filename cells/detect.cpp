@@ -40,7 +40,7 @@ namespace transparent_objects
             // Load the detector for that class
             document.get_attachment<transpod::PoseEstimator>("detector", currentPoseEstimator);
 
-            std::string object_id = document.get_value<ObjectId>("object_id");
+            std::string object_id = document.get_field<ObjectId>("object_id");
             detector_->addTrainObject(object_id, currentPoseEstimator);
             printf("Loaded %s\n", object_id.c_str());
           }
