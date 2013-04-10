@@ -49,7 +49,7 @@ namespace transparent_objects
     static void
     declare_params(tendrils& params)
     {
-      object_recognition_core::db::bases::declare_params_impl(params);
+      object_recognition_core::db::bases::declare_params_impl(params, "TransparentObjects");
       params.declare(&TransparentObjectsDetector::registrationMaskFilename_, "registrationMaskFilename", "The filename of the registration mask.");
       params.declare(&TransparentObjectsDetector::visualize_, "visualize", "Visualize results", false);
       params.declare(&TransparentObjectsDetector::object_db_, "object_db", "The DB parameters").required(true);

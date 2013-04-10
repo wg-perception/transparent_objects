@@ -2,7 +2,7 @@
 
 #include <boost/foreach.hpp>
 #include <object_recognition_core/common/json.hpp>
-#include <object_recognition_core/db/db.h>
+#include <object_recognition_core/db/document.h>
 #include <fstream>
 
 #include "edges_pose_refiner/pinholeCamera.hpp"

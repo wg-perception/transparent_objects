@@ -36,7 +36,7 @@
 #ifndef DB_TRANSPARENT_OBJECTS_HPP_
 #define DB_TRANSPARENT_OBJECTS_HPP_
 
-#include <object_recognition_core/db/db.h>
+#include <object_recognition_core/db/document.h>
 
 #include <edges_pose_refiner/poseEstimator.hpp>
 
