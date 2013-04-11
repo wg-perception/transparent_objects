@@ -3,9 +3,9 @@
   <version>0.3.14</version>
   <description>A technique to recognize and estimate poses of transparent objects</description>
   <author email="ilya.lysenkov@itseez.com">Ilya Lysenkov</author>
-  <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
+  <author email="vincent.rabaud@gmail.com">Vincent Rabaud</author>
   <maintainer email="ilya.lysenkov@itseez.com">Ilya Lysenkov</maintainer>
-  <maintainer email="vrabaud@willowgarage.com">Vincent Rabaud</maintainer>
+  <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <license>BSD</license>
   <url>http://ecto.willowgarage.com</url>
 
