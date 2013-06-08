@@ -1,16 +1,18 @@
 source1:
-  type: ros_kinect
-  rgb_frame_id: '/camera_rgb_optical_frame'
+  type: RosKinect
+  module: object_recognition_ros.io
+  parameters:
+    rgb_frame_id: '/camera_rgb_optical_frame'
 
 sink1:
-  type: publisher
+  type: Publisher
+  module: object_recognition_ros.io
 
 pipeline1:
   type: 'Trainer'
   module: 'object_recognition_transparent_objects'
-  subtype: ''
-  sources: [1]
-  sinks: [1]
+  inputs: [1]
+  outputs: [1]
   parameters:
     db:
       type: 'CouchDB'
