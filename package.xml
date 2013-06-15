@@ -7,7 +7,7 @@
   <maintainer email="ilya.lysenkov@itseez.com">Ilya Lysenkov</maintainer>
   <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <license>BSD</license>
-  <url>http://ecto.willowgarage.com</url>
+  <url>http://wg-perception.github.io/transparent_objects</url>
 
   <build_depend>ecto</build_depend>
   <build_depend>object_recognition_core</build_depend>

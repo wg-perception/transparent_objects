@@ -8,7 +8,7 @@
   <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <license>BSD</license>
   <copyright>Willow Garage</copyright>
-  <url>http://ecto.willowgarage.com</url>
+  <url>http://wg-perception.github.io/transparent_objects</url>
 
   <build_depends>catkin</build_depends>
   <build_depends>ecto</build_depends>
