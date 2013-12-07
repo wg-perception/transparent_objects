@@ -6,23 +6,8 @@ find_package(PCL REQUIRED)
 find_package(catkin QUIET)
 
 if (catkin_FOUND)
-    if (${catkin_VERSION} VERSION_GREATER "0.5.28")
     find_package(catkin REQUIRED ecto ecto_opencv object_recognition_core opencv_candidate)
         catkin_package(INCLUDE_DIRS include)
-    else()
-        find_package(catkin REQUIRED opencv_candidate)
-        find_package(ecto REQUIRED)
-        find_package(ecto_opencv REQUIRED)
-        find_package(object_recognition_core REQUIRED)
-        catkin_stack()
-        catkin_project(object_recognition_transparent_objects
-                   INCLUDE_DIRS include
-        )
-        list(APPEND catkin_INCLUDE_DIRS ${ecto_INCLUDE_DIRS} ${object_recognition_core_INCLUDE_DIRS}
-                                        ${opencv_candidate_INCLUDE_DIRS}
-        )
-        list(APPEND catkin_LIBRARIES ${ecto_LIBRARIES} ${object_recognition_core_LIBRARIES} ${opencv_candidate_LIBRARIES})
-    endif()
 
     #install targets for all things python
     catkin_python_setup()

@@ -250,28 +250,9 @@ target_link_libraries(runDetectionOnDataset edges_pose_refiner)
 
 set(WITH_ROS FALSE)
 if (${WITH_ROS})
-
-if (${catkin_VERSION} VERSION_GREATER "0.5.28")
-    # Groovy case
     include_directories(${catkin_INCLUDE_DIRS})
-else()
-    # Fuerte case
-    include_directories(/opt/ros/fuerte/stacks/vision_opencv/cv_bridge/include/)
-endif()
 
     add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
-
-if (${catkin_VERSION} VERSION_GREATER "0.5.28")
-    # Groovy case
-else()
-    # Fuerte case
-    target_link_libraries(dumpBagFile /opt/ros/fuerte/lib/libmessage_filters.so
-                                      /opt/ros/fuerte/lib/librosbag.so
-                                      /opt/ros/fuerte/lib/libroscpp.so
-                                      /opt/ros/fuerte/lib/librostime.so
-                                      /opt/ros/fuerte/lib/libroscpp_serialization.so
-    )
-endif()
 
     target_link_libraries(dumpBagFile ${Boost_LIBRARIES}
                                       ${catkin_LIBRARIES}
