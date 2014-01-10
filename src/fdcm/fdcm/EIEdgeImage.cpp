@@ -79,7 +79,7 @@ void EIEdgeImage::Read(const char* fileName)
 {
 	FILE* fin=NULL;
 	fin = fopen(fileName, "r");
-	if(fileName==NULL)
+	if(fin==NULL)
 	{
 		cerr<<"[ERROR] Cannot read file "<<fileName<<"\n!!!";
 		exit(0);
