@@ -1,5 +1,5 @@
-Forthcoming
------------
+0.4.0 (2014-07-27)
+------------------
 * Fix check regarding whether the file is opened
 * drop Fuerte support
 * Contributors: Jordi Pages, Vincent Rabaud
