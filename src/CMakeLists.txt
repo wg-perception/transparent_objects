@@ -248,15 +248,12 @@ target_link_libraries(runDetectionOnDataset edges_pose_refiner)
 #add_executable(writeVideo apps/writeVideo.cpp)
 #target_link_libraries(writeVideo ${OpenCV_LIBRARIES})
 
-set(WITH_ROS FALSE)
-if (${WITH_ROS})
-    include_directories(${catkin_INCLUDE_DIRS})
+#if (${catkin_FOUND})
+#    add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
 
-    add_executable(dumpBagFile apps/bags/dumpBagFile.cpp)
-
-    target_link_libraries(dumpBagFile ${Boost_LIBRARIES}
-                                      ${catkin_LIBRARIES}
-                                      ${OpenCV_LIBRARIES}
-                                      ${PYTHON_LIBRARIES}
-    )
-endif()
+#    target_link_libraries(dumpBagFile ${Boost_LIBRARIES}
+#                                      ${catkin_LIBRARIES}
+#                                      ${OpenCV_LIBRARIES}
+#                                      ${PYTHON_LIBRARIES}
+#    )
+#endif()
