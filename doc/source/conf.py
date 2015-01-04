@@ -36,7 +36,6 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.graphviz']
 
 extensions += [
-              'catkin_sphinx.ShLexer',
               'ecto.sphinx.EctoCellDirective',
               'ecto.sphinx.EctoModuleDirective',
               'ecto.sphinx.EctoPlotDirective',
