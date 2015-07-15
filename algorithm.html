@@ -1,0 +1,154 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Algorithm Details &mdash; object_recognition_transparent_objects</title>
+    
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="object_recognition_transparent_objects" href="index.html" />
+    <link rel="next" title="Sample" href="sample.html" />
+    <link rel="prev" title="object_recognition_transparent_objects: Recognition of Transparent Objects" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="sample.html" title="Sample"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="object_recognition_transparent_objects: Recognition of Transparent Objects"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">object_recognition_transparent_objects</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Algorithm Details</a><ul>
+<li><a class="reference internal" href="#training">Training</a><ul>
+<li><a class="reference internal" href="#model-construction">Model Construction</a></li>
+<li><a class="reference internal" href="#silhouettes-generation">Silhouettes Generation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#testing">Testing</a><ul>
+<li><a class="reference internal" href="#test-silhouette-detection">Test Silhouette Detection</a></li>
+<li><a class="reference internal" href="#pose-estimation-estimate-rx-ry-rz-and-t">Pose Estimation(Estimate Rx, Ry, Rz and T)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">object_recognition_transparent_objects: Recognition of Transparent Objects</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="sample.html"
+                        title="next chapter">Sample</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/algorithm.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="algorithm-details">
+<h1>Algorithm Details<a class="headerlink" href="#algorithm-details" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="training">
+<h2>Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="model-construction">
+<h3>Model Construction<a class="headerlink" href="#model-construction" title="Permalink to this headline">¶</a></h3>
+<p>This algorithm needs a predefined 3D model of the transparent object you want to detect.
+So you need to provide your model, either by using KinectFusion to construct one or downloading from web.</p>
+</div>
+<div class="section" id="silhouettes-generation">
+<h3>Silhouettes Generation<a class="headerlink" href="#silhouettes-generation" title="Permalink to this headline">¶</a></h3>
+<p>Once you have the model, the training algorithm will rotate the 3D model in different viewpoint, and store the silhouette of each viewpoint in database.(The silhouettes are different in different viewpoints)
+This is because in testing stage, the test silhouette (the silhouette in the scene) can be matched to the silhouettes in database(training silhouettes). The best match provide hint about the pose of test silhouette.</p>
+</div>
+</div>
+<div class="section" id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="test-silhouette-detection">
+<h3>Test Silhouette Detection<a class="headerlink" href="#test-silhouette-detection" title="Permalink to this headline">¶</a></h3>
+<p>In testing stage, first the depth map from Kinect is used to search the candidate region of transparency. The idea is that transparent object cause NaN in depth map(black region in depth map), so the NaN region in depth map can be candidate of transparency.
+Once the candidate region are fetched, GrabCut is used to crop the test silhouette.</p>
+</div>
+<div class="section" id="pose-estimation-estimate-rx-ry-rz-and-t">
+<h3>Pose Estimation(Estimate Rx, Ry, Rz and T)<a class="headerlink" href="#pose-estimation-estimate-rx-ry-rz-and-t" title="Permalink to this headline">¶</a></h3>
+<p>The test silhouette is now at hand, it can be matched with the silhouettes in the database by first applying Proscrutes Analysis to find similarity transform of each training silhouette to test silhouette. (In this step, Rx&amp;Ry are computed)
+The next step is to find Rz and T by applying weak projection model. After this step, Rx, Ry, Rz and T of each training silhouette are all computed.
+Finally, Chamfer matching is used to score each training silhouette and a rough pose estimation can thus be computed.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="sample.html" title="Sample"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="object_recognition_transparent_objects: Recognition of Transparent Objects"
+             >previous</a> |</li>
+        <li><a href="index.html">object_recognition_transparent_objects</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013,  Willow Garage, Inc.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
+    </div>
+  </body>
+</html>
