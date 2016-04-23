@@ -18,6 +18,8 @@
 #include <opencv2/opencv.hpp>
 #include <boost/thread/thread.hpp>
 
+#include <vector>
+
 //#define VISUALIZE_TABLE_ESTIMATION
 
 //#define VISUALIZE_INITIAL_POSE_REFINEMENT
@@ -30,6 +32,7 @@
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::vector;
 
 namespace transpod
 {
@@ -37,7 +40,7 @@ namespace transpod
   {
     kinectCamera = _camera;
     params = _params;
-    ghTable = 0;
+    ghTable = cv::Ptr<GHTable>();
   }
 
   void PoseEstimator::setModel(const EdgeModel &_edgeModel)

@@ -12,9 +12,14 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+#include <string>
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 
 TODBaseImporter::TODBaseImporter()

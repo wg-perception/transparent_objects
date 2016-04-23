@@ -8,10 +8,13 @@
 #include "edges_pose_refiner/pinholeCamera.hpp"
 #include <opencv2/opencv.hpp>
 
+#include <vector>
+
 using namespace cv;
 
 using std::cout;
 using std::endl;
+using std::vector;
 
 PinholeCamera::PinholeCamera(const cv::Mat &_cameraMatrix, const cv::Mat &_distCoeffs, const PoseRT &_extrinsics, const cv::Size &_imageSize)
 {

@@ -14,6 +14,10 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <limits>
+#include <string>
+#include <vector>
+
 //#define VERBOSE
 //#define VISUALIZE
 //#define DEBUG_ORIENTATIONS
@@ -22,6 +26,8 @@
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 LocalPoseRefiner::LocalPoseRefiner(const EdgeModel &_edgeModel, const cv::Mat &_bgrImage, const cv::Mat &_edgesImage, const PinholeCamera &camera, const LocalPoseRefinerParams &_params)
 {
@@ -1159,9 +1165,7 @@ float LocalPoseRefiner::refineUsingSilhouette(PoseRT &pose_cam, bool usePoseGues
 
   if (finalJacobian != 0)
   {
-    CvMat cvJ = *(solver.J);
-    Mat J = &cvJ;
-    J.copyTo(*finalJacobian);
+    *finalJacobian = cv::cvarrToMat(&(*solver.J), true);
   }
 
   finishError = getError(err);

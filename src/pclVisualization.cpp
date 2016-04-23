@@ -12,9 +12,12 @@
 #include <boost/thread/thread.hpp>
 #endif
 
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::vector;
 
 #ifdef USE_3D_VISUALIZATION
 void publishPoints(const std::vector<cv::Point3f>& points, const boost::shared_ptr<pcl::visualization::PCLVisualizer> &viewer, cv::Scalar color, const std::string &title, const PoseRT &pose)

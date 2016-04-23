@@ -1,12 +1,16 @@
 #include <opencv2/opencv.hpp>
-#include <opencv2/legacy/legacy.hpp>
 
 #include "edges_pose_refiner/glassSegmentator.hpp"
 #include "edges_pose_refiner/utils.hpp"
 
+#include <string>
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 //#define VISUALIZE
 
@@ -99,73 +103,6 @@ void refineSegmentationByGrabCut(const Mat &bgrImage, const Mat &rawMask, Mat &r
   imshow("final GrabCut mask", refinedMask);
 #endif
 }
-
-void snakeImage(const Mat &image, vector<Point> &points)
-{
-  float alpha = 10.0f;
-  float beta = 30.0f;
-//  float gamma = 10000.0f;
-  float gamma = 10.0f;
-  const CvSize searchWindow = cvSize(15, 15);
-
-/*
-  vector<CvPoint> cvPoints(points.size());
-  for(size_t i = 0; i < points.size(); ++i)
-  {
-    cvPoints[i] = points[i];
-  }
-*/
-
-  vector<CvPoint> cvPoints;
-  for(size_t i = 0; i < points.size(); ++i)
-  {
-    if(i % 2 == 0)
-      cvPoints.push_back(points[i]);
-  }
-
-
-  Mat grayImage;
-  if(image.channels() == 3)
-  {
-    cvtColor(image, grayImage, CV_BGR2GRAY);
-  }
-  else
-  {
-    grayImage = image;
-  }
-
-  IplImage imageForSnake = grayImage;
-  cvSnakeImage(&imageForSnake, cvPoints.data(), cvPoints.size(), &alpha, &beta, &gamma, CV_VALUE, searchWindow, cvTermCriteria(CV_TERMCRIT_ITER, 1, 0.0), 1);
-
-
-  for (size_t i = 0; i < points.size(); ++i)
-  {
-    points[i] = cvPoints[i / 2];
-  }
-}
-
-void refineSegmentationBySnake(const Mat &bgrImage, const Mat &rawMask, Mat &refinedMask)
-{
-  refinedMask = Mat(rawMask.size(), CV_8UC1, Scalar(0));
-
-  Mat tmpRawMask = rawMask.clone();
-  vector<vector<Point> > contours;
-  findContours(tmpRawMask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-
-  for(size_t i = 0; i < contours.size(); ++i)
-  {
-    for(int j=0; j<10000; ++j)
-    {
-      Mat drawImage = bgrImage.clone();
-      drawContours(drawImage, contours, i, Scalar(0, 255, 0), 1);
-      imshow("snake", drawImage);
-      waitKey();
-
-      snakeImage(bgrImage, contours[i]);
-    }
-  }
-}
-
 
 void showGrabCutResults(const Mat &bgrImage, const Mat &mask, const string &title)
 {

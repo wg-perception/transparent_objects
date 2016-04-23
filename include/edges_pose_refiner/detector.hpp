@@ -11,6 +11,8 @@
 #include "edges_pose_refiner/poseEstimator.hpp"
 #include "edges_pose_refiner/glassSegmentator.hpp"
 
+#include <map>
+
 namespace transpod
 {
   struct PCLPlaneSegmentationParams

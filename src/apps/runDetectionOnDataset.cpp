@@ -11,10 +11,13 @@
 
 #include "edges_pose_refiner/tableSegmentation.hpp"
 
-#include <iomanip>
-#include <fstream>
 #include <omp.h>
 #include <sys/stat.h>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <string>
+#include <vector>
 
 //#define RUN_ONLY_SEGMENTATION
 
@@ -22,6 +25,8 @@ using namespace cv;
 using namespace transpod;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 int main(int argc, char *argv[])
 {
@@ -104,8 +109,7 @@ int main(int argc, char *argv[])
         dataImporter.importDepth(testImageIndex, depth);
         vector<Point3f> cloud;
 
-        TickMeter recognitionTime;
-        recognitionTime.start();
+        double recognitionTime = (double)getTickCount();
 
 #ifdef RUN_ONLY_SEGMENTATION
         cv::Vec4f tablePlane;
@@ -134,14 +138,14 @@ int main(int argc, char *argv[])
         catch(const cv::Exception &)
         {
         }
-        recognitionTime.stop();
+        recognitionTime = ((double)getTickCount() - recognitionTime)/getTickFrequency();
 
         std::stringstream statusMessage;
         const int imageIndexWidth = 5;
         const int precision = 3;
         const int timeWidth = precision + 4;
         statusMessage << "Proccessed image " << std::setw(imageIndexWidth) << testImageIndex <<
-                         " in " << std::fixed << std::setprecision(precision) << std::setw(timeWidth) << recognitionTime.getTimeSec() << " seconds" << endl;
+                         " in " << std::fixed << std::setprecision(precision) << std::setw(timeWidth) << recognitionTime << " seconds" << endl;
         statusMessage << "Object errors:";
         //TODO: for several objects print +inf if one of them was not detected
         for (size_t i = 0; i < posesQualities.size(); ++i)

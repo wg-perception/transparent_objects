@@ -15,11 +15,16 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <string>
+#include <vector>
+
 //#define VISUALIZE_DETECTION
 
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 namespace transpod
 {

@@ -46,6 +46,8 @@
 //#define DEBUG_CHAMFER_MATCHING
 //#define DEBUG_MEDIAN_CM
 
+#include <limits>
+
 #ifdef DEBUG_MEDIAN_CM
 #include <iostream>
 using std::cout;

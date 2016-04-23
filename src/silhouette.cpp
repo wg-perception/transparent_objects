@@ -10,9 +10,12 @@
 #include "edges_pose_refiner/edgeModel.hpp"
 #include <opencv2/opencv.hpp>
 
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::vector;
 
 //#define VISUALIZE_TRANSFORMS
 

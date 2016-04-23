@@ -12,9 +12,12 @@
 #include <boost/thread/thread.hpp>
 #endif
 
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::vector;
 
 //#define VISUALIZE_ALL_GENERATED_SILHOUETTES
 //#define VISUALIZE_SILHOUETTE_GENERATION

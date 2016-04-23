@@ -5,6 +5,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <limits>
+
 using namespace cv;
 
 void cv2fdcm(const Mat &cvImage, Ptr<Image<uchar> > &fdcmImage)

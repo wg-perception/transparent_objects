@@ -179,10 +179,17 @@ void detectFiducial(const cv::Mat &bgrImage, cv::Mat &blackBlobs, cv::Mat &white
 //  params.minDistBetweenBlobs = 3;
 
   params.blobColor = 0;
+#if CV_MAJOR_VERSION ==2
   Ptr<FeatureDetector> blackBlobDetector = new SimpleBlobDetector(params);
 
   params.blobColor = 255;
   Ptr<FeatureDetector> whiteBlobDetector = new SimpleBlobDetector(params);
+#else
+  Ptr<FeatureDetector> blackBlobDetector = cv::SimpleBlobDetector::create(params);
+
+  params.blobColor = 255;
+  Ptr<FeatureDetector> whiteBlobDetector = cv::SimpleBlobDetector::create(params);
+#endif
 
   bool isBlackFound = findCirclesGrid(bgrImage, boardSize, blackBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, blackBlobDetector);
   bool isWhiteFound = findCirclesGrid(bgrImage, boardSize, whiteBlobs, CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING, whiteBlobDetector);
@@ -305,7 +312,11 @@ void publishTable(const Vec4f &tablePlane, int id, Scalar color, ros::Publisher 
 void writePointCloud(const string &filename, const std::vector<cv::Point3f> &pointCloud)
 {
   std::ofstream fout(filename.c_str());
-  fout << format(Mat(pointCloud), "csv");
+#if CV_MAJOR_VERSION == 2
+  fout << cv::format(Mat(pointCloud), "csv");
+#else
+  fout << cv::format(Mat(pointCloud), cv::Formatter::FMT_CSV);
+#endif
   fout.close();
 }
 
@@ -542,7 +553,7 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
   computeEdgeOrientations(edge_clone, orientation_img, testM);
   cvReleaseImage(&edge_clone);
 
-  Mat orientation_img_mat(orientation_img);
+  Mat orientation_img_mat(cvarrToMat(orientation_img));
   CV_Assert(orientation_img_mat.type() == CV_32FC1);
   for (int i = 0; i < orientation_img_mat.rows; ++i)
   {
@@ -563,7 +574,7 @@ void computeOrientations(const cv::Mat &edges, cv::Mat &orientationsImage)
 
   fillNonContourOrientations(annotated_img, orientation_img);
 
-  orientationsImage = Mat(orientation_img).clone();
+  orientationsImage = cvarrToMat(orientation_img, true);
 
 #ifdef OCM_VISUALIZE
   Mat orView = min(orientationImage, CV_PI - orientationImage);

@@ -2,8 +2,13 @@
 #include "edges_pose_refiner/detector.hpp"
 #include "edges_pose_refiner/TODBaseImporter.hpp"
 
+#include <string>
+#include <vector>
+
 using namespace cv;
 using namespace transpod;
+using std::string;
+using std::vector;
 
 void readData(const string &pathToDemoData, PinholeCamera &camera,
               Mat &objectPointCloud_1, Mat &objectNormals_1, Mat &objectPointCloud_2, Mat &objectNormals_2,

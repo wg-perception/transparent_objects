@@ -19,12 +19,22 @@
 #define USE_RGBD_MODULE
 
 #ifdef USE_RGBD_MODULE
+#if CV_MAJOR_VERSION == 2
 #include <opencv2/rgbd/rgbd.hpp>
+#else
+#include <opencv2/rgbd.hpp>
+using namespace cv::rgbd;
 #endif
+#endif
+
+#include <string>
+#include <vector>
 
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::string;
+using std::vector;
 
 bool computeTableOrientationByPCL(float downLeafSize, int kSearch, float distanceThreshold, const std::vector<cv::Point3f> &cvFullSceneCloud,
                                   cv::Vec4f &tablePlane, const PinholeCamera *camera, std::vector<cv::Point2f> *tableHull, float clusterTolerance, cv::Point3f verticalDirection)

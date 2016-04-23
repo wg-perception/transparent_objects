@@ -8,9 +8,12 @@
 #include "edges_pose_refiner/poseError.hpp"
 #include <opencv2/opencv.hpp>
 
+#include <vector>
+
 using namespace cv;
 using std::cout;
 using std::endl;
+using std::vector;
 
 PoseRT PoseError::getPosesDifference() const
 {
