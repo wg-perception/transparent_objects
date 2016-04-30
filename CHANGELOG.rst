@@ -1,3 +1,8 @@
+Forthcoming
+-----------
+* add proj as a dependency
+* Contributors: Vincent Rabaud
+
 0.4.1 (2016-04-30)
 ------------------
 * get code to compile on Xenial
