@@ -1,5 +1,5 @@
-Forthcoming
------------
+0.4.2 (2016-04-30)
+------------------
 * add proj as a dependency
 * Contributors: Vincent Rabaud
 
