@@ -1,3 +1,11 @@
+Forthcoming
+-----------
+* get code to compile on Xenial
+* add explanation for algorithm
+* clean extensions
+* cleanup CMake a bit
+* Contributors: Jordi Pages, Po-Jen Lai, Vincent Rabaud
+
 0.4.0 (2014-07-27)
 ------------------
 * Fix check regarding whether the file is opened
