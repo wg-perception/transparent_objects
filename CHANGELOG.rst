@@ -1,5 +1,5 @@
-Forthcoming
------------
+0.4.1 (2016-04-30)
+------------------
 * get code to compile on Xenial
 * add explanation for algorithm
 * clean extensions
