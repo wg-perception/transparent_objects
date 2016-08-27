@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
 
         return -1;
     }
-    std::system("date");
 
     bool isNumberOfThreadsPassed = strcmp(argv[1], "-j") == 0;
     const int numberOfThreads = isNumberOfThreadsPassed ? atoi(argv[2]) : 1;
@@ -201,6 +200,5 @@ int main(int argc, char *argv[])
         fout.close();
     }
 
-    std::system("date");
     return 0;
 }

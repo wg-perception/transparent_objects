@@ -19,8 +19,6 @@ using std::endl;
 
 int main(int argc, char *argv[])
 {
-  std::system("date");
-
   srand(42);
   RNG &rng = theRNG();
   rng.state = 0xffffffff;
@@ -180,6 +178,5 @@ int main(int argc, char *argv[])
   detector.visualize(poses_cam, detectedObjectsNames, testPointCloud);
 #endif
 
-  std::system("date");
   return 0;
 }
