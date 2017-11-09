@@ -1,3 +1,9 @@
+Forthcoming
+-----------
+* fix compilation with OpenCV 3.3.1
+* remove date that triggers warnings
+* Contributors: Vincent Rabaud
+
 0.4.2 (2016-04-30)
 ------------------
 * add proj as a dependency
