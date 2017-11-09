@@ -1,5 +1,5 @@
-Forthcoming
------------
+0.4.3 (2017-11-09)
+------------------
 * fix compilation with OpenCV 3.3.1
 * remove date that triggers warnings
 * Contributors: Vincent Rabaud
