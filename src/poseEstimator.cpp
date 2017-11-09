@@ -1106,7 +1106,6 @@ namespace transpod
 */
 
     Mat hash_table(ghTable->size(), GH_KEY_DIMENSION + GHValue::channels, CV_32SC1);
-    CV_Assert(GHValue::depth == CV_32S);
     int elementIndex = 0;
     for (GHTable::const_iterator it = ghTable->begin(); it != ghTable->end(); ++it, ++elementIndex)
     {
